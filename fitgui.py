@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.4 2005/01/06 18:45:12 jsy1001 Exp $
+# $Id: fitgui.py,v 1.5 2005/01/07 11:38:05 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.4 $")[1]
+_revision = string.split("$Revision: 1.5 $")[1]
 
 
 class GUI:
@@ -197,7 +197,7 @@ class GUI:
             parent=self.parent,
             initialdir=self.initialdir,
             title='Choose data file for fit',
-            filetypes=[('(OI-)FITS files','*.fits'), ('COAST Mapping Data files', '*.mapdat'),
+            filetypes=[('(OI-)FITS files','*fits'), ('COAST Mapping Data files', '*.mapdat'),
                        ('All files','*')])
         if newName != '': self.fileName.set(newName)
 
