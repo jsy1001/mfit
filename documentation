@@ -209,8 +209,8 @@ Posterior, Goodness-of-fit
 ==========================
 
 At the solution position the (unnormalised) negative log posterior is given
-(i.e. it is sum of the negative log prior and negative log likelihood without
-the addition of the negative log evidence). The chi squared value is also
+(i.e. the sum of the negative log prior and negative log likelihood without
+the subtraction of the negative log evidence). The chi squared value is also
 reported:
 
      chi sqrd = sum { ( (data-model)/(error in data) )^2 }
@@ -254,28 +254,38 @@ The "hessian-based error" of a parameter is the square root of the variance in
 the quantity.
 
 
+Model selection
+===============
+
+An approximation to the negative log evidence is also reported:
+
+-log(posterior) - N/2 log(2pi) + 1/2 log(det(H))
+
+where N is the number of model parameters varied. This expression is only valid
+if the posterior pdf is unimodal, and the peak in the posterior can be
+approximated by a Gaussian.
+
+
 Plotting
 ========
 
 After each fit, the V^2 data points and the best-fit model values are plotted
-against projected baseline length. The model values are calculated for
-baselines oriented east-west.
+against projected baseline length. The triple product amplitudes and phases are
+plotted against the longest projected baseline in the triangle. Flagged points
+are shown in red. If all points of a particular data type are flagged, or there
+is no data of that type, the plot is skipped.
 
 
 Known deficiencies
 ==================
 
-Other plot choices, and the ability to change the output device, should be
-added. Flagged points should be ignored.
+Other plot choices should be added.
 
 Mfit doesn't cope with pathnames containing more than a single dot (assumed to
 separate the extension from the rest of the pathname).
 
-Wavebands with the same lambda but different delta(lambda) are not
-distinguished in mapdat files.
 
-
-$Id: documentation,v 1.5 2003/02/17 13:20:02 jsy1001 Exp $
+$Id: documentation,v 1.6 2003/05/29 12:40:52 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

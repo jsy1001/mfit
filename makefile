@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.9 2003/02/17 13:20:02 jsy1001 Exp $
+# $Id: makefile,v 1.10 2003/05/29 12:40:52 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -46,7 +46,7 @@ visibility.mod: visibility.f90 maths.mod
 inout.mod: inout.f90
 	$(F90) -c $(FFLAGC) inout.f90
 
-plot.mod: plot.f90
+plot.mod: plot.f90 model.mod fit.mod
 	$(F90) -c $(FFLAGC) plot.f90
 
 model.mod: model.f90

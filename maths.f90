@@ -6,7 +6,8 @@ module Maths
 !                         with real argument x and
 !                         orders nu, nu+1 ... nu+(n-1)
 !                         NB 0 <= nu < 1
-!inv_mat(A) - returns the inverse of matrix A
+!inv_mat(A) - inverts the matrix A
+!invdet_mat(A, det) - inverts the matrix A, also calculates determinant
 !laguerre(n,x, output) - returns real array of laguerre polynomial values for
 !                        argument x. Returns polynomials of order 0 up to n.
 !                        Returned array is double precision with elements 0:n
@@ -89,6 +90,40 @@ subroutine inv_mat(A)
   deallocate(work)
       
 end subroutine inv_mat
+
+!==============================================================================
+
+subroutine invdet_mat(A, det)
+
+  !inverts matrix A in situ, also calculates determinant
+
+  !subroutine arguments
+  double precision, dimension(:,:) :: A
+  double precision, intent(out) :: det
+
+  !local variables
+  integer :: ifail
+  integer, dimension(:), allocatable :: ipvt
+  double precision, dimension(:), allocatable :: work
+  double precision, dimension(2) :: det0
+
+  ifail = 0
+  allocate(ipvt(size(A, 2)))
+  allocate(work(size(A, 2)))
+
+  call PDA_DGEFA(A, size(A, 1), size(A, 2), ipvt, ifail)
+  if ( ifail .ne. 0 ) then
+     stop 'maths error: inv_mat: zero-valued element in factorisation; cannot invert matrix'
+  else
+     call PDA_DGEDI(A, size(A, 1), size(A, 2), ipvt, det0, work, 11)
+     det = det0(1) * 10.0**det0(2)
+  end if
+
+  !clean up
+  deallocate(ipvt)
+  deallocate(work)
+      
+end subroutine invdet_mat
 
 !==============================================================================
 

@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.7 2003/02/17 13:20:02 jsy1001 Exp $
+!$Id: fit.f90,v 1.8 2003/05/29 12:40:52 jsy1001 Exp $
 
 module Fit
 
@@ -12,10 +12,6 @@ module Fit
 !
 !local subroutines contained
 !
-!simplex - downhill simplex method minimisation based on numerical 
-!          recipies amoeba code
-!extrap - extrapolation of new simplex vertex position based on
-!         numerical recipies amotry code
 !posterior - returns negative log posterior of model and data
 
 use Maths
@@ -46,7 +42,7 @@ contains
 !==============================================================================
   
   subroutine minimiser(info, force_symm, sol, flag, desc, &
-       hes, cov, cor, chisqrd, nlposterior)
+       hes, cov, cor, chisqrd, nlposterior, nlevidence)
 
     !On exit, flag holds success state of the minimisation:
     ! flag =  0:  Optimal solution found
@@ -69,7 +65,7 @@ contains
     character(len=128), intent(out) :: info
     character(len=35), dimension(:), allocatable, intent(out) :: desc
     double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
-    double precision, intent(out) :: nlposterior, chisqrd
+    double precision, intent(out) :: chisqrd, nlposterior, nlevidence
     integer, intent(out) :: flag
     logical, intent(in) :: force_symm
 
@@ -77,7 +73,7 @@ contains
     integer :: i, j, k, n, lwork
     character(len=128) :: name, comp
     character(len=2), dimension(10) :: numbers
-    double precision :: P, Pl, Pu, Pi, Pj, deltai, deltaj, eta, diff
+    double precision :: P, Pl, Pu, Pi, Pj, deltai, deltaj, eta, diff, det
     double precision, dimension(:), allocatable ::  x, temp_x, work
     logical :: illegal
 
@@ -307,9 +303,9 @@ contains
        end do
     end do
 
-    !calculate covariance matrix is (inverse of the hessian)
+    !calculate covariance matrix (is inverse of the hessian)
     cov = hes
-    call inv_mat(cov) !inversion
+    call invdet_mat(cov, det) !inversion - also calculate determinant
 
     !calculate correlation matrix
     !correlation defined as: corr(x,y) = cov(x,y) / sqroot(var(x)*var(y))
@@ -337,6 +333,14 @@ contains
 
     !calculate goodness-of-fit statistic chi squared
     call gof(chisqrd)
+
+    !estimate -log(evidence)
+    !if det -ve returns zero
+    if (det > 0) then
+       nlevidence = nlposterior - 0.5D0*n*log(2D0*pi) + 0.5D0*log(det)
+    else
+       nlevidence = 0D0
+    end if
 
     !clean-up and return
 200 continue
@@ -558,17 +562,19 @@ do i = 1, size(triple_data,1)
       model_phase = rad2deg*argument(vis)
    end if
 
-   !compute likelihood contributions
+   !compute normalised likelihood contributions
    !nb phase calculations modulo 360 degrees
    if (data_amp_err>0D0) then
       likelihood = likelihood + &
-           (((data_amp-model_amp)**2D0)/(2D0*(data_amp_err**2D0)))
+           (((data_amp-model_amp)**2D0)/(2D0*(data_amp_err**2D0))) + &
+           log(data_amp_err*sqrt(2D0*pi))
    end if
    if (data_phase_err>0D0) then
       likelihood = likelihood + &
-           (((modx(data_phase,model_phase))**2D0)/(2D0*(data_phase_err**2D0)))
+           (((modx(data_phase,model_phase))**2D0)/(2D0*(data_phase_err**2D0))) + &
+           log(data_phase_err*sqrt(2D0*pi))
    end if
-   end do
+end do
 
 end function likelihood
 
@@ -596,8 +602,8 @@ do i = 1, size(x_pos,1)
    err = model_prior(x_pos(i,1),x_pos(i,2)) !parameter prior width
    value = x(i) !parameter current value as it is varied
 
-   !calculate contribution to the prior
-   prior = prior + (((value-value0)**2D0)/(2D0*(err**2D0)))
+   !calculate normalised contribution to the prior
+   prior = prior + (((value-value0)**2D0)/(2D0*(err**2D0))) + log(err*sqrt(2D0*pi))
 
 end do
 

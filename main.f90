@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.8 2003/05/28 14:42:53 jsy1001 Exp $
+!$Id: main.f90,v 1.9 2003/05/29 12:40:52 jsy1001 Exp $
 
 program Main
 
@@ -30,7 +30,7 @@ program Main
   character(len=128) :: info, file_name, ext, source, top_title, xrange
   integer :: i, j, length, flag, degfreedom
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
-  double precision :: nlposterior, chisqrd, normchisqrd
+  double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
   double precision :: version, calib_error, uxmin, uxmax
   logical :: force_symm
 
@@ -296,7 +296,7 @@ program Main
      info = ''
      ! minimiser allocates fit_param, x, x_pos, sol, desc, hes, cov, cor
      call minimiser(info, symm, sol, flag, desc, &
-          hes, cov, cor, chisqrd, nlposterior)
+          hes, cov, cor, chisqrd, nlposterior, nlevidence)
      if (info /= '') then
         print *,'*****'
         print *,trim(info)
@@ -309,6 +309,7 @@ program Main
 
         print *, ' '
         print *, 'negative log posterior =',real(nlposterior)
+        print *, 'negative log evidence  =',real(nlevidence)
         print *, ' '
         print *, '           chi squared =',real(chisqrd) 
         print *, '    degrees of freedom =',degfreedom
