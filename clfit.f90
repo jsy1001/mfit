@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.8 2004/01/28 12:26:04 jsy1001 Exp $
+!$Id: clfit.f90,v 1.9 2004/02/13 16:50:57 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.8 $'
+  cvs_rev = '$Revision: 1.9 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -251,9 +251,9 @@ program Main
   print *, trim(ext),' file triple product data for ',trim(source),':'
   print *, ' '
   print *, '  wave  band                baseline triangle coords', &
-       '                  triple product'
+       '                      triple product'
   print *, 'length width        u1        v1        u2        v2', &
-       '  amplitude     error  phase err'
+       '  amplitude     error   phase    err'
   print *, '  (nm)  (nm)       (m)       (m)       (m)       (m)'
   do i = 1, size(triple_data,1)
      write(*,61) triple_data(i,:)
@@ -401,6 +401,18 @@ program Main
            write(*,62) i, desc(i), sol(i,:)
         end do
 62      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6) 
+
+        ! Display alternative error bars for fitted parameters
+        ! Estimates assuming data errors scaled so chi sqrd/deg freedom = unity
+        print *, ' '
+        print *, 'SCALED DATA ERRORS ->                             ', &
+             'fitted      hessian'
+        print *, '  num  parameter name                             ', &
+             ' value        error'
+        do i = 1, size(sol,1)
+           write(*,63) i, desc(i), sol(i,1), sqrt(normchisqrd)*sol(i,2)
+        end do
+63      format('  *(', i2, ') ', A35, 1x, f13.6, 1x, f12.6, '*') 
 
         length = size(hes,1)
         print *, ' '
