@@ -32,10 +32,9 @@ function cmplx_vis(spec, param, lambda, u, v)
   !the model_spec and model_param arrays.
   
   !subroutine arguments
-  character(len=128) :: info, source
-  character(len=128), dimension(:,:), allocatable :: spec
-  double precision, dimension(:,:), allocatable :: param
-  double precision :: lambda, u, v
+  character(len=128), dimension(:,:), intent(in) :: spec
+  double precision, dimension(:,:), intent(in) :: param
+  double precision, intent(in) :: lambda, u, v
   double complex :: cmplx_vis
   
   !local variables

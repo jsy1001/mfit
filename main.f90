@@ -4,6 +4,7 @@ program Main
   use Plot
   use Visibility
   use Fit
+  use Model
 
   implicit none
 
@@ -12,26 +13,19 @@ program Main
 
   !parameters
   !pi, deg/rad conversions all picked up from Maths module
-  integer, parameter :: max_lines = 1000
+  integer, parameter :: max_lines = 1000 ! max. lines in data file
 
-  !data arrays
-  double precision, dimension(:,:), allocatable :: vis_data
-  double precision, dimension(:,:), allocatable :: triple_data
+  !arrays for manipulating data
   double precision, dimension(:,:), allocatable :: swap
   double precision, dimension(:), allocatable :: wavebands
   logical, dimension(:), allocatable :: keep
 
-  !original model arrays
-  character(len=128), dimension(:,:), allocatable :: model_spec
-  double precision, dimension(:,:), allocatable :: model_param
-  double precision, dimension(:,:), allocatable :: model_prior
-  double precision, dimension(17,2) :: limits
-
-  !fitting arrays
-  double precision, dimension(:,:), allocatable :: fit_param
-  double precision, dimension(:,:), allocatable :: model_vis_data
+  !arrays for fit results
   character(len=35), dimension(:), allocatable :: var
   double precision, dimension(:,:), allocatable :: sol, hes, cov, cor
+
+  !arrays for plotting
+  double precision, dimension(:,:), allocatable :: model_vis_data
 
   !variables
   integer, parameter :: char=80 !for spacer lines
@@ -39,7 +33,7 @@ program Main
   character(len=128) :: info, file_name, ext, source, x_title, y_title
   integer :: i, j, length, flag, degfreedom
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
-  double precision :: nlposterior, nlevidence, chisqrd, sumsqr, normchisqrd
+  double precision :: nlposterior, chisqrd, sumsqr, normchisqrd
   double precision :: version, lambda, u1, v1, u2, v2, step, calib_error, cp
   double complex :: W1, W2, W3, T
   logical :: symm
@@ -120,8 +114,8 @@ program Main
         !data arrays in case multi-waveband functionality is added later
 
         !read_mapdat allocates vis_data, triple_data, and wavebands
-        call read_mapdat(info, file_name, max_lines, vis_data, triple_data, &
-             wavebands, calib_error)
+        call read_mapdat(info, file_name, source, max_lines, &
+             vis_data, triple_data, wavebands, calib_error)
         symm = .false.
 
         !Filter here to reduce vis and triple data to single waveband, selected
@@ -238,7 +232,7 @@ program Main
 
   print *,'...done'
   print *,' '
-  print *,trim(ext),' file visibility data for',source,':'
+  print *,trim(ext),' file visibility data for ',trim(source),':'
 
   print *,' '
   print *,'  wave   baseline coords     sqrd      abs'
@@ -250,7 +244,7 @@ program Main
 60 format(f7.1, 1x, f8.4, 1x, f8.4, 1x, f8.5, 1x, f8.5)
 
   print *,' '
-  print *,trim(ext),' file triple product data for',source,':'
+  print *,trim(ext),' file triple product data for ',trim(source),':'
   print *,' '
   print *,'  wave            baseline triangle coords', &
        '                        triple product'
@@ -275,15 +269,15 @@ program Main
   print *,spacer_line
 
   ! allow repeated model fits to same data
-  model: do
+  model_loop: do
 
      !-------------------------------------------------------------------------
      !Read model data
      !
      !Model file describing model as per documentation is read in.
      !Checks are made to ensure parameters lie within acceptable ranges
-     !(defined by the limits array), the same limits are used later in the
-     !simplex fitting routines (refer to them).
+     !(defined by the model_limits array), the same limits are used later in
+     !the fitting routines (refer to them).
      !Free parameters should be supplied with (non zero and positive) prior
      !widths which are the 1-sigma width of the gaussian prior
      !distributions as per DB thesis chapter 2.
@@ -294,37 +288,19 @@ program Main
         print *,' '
         print *,'enter model filename in current directory (or [return] to exit)'
         read (*,'(a)') file_name
-        if (file_name == '') exit model
+        if (file_name == '') exit model_loop
         print *,' '
         print *,'reading model...'
         info = ''
-        ! allocates model_spec, model_param, model_prior
-        call read_model(info, file_name, source, max_lines, &
-             model_spec, model_param, model_prior, limits)
+        call read_model(info, file_name)
         if (info == '') exit
         print *, info
      end do
 
      print *,'...done'
      print *,' '
-     print *,'model data:'
-     do i = 1, size(model_param,1)
-        print *,' '
-        print *,'component:',i
-        print *,'name     : ',trim(model_spec(i,1))
-        print *,'LD type  : ',trim(model_spec(i,3)), &
-             ' of order',int(model_param(i,1))
-        print *,'shape    : ',trim(model_spec(i,2))
-        print *,'position :',real(model_param(i,2:3))
-        print *,'    prior:',real(model_prior(i,2:3))
-        print *,'flux     :',real(model_param(i,4))
-        print *,'    prior:',real(model_prior(i,4))
-        print *,'shape par:',real(model_param(i,5:7))
-        print *,'    prior:',real(model_prior(i,5:7))
-        print *,'LD params:',real(model_param(i,8:17))
-        print *,'    prior:',real(model_prior(i,8:17))
-     end do
-
+     print *,'model details:'
+     call print_model()
      print *,' '
      print *,spacer_line
 
@@ -338,9 +314,8 @@ program Main
      print *,'fitting model by minimising negative log posterior...'
 
      info = ''
-     ! minimiser allocates fit_param, sol, var, hes, cov, cor
-     call minimiser(info, model_spec, model_param, model_prior, limits, &
-          fit_param, vis_data, triple_data, symm, sol, flag, var, &
+     ! minimiser allocates fit_param, x, x_pos, sol, var, hes, cov, cor
+     call minimiser(info, symm, sol, flag, var, &
           hes, cov, cor, chisqrd, sumsqr, nlposterior)
      if (info /= '') then
         print *,info
@@ -355,14 +330,14 @@ program Main
         case(1)
            print *,'...done'
            print *,' '
-           print *,'maximisation suceeded but have obtained invalid negative values'
+           print *,'minimisation suceeded but have obtained invalid negative values'
            print *,'for some/all diagonal elements of covariance matrix,'
            print *,'some/all correlation matrix elements are invalid,'
            print *,'some/all hessian-based error estimates are not possible'
         case(2)
            print *,'...done'
            print *,' '
-           print *,'maximisation suceeded with valid hessian, covariance and '
+           print *,'minimisation suceeded with valid hessian, covariance and '
            print *,'correlation matrices available at solution'
         end select
 
@@ -441,7 +416,6 @@ program Main
            W3 = cmplx_vis(model_spec, model_param, lambda, -(u1+u2), -(v1+v2))
            T = W1*w2*w3
            cp = rad2deg*argument(T)
-           print *,u1,v1,u2,v2,cp,triple_data(i,8)
         end do
 
         allocate(model_vis_data(1000, 5))
@@ -460,24 +434,22 @@ program Main
 
         info = ''
         call plot_vis_data(info, vis_data, model_vis_data, &
-             lambda, x_title, y_title, source)
+             lambda, x_title, y_title, (trim(source)//': '//trim(model_name)))
         deallocate(model_vis_data)
         if (info /= '') print *,info
      end if
 
      !-------------------------------------------------------------------------
      !Deallocate model/fitting storage
-     if (allocated(model_spec)) deallocate(model_spec)
-     if (allocated(model_param)) deallocate(model_param)
-     if (allocated(model_prior)) deallocate(model_prior)
-     if (allocated(fit_param)) deallocate(fit_param)
+     call free_model() !model_*
+     call free_fit() !fit_param, x_pos, x_info
      if (allocated(var)) deallocate(var)
      if (allocated(sol)) deallocate(sol)
      if (allocated(hes)) deallocate(hes)
      if (allocated(cov)) deallocate(cov)
      if (allocated(cor)) deallocate(cor)
 
-  end do model
+  end do model_loop
 
   !----------------------------------------------------------------------------
   !Deallocate data storage

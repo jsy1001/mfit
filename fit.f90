@@ -5,6 +5,8 @@ module Fit
 !minimiser - wrapper to the minimising routine. this subroutine preps
 !            the arrays into true parameter space and fixed model space
 !            before calling the actual minimising alogrithm
+!likelihood - returns negative log likelihood of data given data, model
+!prior - returns negative log prior given model 
 !
 !local subroutines contained
 !
@@ -13,20 +15,35 @@ module Fit
 !extrap - extrapolation of new simplex vertex position based on
 !         numerical recipies amotry code
 !posterior - returns negative log posterior of model and data
-!likelihood - returns negative log likelihood of data given model
-!prior - returns negative log prior of current model 
 
 use Maths
 use Visibility
+use Model
 
 implicit none
+
+!module variables contained:
+
+!data arrays
+double precision, dimension(:,:), allocatable :: vis_data, triple_data
+
+!storage for model parameters (both variable and non-variable) during fit
+double precision, dimension(:,:), allocatable :: fit_param
+
+!positions of variable parameters in model_param and fit_param arrays
+integer, dimension(:,:), allocatable :: x_pos
+
+!1st column is of typical length scales for variables and set equal to the
+!prior width. 2nd and 3rd columns hold lower and upper bounds on the
+!value of the parameter in question - used to prevent negative/other illegal
+!values causing problems (esp in visibility calculations)
+double precision, dimension(:,:), allocatable :: x_info
 
 contains
 
 !==============================================================================
 
-subroutine minimiser(info, model_spec, model_param, model_prior, limits, &
-                     fit_param, vis_data, triple_data, symm, sol, flag, var, &
+subroutine minimiser(info, symm, sol, flag, var, &
                      hes, cov, cor, chisqrd, sumsqr, nlposterior)
 
 !returns the fit_param array of best fitting model parameters to the data
@@ -38,17 +55,12 @@ subroutine minimiser(info, model_spec, model_param, model_prior, limits, &
 !symm is a logical that forces centrosymmetric only models
 
 !subroutine arguments
-character(len=128) :: info
-character(len=128), dimension(:,:), allocatable :: model_spec
-double precision, dimension(:,:), allocatable :: model_param, model_prior 
-double precision, dimension(:,:), allocatable :: fit_param
-double precision, dimension(:,:), allocatable :: vis_data, triple_data
-double precision, dimension(17,2) :: limits
-character(len=35), dimension(:), allocatable :: var
-double precision, dimension(:,:), allocatable :: sol, hes, cov, cor
-double precision :: nlposterior, nlevidence, chisqrd, sumsqr
-integer :: flag
-logical :: symm
+character(len=128), intent(out) :: info
+character(len=35), dimension(:), allocatable, intent(out) :: var
+double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
+double precision, intent(out) :: nlposterior, chisqrd, sumsqr
+integer, intent(out) :: flag
+logical, intent(in) :: symm
 
 !local variables
 integer :: i, j, k, n
@@ -56,8 +68,6 @@ character(len=128) :: name, comp
 character(len=2), dimension(10) :: numbers
 double precision :: P, Pl, Pu, Pi, Pj, deltai, deltaj, eta, diff
 double precision, dimension(:), allocatable ::  x, temp_x
-double precision, dimension(:,:), allocatable :: x_info
-integer, dimension(:,:), allocatable :: x_pos
 logical :: illegal, ok
 
 !go through model arrays and count number of variable parameters
@@ -170,15 +180,15 @@ do i = 1, n
 end do
 !preset limits to values from the limits array used in model input
 do i = 1, n
-   x_info(i,2) = limits(x_pos(i,2),1)
-   x_info(i,3) = limits(x_pos(i,2),2)
+   x_info(i,2) = model_limits(x_pos(i,2),1)
+   x_info(i,3) = model_limits(x_pos(i,2),2)
    !alpha(1) in hestroffer model must be > 0
    if (x_pos(i,2)==8) then
       if (trim(model_spec(x_pos(i,1),3))=='hestroffer') x_info(i,2) = 0D0
    end if
 end do
 
-!allocate var, sol, hes, cov, cor arrays
+!allocate sol, hes, cov, cor arrays
 allocate(sol(n,6))
 allocate(hes(n,n))
 allocate(cov(n,n))
@@ -190,20 +200,18 @@ cor = 0D0
 
 print *, 'calculating initial goodness-of-fit...'
 !calculate goodness-of-fit statistic chi squared
-call gof(chisqrd, sumsqr, model_spec, model_param, vis_data, triple_data)
+call gof(chisqrd, sumsqr)
 print *,' '
 print *,'initial sum of sqrd deviations =',real(sumsqr)
 print *,' '
 print *,'           initial chi squared =',real(chisqrd) 
-nlposterior = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, model_param, x, x_pos, x_info, n)
+call posterior(n, x, nlposterior) ! uses fit_param (=model_param at this stage)
 print *,'negative log posterior =',real(nlposterior)
 
 !call minimising algorithm
 info = ''
-print *,'running simplex minimiser...'
-call simplex(info, model_spec, model_param, model_prior, &
-             vis_data, triple_data, fit_param, x, x_pos, x_info, sol, ok, n)
+print *,'running minimiser...'
+call simplex(info, x, sol, ok, n)
 if (info/='') goto 91
 !now have solution x and x_info which provides minimiser est err, and
 !min/max bounds on solution
@@ -215,8 +223,7 @@ end do
 
 !negative logarithm of posterior probability at solution
 x = sol(:,1)
-nlposterior = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, x, x_pos, x_info, n)
+call posterior(n, x, nlposterior)
 
 flag = 2
 if (.not.(ok)) flag = 0
@@ -241,16 +248,13 @@ do i = 1, n
       temp_x = sol(:,1)
       if (j == i) then
          !P(i)
-         P = posterior(model_spec, model_param, model_prior, vis_data, &
-                       triple_data, fit_param, temp_x, x_pos, x_info, n)
+         call posterior(n, temp_x, P)
          !P(i-di)
          temp_x(i) = sol(i,1)-deltai
-         Pl = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, temp_x, x_pos, x_info, n)
+         call posterior(n, temp_x, Pl)
          !P(i+di)
          temp_x(i) = sol(i,1)+deltai
-         Pu = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, temp_x, x_pos, x_info, n) 
+         call posterior(n, temp_x, Pu) 
          !hessian by numeric method
          diff = Pu + Pl - (2D0*P)
          if (diff/=0D0) hes(i,i) = diff/(deltai**2)
@@ -258,20 +262,16 @@ do i = 1, n
          !P(i+di,j+dj)
          temp_x(i) = sol(i,1)+deltai
          temp_x(j) = sol(j,1)+deltaj
-         Pu = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, temp_x, x_pos, x_info, n)
+         call posterior(n, temp_x, Pu)
          !P(i+di,j-dj)
          temp_x(j) = sol(j,1)-deltaj
-         Pi = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, temp_x, x_pos, x_info, n)   
+         call posterior(n, temp_x, Pi)   
          !P(i-di,j-dj)
          temp_x(i) = sol(i,1)-deltai
-         Pl = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, temp_x, x_pos, x_info, n)
+         call posterior(n, temp_x, Pl)
          !P(i-di,j+dj)
          temp_x(j) = sol(j,1)+deltaj
-         Pj = posterior(model_spec, model_param, model_prior, vis_data, &
-                        triple_data, fit_param, temp_x, x_pos, x_info, n)  
+         call posterior(n, temp_x, Pj)  
          !hessian by numeric method
          diff = Pu + Pl - Pi - Pj
          if (diff/=0D0) hes(i,j) = diff/(4D0*deltai*deltaj)
@@ -317,15 +317,13 @@ end do
 
 print *, 'calculating final goodness-of-fit...'
 !calculate goodness-of-fit statistic chi squared
-call gof(chisqrd, sumsqr, model_spec, fit_param, vis_data, triple_data)
+call gof(chisqrd, sumsqr)
 
 !clean-up and return
 200 continue
 
 !deallocate local storage
 if (allocated(x)) deallocate(x)
-if (allocated(x_info)) deallocate(x_info)
-if (allocated(x_pos)) deallocate(x_pos)
 if (allocated(temp_x)) deallocate(temp_x)
 
 return
@@ -335,30 +333,24 @@ return
 goto 200
 91 info = 'minimisation routine error: ' // info
 goto 200
-92 info = 'for vis/nvis data must have gauranteed symmetric model'
+92 info = 'for vis/nvis data must have guaranteed symmetric model'
 goto 200
 
 end subroutine minimiser
 
 !==============================================================================
 
-subroutine simplex(info, model_spec, model_param, model_prior, vis_data, &
-                   triple_data, fit_param, x, x_pos, x_info, sol, ok, ndim)
+subroutine simplex(info, x, sol, ok, ndim)
 
 !based on amoeba code (numerical recipies) for downhill simplex algorithm
 !in multidimensions (uses amotry code also in numerical recipies)
 
 !subroutine arguments
 character(len=128) :: info
-character(len=128), dimension(:,:), allocatable :: model_spec
-double precision, dimension(:,:), allocatable :: model_param, model_prior 
-double precision, dimension(:,:), allocatable :: fit_param, x_info
-double precision, dimension(:,:), allocatable :: vis_data, triple_data
-double precision, dimension(:,:), allocatable :: sol
-double precision, dimension(:), allocatable :: x
-logical :: ok
-integer, dimension(:,:), allocatable :: x_pos
-integer :: ndim
+double precision, dimension(:,:), intent(out) :: sol
+double precision, dimension(:), intent(inout) :: x
+logical, intent(out) :: ok
+integer, intent(in) :: ndim
 
 !local variables
 integer :: s
@@ -379,7 +371,6 @@ nmax = ndim
 !to prevent rounding errors causing problems (refer to numerical recipies)
 zeta = 1D6
 ftol = zeta*machine_precision()
-print *, 'ftol=', ftol
 !initial bounding of minimum accomplished by bounding moving to lower
 !and upper limits on each variable. the limit is chosen by moving a distance
 !of prior * eta away from the model value. 
@@ -396,8 +387,7 @@ allocate(psum(nmax))
 !form initial simplex
 !rows of p are the vertices of the starting simplex
 !1st vertex is the model point
-! ** NO IT WASN'T??
-p(1,:) = x - eta*x_info(:,1)
+p(1, :) = x
 
 !check and correct for range violations
 do s = 1, ndim
@@ -418,9 +408,7 @@ end do
 !each of the simplex vertices
 do s = 1, ndim+1
    x = p(s,:)
-   print *, x
-   y(s) = posterior(model_spec, model_param, model_prior, vis_data, &
-                    triple_data, fit_param, x, x_pos, x_info, ndim)
+   call posterior(ndim, x, y(s))
 end do
 
 !amoeba code
@@ -454,7 +442,6 @@ do i=1, ndim+1 !by looping over points in the simplex
       if (i /= ihi) inhi=i
    end if
 end do
-print *, '--', iter, y(:), ihi, inhi, ilo
 
 !compute the fractional range from highest to lowest and return if satisfactory
 rtol = 2D0*abs(y(ihi)-y(ilo))/(abs(y(ihi))+abs(y(ilo)))
@@ -482,22 +469,16 @@ iter = iter + 2
 !begin new iteration, first extrapolate by a factor -1 through the face of
 !the simplex across from the high point, i.e. reflect the simplex from the
 !high point
-ytry = extrap(p, y, psum, ndim, ihi, -1D0, nmax, model_spec, model_param, &
-              model_prior, vis_data, triple_data, fit_param, x_pos, x_info)
-! ** NR has <= here
-if (ytry < y(ilo)) then !gives better result than the best point so
+ytry = extrap(p, y, psum, ndim, ihi, -1D0, nmax)
+if (ytry <= y(ilo)) then !gives better result than the best point so
                         !try additonal extrapolation by a factor 2
-   ytry = extrap(p, y, psum, ndim, ihi, 2D0, nmax, model_spec, model_param, &
-                 model_prior, vis_data, triple_data, fit_param, x_pos, x_info)
-! ** NR has >= y(inhi) here
-else if (ytry > y(ihi)) then !the reflected point is worse than the second
+   ytry = extrap(p, y, psum, ndim, ihi, 2D0, nmax)
+else if (ytry >= y(inhi)) then !the reflected point is worse than the second
                              !highest so look for intermediate lower point
                              !i.e. do one dimensional contraction
    ysave = y(ihi)
-   ytry = extrap(p, y, psum, ndim, ihi, 0.5D0, nmax, model_spec, model_param, &
-                 model_prior, vis_data, triple_data, fit_param, x_pos, x_info)
-! ** NR has >= here
-   if (ytry > ysave) then !cant seem to get rid of that high point, better
+   ytry = extrap(p, y, psum, ndim, ihi, 0.5D0, nmax)
+   if (ytry >= ysave) then !cant seem to get rid of that high point, better
                           !contract around the lowest (best) point
       do i=1, ndim+1
          if (i /= ilo) then
@@ -505,8 +486,7 @@ else if (ytry > y(ihi)) then !the reflected point is worse than the second
                psum(j) = 0.5D0*(p(i,j)+p(ilo,j))
                p(i,j) = psum(j)
             end do
-            y(i) = posterior(model_spec, model_param, model_prior, vis_data, &
-                             triple_data, fit_param, psum, x_pos, x_info, ndim)
+            call posterior(ndim, psum, y(i))
          end if
       end do
       iter = iter + ndim !keep track of function evaluations
@@ -556,7 +536,7 @@ end subroutine simplex
 
 !==============================================================================
 
-subroutine gof(chisqrd, sumsqr, model_spec, fit_param, vis_data, triple_data)
+subroutine gof(chisqrd, sumsqr)
 
 !goodness of fit information calculation
 !computes the chisqrd value of a model fit and data set
@@ -568,10 +548,7 @@ subroutine gof(chisqrd, sumsqr, model_spec, fit_param, vis_data, triple_data)
 !for num of data points and num of free parameters
 
 !subroutine arguments
-double precision :: chisqrd, sumsqr
-character(len=128), dimension(:,:), allocatable :: model_spec
-double precision, dimension(:,:), allocatable :: fit_param
-double precision, dimension(:,:), allocatable :: vis_data, triple_data
+double precision, intent(out) :: chisqrd, sumsqr
 
 !local variables
 integer :: i
@@ -605,8 +582,8 @@ do i = 1, size(vis_data,1)
       chisqrd = chisqrd + &
                 (((data_vis-model_vis)/data_vis_err)**2D0)
 
-      print '(a, 3f7.4, 2f9.2)','vis',data_vis,model_vis,data_vis_err, &
-           ((data_vis-model_vis)/data_vis_err)**2D0, chisqrd
+      !print '(a, 3f7.4, 2f9.2)','vis',data_vis,model_vis,data_vis_err, &
+      !     ((data_vis-model_vis)/data_vis_err)**2D0, chisqrd
 
    end if      
 
@@ -648,8 +625,8 @@ do i = 1, size(triple_data,1)
       chisqrd = chisqrd + &
            (modx(data_phase,model_phase)/data_phase_err)**2D0
 
-      print '(a, 3f8.2, 2f9.2)','t_phase',data_phase,model_phase,data_phase_err, &
-           (modx(data_phase,model_phase)/data_phase_err)**2D0, chisqrd
+      !print '(a, 3f8.2, 2f9.2)','t_phase',data_phase,model_phase,data_phase_err, &
+      !     (modx(data_phase,model_phase)/data_phase_err)**2D0, chisqrd
    end if 
 
 
@@ -659,8 +636,7 @@ end subroutine gof
 
 !==============================================================================
 
-function extrap(p, y, psum, ndim, ihi, fac, nmax, model_spec, model_param, &
-                model_prior, vis_data, triple_data, fit_param, x_pos, x_info)
+function extrap(p, y, psum, ndim, ihi, fac, nmax)
 
 !called from amoeba code in subroutine simplex
 !identical to amotry code given in numerical recipies
@@ -669,15 +645,11 @@ function extrap(p, y, psum, ndim, ihi, fac, nmax, model_spec, model_param, &
 !is better
 
 !function arguments
-integer :: ihi, ndim, nmax
-double precision :: extrap, fac
-double precision, dimension(:,:), allocatable :: p
-double precision, dimension(:), allocatable :: psum, y
-character(len=128), dimension(:,:), allocatable :: model_spec
-double precision, dimension(:,:), allocatable :: model_param, model_prior 
-double precision, dimension(:,:), allocatable :: fit_param, x_info
-double precision, dimension(:,:), allocatable :: vis_data, triple_data
-integer, dimension(:,:), allocatable :: x_pos
+integer, intent(in) :: ihi, ndim, nmax
+double precision :: extrap
+double precision, intent(in) :: fac
+double precision, dimension(:,:), intent(inout) :: p
+double precision, dimension(:), intent(out) :: psum, y
 
 !local variables
 integer :: j
@@ -696,8 +668,7 @@ end do
 
 !evaluate the function at the highest point, it its better than the highest
 !then replace the highest
-ytry = posterior(model_spec, model_param, model_prior, vis_data, &
-                 triple_data, fit_param, ptry, x_pos, x_info, ndim)
+call posterior(ndim, ptry, ytry)
 if (ytry < y(ihi)) then
    y(ihi) = ytry
    do j = 1, ndim
@@ -717,18 +688,15 @@ end function extrap
 
 !==============================================================================
 
-function posterior(model_spec, model_param, model_prior, vis_data, &
-                   triple_data, fit_param, x, x_pos, x_info, n)
+subroutine posterior(n, x, post)
+
+! Black box minimisers require this function have specific arguments
+! Everything else needed comes from module variables
 
 !subroutine arguments
-double precision :: posterior
-character(len=128), dimension(:,:), allocatable :: model_spec
-double precision, dimension(:,:), allocatable :: model_param, model_prior 
-double precision, dimension(:,:), allocatable :: fit_param, x_info
-double precision, dimension(:,:), allocatable :: vis_data, triple_data
-double precision, dimension(:), allocatable :: x
-integer, dimension(:,:), allocatable :: x_pos
-integer :: n
+double precision, dimension(:), intent(in) :: x
+integer, intent(in) :: n
+double precision, intent(out) :: post
 
 !local variables
 double precision :: lhd, pri
@@ -749,7 +717,7 @@ do i = 1, n !over variable parameters
    end if
 end do
 if (violation) then
-   posterior = machine_max()
+   post = machine_max()
    return
 end if 
 
@@ -759,23 +727,23 @@ do i = 1, n
 end do
 
 !form E = neg log posterior = neg log likelihood + neg log prior
-lhd = likelihood(model_spec, fit_param, vis_data, triple_data)
-pri = prior(model_param, model_prior, x, x_pos)
-posterior = lhd + pri
+lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
+pri = prior(x, x_pos, model_param, model_prior)
+post = lhd + pri
 
-end function posterior
+end subroutine posterior
 
 !==============================================================================
 
-function likelihood(model_spec, fit_param, vis_data, triple_data)
+function likelihood(vis_data, triple_data, model_spec, param)
 
 !computes the negative log likelihood of data given model
 
 !subroutine arguments
 double precision :: likelihood
-character(len=128), dimension(:,:), allocatable :: model_spec
-double precision, dimension(:,:), allocatable :: fit_param
-double precision, dimension(:,:), allocatable :: vis_data, triple_data
+double precision, dimension(:,:), intent(in) :: vis_data, triple_data
+character(len=128), dimension(:,:), intent(in) :: model_spec
+double precision, dimension(:,:) :: param
 
 !local variables
 integer :: i
@@ -799,7 +767,7 @@ do i = 1, size(vis_data,1)
    if (data_vis_err>0D0) then
       
       !compute model-predicted visibility amplitude squared
-      vis = cmplx_vis(model_spec, fit_param, lambda, u, v)
+      vis = cmplx_vis(model_spec, param, lambda, u, v)
       model_vis = (modulus(vis)**2D0)
       
       !compute contribution to likelihood
@@ -826,9 +794,9 @@ do i = 1, size(triple_data,1)
 
    if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
       !compute model-predicted triple product
-      vis1 = cmplx_vis(model_spec, fit_param, lambda, u1, v1)
-      vis2 = cmplx_vis(model_spec, fit_param, lambda, u2, v2)
-      vis3 = cmplx_vis(model_spec, fit_param, lambda, -(u1+u2), -(v1+v2))
+      vis1 = cmplx_vis(model_spec, param, lambda, u1, v1)
+      vis2 = cmplx_vis(model_spec, param, lambda, u2, v2)
+      vis3 = cmplx_vis(model_spec, param, lambda, -(u1+u2), -(v1+v2))
       vis = vis1*vis2*vis3
       model_amp = modulus(vis)
       model_phase = rad2deg*argument(vis)
@@ -850,13 +818,14 @@ end function likelihood
 
 !==============================================================================
 
-function prior(model_param, model_prior, x, x_pos)
+function prior(x, x_pos, model_param, model_prior)
 
 !function arguments
 double precision :: prior
-double precision, dimension(:,:), allocatable :: model_param, model_prior
-double precision, dimension(:), allocatable :: x
-integer, dimension(:,:), allocatable :: x_pos
+double precision, dimension(:), intent(in) :: x
+integer, dimension(:,:), intent(in) :: x_pos
+double precision, dimension(:,:), intent(in) :: model_param
+double precision, dimension(:,:), intent(in) :: model_prior
 
 !local variables
 integer :: i
@@ -877,6 +846,17 @@ do i = 1, size(x_pos,1)
 end do
 
 end function prior
+
+!==============================================================================
+
+subroutine free_fit()
+
+  !Deallocate fitting storage
+  if (allocated(fit_param)) deallocate(fit_param)
+  if (allocated(x_pos)) deallocate(x_pos)
+  if (allocated(x_info)) deallocate(x_info)
+
+end subroutine free_fit
 
 !==============================================================================
 

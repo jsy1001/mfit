@@ -14,10 +14,11 @@ subroutine plot_vis_data(info, vis_data, model_vis_data, lambda, x_title, &
                          y_title, top_title)
 
   !subroutine arguments
-  character(len=128) :: info, x_title, y_title, top_title
-  double precision, dimension(:,:), allocatable :: vis_data
-  double precision, dimension(:,:), allocatable :: model_vis_data
-  double precision :: lambda
+  character(len=128), intent(out) :: info
+  character(len=*), intent(in) :: x_title, y_title, top_title
+  double precision, dimension(:,:), intent(in) :: vis_data
+  double precision, dimension(:,:), intent(in) :: model_vis_data
+  double precision, intent(in) :: lambda
   
   !local variables
   real, dimension(:,:), allocatable :: plot_data, plot_data2
