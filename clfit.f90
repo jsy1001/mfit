@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.2 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: clfit.f90,v 1.3 2003/08/20 16:51:53 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.2 $'
+  cvs_rev = '$Revision: 1.3 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -307,11 +307,13 @@ program Main
         end do
      end do
      degfreedom = useful_vis + useful_amp + useful_cp - n
-     normchisqrd = chisqrd/degfreedom
      print *, ' '
      print *, '           chi squared =',real(chisqrd) 
      print *, '    degrees of freedom =',degfreedom
-     print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+     if (degfreedom > 0) then
+        normchisqrd = chisqrd/degfreedom
+        print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+     end if
      top_title = trim(source)//' - initial model: '//trim(model_name)
      if (sel_plot == 'vis2' .and. useful_vis > 0) then
         if (zoom) then 
@@ -365,7 +367,6 @@ program Main
 
      if (flag > -1 .and. flag < 4) then
         degfreedom = useful_vis + useful_amp + useful_cp - size(sol,1)
-        normchisqrd = chisqrd/degfreedom
 
         print *, ' '
         print *, 'negative log posterior =',real(nlposterior)
@@ -373,7 +374,10 @@ program Main
         print *, ' '
         print *, '           chi squared =',real(chisqrd) 
         print *, '    degrees of freedom =',degfreedom
-        print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+        if (degfreedom > 0) then
+           normchisqrd = chisqrd/degfreedom
+           print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+        end if
 
         print *, ' '
         print *, 'solution details:'

@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.12 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: main.f90,v 1.13 2003/08/20 16:51:53 jsy1001 Exp $
 
 program Main
 
@@ -297,7 +297,6 @@ program Main
 
      if (flag > -1 .and. flag < 4) then
         degfreedom = useful_vis + useful_amp + useful_cp - size(sol,1)
-        normchisqrd = chisqrd/degfreedom
 
         print *, ' '
         print *, 'negative log posterior =',real(nlposterior)
@@ -305,7 +304,10 @@ program Main
         print *, ' '
         print *, '           chi squared =',real(chisqrd) 
         print *, '    degrees of freedom =',degfreedom
-        print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+        if (degfreedom > 0) then
+           normchisqrd = chisqrd/degfreedom
+           print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+        end if
 
         print *, ' '
         print *, 'solution details:'
