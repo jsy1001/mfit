@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.6 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: model.f90,v 1.7 2005/02/22 18:17:41 jsy1001 Exp $
 
 module Model
 
@@ -113,7 +113,7 @@ subroutine read_model(info, file_name, wavebands)
   !these limits trigger error on reading the model
   model_limits(1:7,1) = dble((/0,0,-720,-100,0,-720,0/))
   model_limits(8:17,1) = -100D0
-  model_limits(1:7,2) = dble((/10,100,720,100,1000,720,10/))
+  model_limits(1:7,2) = dble((/10,500,720,100,1000,720,10/))
   model_limits(8:17,2) = 100D0
 
   !read source name

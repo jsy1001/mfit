@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.12 2005/01/07 16:02:44 jsy1001 Exp $
+!$Id: clfit.f90,v 1.13 2005/02/22 18:17:41 jsy1001 Exp $
 
 program Main
 
@@ -16,7 +16,7 @@ program Main
   
   !parameters
   !pi, deg/rad conversions all picked up from Maths module
-  integer, parameter :: max_lines = 1000      !max. lines in data file
+  integer, parameter :: max_lines = 5000      !max. lines in data file
   integer, parameter :: width = 78            !for spacer lines
   double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.12 $'
+  cvs_rev = '$Revision: 1.13 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
