@@ -41,7 +41,8 @@ vis2   squared visibility against projected baseline
 t3amp  triple product amplitude against longest projected baseline in triangle
 t3phi  triple product phase against longest projected baseline in triangle
 post n one-dimensional cut through the minimum of the negative log posterior,
-       along the axis of variable parameter n
+       along the axis of variable parameter n (i.e. not a marginalised
+       posterior)
 
 fitgui will similarly make up to one plot each time 'Go' is clicked. The plot
 types are as listed above.
@@ -273,7 +274,8 @@ An approximation to the negative log evidence is also reported:
 
 where N is the number of model parameters varied. This expression is only valid
 if the posterior pdf is unimodal, and the peak in the posterior can be
-approximated by a Gaussian.
+approximated by a multivariate Gaussian. Possible differences in prior widths
+between models to be compared have been neglected.
 
 
 Known deficiencies
@@ -287,7 +289,7 @@ Ignores complex visibilities from OI-FITS file.
 Assumes single target in OI-FITS file.
 
 
-$Id: documentation,v 1.9 2003/09/09 16:55:03 jsy1001 Exp $
+$Id: documentation,v 1.10 2004/01/28 12:26:04 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

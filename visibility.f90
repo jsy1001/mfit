@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.7 2003/09/09 15:45:19 jsy1001 Exp $
+!$Id: visibility.f90,v 1.8 2004/01/28 12:26:04 jsy1001 Exp $
 
 module Visibility
 
@@ -19,6 +19,7 @@ module Visibility
 !gaussian          happy - thesis ok
 !hestroffer        happy - agrees with paper
 !gauss_hermite     not happy - db thesis seems incorrect
+!clvvis            tested
 
 use Maths !picks up pi parameter from here
 use Model

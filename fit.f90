@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.12 2003/09/01 12:27:27 jsy1001 Exp $
+!$Id: fit.f90,v 1.13 2004/01/28 12:26:04 jsy1001 Exp $
 
 module Fit
 
@@ -73,7 +73,7 @@ contains
     integer :: i, j, k, n, lwork
     character(len=128) :: name, comp
     character(len=2), dimension(10) :: numbers
-    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, eta, diff, det
+    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det
     double precision, dimension(:), allocatable ::  x, temp_x, work
     logical :: illegal
 
@@ -223,12 +223,7 @@ contains
     call PDA_UNCMND(n, temp_x, posterior, x, nlposterior, flag, work, lwork)
     deallocate(work)
     ! solution is in x
-
-    !put best-fit values in fit_param & sol
-    do i = 1, n
-       fit_param(x_pos(i,1),x_pos(i,2)) = x(i)
-       sol(i,1) = x(i)
-    end do
+    sol(:,1) = x
 
     !set return message
     select case(flag)
@@ -252,7 +247,7 @@ contains
 
     if (flag < 0 .or. flag > 3) return ! not a minimum, so skip hessian calc.
     
-    !find error in x position more rigourously by considering hessian
+    !find error in x position more rigorously by considering hessian
     !hessian matrix Aij has components (d2/(dyi*dyj))P({y}) where yi and yj
     !are parameters i and j, P({y}) is the neg log posterior for model with
     !parameters {y} = y1, y2, ... yi, ... yj, ... yN
@@ -260,14 +255,14 @@ contains
     !differentiation method, for off-diagonals this is
     ![P(i+di,j+dj)+P(i-di,j-dj)-P(i+di,j-dj)-P(i-di,j+dj)]/[4di*dj], for diagonals
     ![P(i+di)+P(i-di)-2P(i)]/[di^2]
-    !eta is scaling factor in selecting increment in numeric differentiation,
-    !increment is eta * upper limit on parameter
-    eta = 1D-4
+    !increments deltai, deltaj are chosen to minimise
+    !uncertainty in second derivative in presence of roundoff error
+
     !find hessian elements (nb Aij=Aji symmetric)
     do i = 1, n
-       deltai = eta * x_info(i,3)
+       deltai = 1D-4
        do j = 1, i
-          deltaj = eta * x_info(j,3)
+          deltaj = 1D-4
           temp_x = sol(:,1)
           if (j == i) then
              !P(i)
@@ -332,6 +327,9 @@ contains
     end do
 
     !calculate goodness-of-fit statistic chi squared
+    do i = 1, n
+       fit_param(x_pos(i,1),x_pos(i,2)) = sol(i,1)
+    end do
     call gof(model_spec, fit_param, chisqrd)
 
     !estimate -log(evidence)
@@ -568,17 +566,15 @@ do i = 1, size(triple_data,1)
       model_phase = rad2deg*argument(vis)
    end if
 
-   !compute normalised likelihood contributions
+   !compute likelihood contributions
    !nb phase calculations modulo 360 degrees
    if (data_amp_err>0D0) then
       likelihood = likelihood + &
-           (((data_amp-model_amp)**2D0)/(2D0*(data_amp_err**2D0))) + &
-           log(data_amp_err*sqrt(2D0*pi))
+           (((data_amp-model_amp)**2D0)/(2D0*(data_amp_err**2D0)))
    end if
    if (data_phase_err>0D0) then
       likelihood = likelihood + &
-           (((modx(data_phase,model_phase))**2D0)/(2D0*(data_phase_err**2D0))) + &
-           log(data_phase_err*sqrt(2D0*pi))
+           (((modx(data_phase,model_phase))**2D0)/(2D0*(data_phase_err**2D0)))
    end if
 end do
 

@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.9 2003/09/29 15:50:00 jsy1001 Exp $
+!$Id: inout.f90,v 1.10 2004/01/28 12:26:04 jsy1001 Exp $
 
 module Inout
 
@@ -7,7 +7,6 @@ module Inout
 !read_vis
 !read_nvis
 !read_mapdat
-!read_oifits
 !read_oi_fits
 !
 !For internal use:
@@ -17,7 +16,7 @@ module Inout
 
 implicit none
 
-character(len=5), parameter :: release = '1.3.2'
+character(len=5), parameter :: release = '1.3.3'
 
 contains
 

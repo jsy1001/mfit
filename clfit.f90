@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.7 2003/09/29 15:50:00 jsy1001 Exp $
+!$Id: clfit.f90,v 1.8 2004/01/28 12:26:04 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.7 $'
+  cvs_rev = '$Revision: 1.8 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -239,26 +239,26 @@ program Main
   print *, trim(ext), ' file visibility data for ', trim(source),':'
 
   print *, ' '
-  print *, '  wave   band   baseline coords     sqrd      abs'
-  print *, 'length  width        u        v      vis    error'
-  print *, '  (nm)   (nm)      (m)      (m)'  
+  print *, '  wave   band     baseline coords     sqrd      abs'
+  print *, 'length  width         u         v      vis    error'
+  print *, '  (nm)   (nm)       (m)       (m)'  
   do i = 1, size(vis_data,1)
      write(*,60) vis_data(i,:)
   end do
-60 format(f7.1, 1x, f6.1, 1x, f8.4, 1x, f8.4, 1x, f8.5, 1x, f8.5)
+60 format(f7.1, 1x, f6.1, 1x, f9.4, 1x, f9.4, 1x, f8.5, 1x, f8.5)
 
   print *, ' '
   print *, trim(ext),' file triple product data for ',trim(source),':'
   print *, ' '
-  print *, '  wave  band            baseline triangle coords', &
+  print *, '  wave  band                baseline triangle coords', &
        '                  triple product'
-  print *, 'length width       u1       v1       u2       v2', &
+  print *, 'length width        u1        v1        u2        v2', &
        '  amplitude     error  phase err'
-  print *, '  (nm)  (nm)      (m)      (m)      (m)      (m)'
+  print *, '  (nm)  (nm)       (m)       (m)       (m)       (m)'
   do i = 1, size(triple_data,1)
      write(*,61) triple_data(i,:)
   end do
-61 format(f7.1, 1x, f5.1, 1x, f8.4, 1x, f8.4, 1x, f8.4, 1x, f8.4, 1x, &
+61 format(f7.1, 1x, f5.1, 1x, f9.4, 1x, f9.4, 1x, f9.4, 1x, f9.4, 1x, &
        e10.3, 1x, e9.3, 1x, f7.2, 1x, f6.2, 1x)
 
   print *, ' '
