@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.9 2003/09/09 15:45:19 jsy1001 Exp $
+!$Id: plot.f90,v 1.10 2003/09/09 17:55:22 jsy1001 Exp $
 
 module Plot
   
@@ -497,6 +497,8 @@ contains
     integer :: pgopen
 
     !return if nothing to plot
+    nvar = size(x_pos, 1)
+    if (index < 1 .or. index > nvar) return
     if (uxmax < x_info(index, 2)) return
     if (uxmin > x_info(index, 3)) return
 
@@ -515,7 +517,6 @@ contains
     !copy model parameters
     allocate(all_param(size(param, 1), 17))
     all_param = param
-    nvar = size(x_pos, 1)
     allocate(var_param(nvar))
     do i = 1, nvar
        var_param(i) = param(x_pos(i, 1), x_pos(i, 2))
