@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.5 2005/01/07 11:38:05 jsy1001 Exp $
+# $Id: fitgui.py,v 1.6 2005/01/07 14:02:02 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.5 $")[1]
+_revision = string.split("$Revision: 1.6 $")[1]
 
 
 class GUI:
@@ -87,7 +87,7 @@ class GUI:
         self.ChangeFileButton.pack(side=LEFT)
         calErrFrame = Frame(parent)
         calErrFrame.pack(side=TOP, fill=X, pady=4)
-        Label(calErrFrame, text='Calibration Error (extra frac. error in system vis.) [NOT OIFITS]').pack(side=LEFT, anchor=W)
+        Label(calErrFrame, text='Calibration Error (extra frac. error in system vis.)').pack(side=LEFT, anchor=W)
         Entry(calErrFrame, textvariable=self.calErr, width=5).pack(
             side=LEFT, anchor=W, padx=4)
         wbFrame = Frame(parent)

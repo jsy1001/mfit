@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.16 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: main.f90,v 1.17 2005/01/07 14:02:02 jsy1001 Exp $
 
 program Main
 
@@ -77,15 +77,15 @@ program Main
      read (*, '(a)') file_name
      ext = trim(file_name(scan(file_name,'.',.true.)+1:len(file_name)))
 
-     if (ext(len_trim(ext)-3:len_trim(ext)) /= 'fits') then
-        do
-           print *, ' '
-           print *, 'enter calibration error (fractional error in system visibility)'
-           read *, calib_error
-           if (calib_error >= 0D0) exit
-           print *, 'must specify a positive calibration error'
-        end do
-     end if
+     if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') &
+          print *, 'OIFITS-format data often includes calibration error already'
+     do
+        print *, ' '
+        print *, 'enter calibration error to add (fractional error in system visibility)'
+        read *, calib_error
+        if (calib_error >= 0D0) exit
+        print *, 'must specify a positive calibration error'
+     end do
 
      if (ext == 'vis' .or. ext == 'nvis') then
         print *, 'enter observing wavelength and bandwidth (nm) for (n)vis-format data'
@@ -132,7 +132,7 @@ program Main
 
      else if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') then
         call read_oi_fits(info, file_name, -1, source, &
-             vis_data, triple_data, wavebands)
+             vis_data, triple_data, wavebands, calib_error)
 
      else
         info = 'file type "'//trim(ext)//'" not handled'

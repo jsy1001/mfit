@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.14 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: inout.f90,v 1.15 2005/01/07 14:02:02 jsy1001 Exp $
 
 module Inout
 
@@ -384,7 +384,7 @@ end subroutine read_mapdat
 !==============================================================================
 
 subroutine read_oi_fits(info, file_name, user_target_id, source, &
-     vis_data, triple_data, wavebands)
+     vis_data, triple_data, wavebands, calib_error)
 
   !Reads OIFITS format
   !
@@ -404,12 +404,15 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
   !complicated because returned data arrays are not a good match for the
   !structure of the tables in the file
   !
+  !Adds calib_error, assumed to be constant fractional error in mod V
+  !
   !On error, returns message in info (otherwise empty string)
   
   !subroutine arguments
   character(len=128), intent(out) :: info, source
   character(len=*), intent(in) :: file_name
   integer, intent(in) :: user_target_id
+  double precision, intent(in) :: calib_error
   double precision, dimension(:, :), allocatable, intent(out) :: vis_data
   double precision, dimension(:, :), allocatable, intent(out) :: triple_data
   double precision, dimension(:, :), allocatable, intent(out) :: wavebands
@@ -434,6 +437,7 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
   integer, dimension(:), allocatable :: all_ids
   character (len=16), dimension(:), allocatable :: all_names
   double precision :: mjd, ucoord, vcoord, u2coord, v2coord
+  double precision :: frac_error, tot_error
 
   !Open FITS file
   status = 0
@@ -625,11 +629,14 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
            !doesn't actually matter for V^2 data
            vis_data(count, 3) = -ucoord
            vis_data(count, 4) = -vcoord
-           vis_data(count, 5) = vis2data(iwave)
+           vis_data(count, 5) = vis2data(iwave) !may be -ve
+           frac_error = abs(vis2err(iwave)/vis2data(iwave))
+           tot_error = abs(vis2data(iwave)) &
+                * sqrt((2D0*calib_error)**2D0 + frac_error**2D0 )
            if (flag(iwave)) then
-              vis_data(count, 6) = -vis2err(iwave)
+              vis_data(count, 6) = -tot_error
            else
-              vis_data(count, 6) = vis2err(iwave)
+              vis_data(count, 6) = tot_error
            end if
            count = count + 1
            do j = 1, num_wb

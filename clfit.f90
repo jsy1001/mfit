@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.10 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: clfit.f90,v 1.11 2005/01/07 14:02:02 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.10 $'
+  cvs_rev = '$Revision: 1.11 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -204,7 +204,7 @@ program Main
   else if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') then
      !read_oi_fits allocates vis_data, triple_data, and wavebands
      call read_oi_fits(info, file_name, user_target_id, source, &
-          vis_data, triple_data, wavebands)
+          vis_data, triple_data, wavebands, calib_error)
 
   else
      info = 'file type "'//trim(ext)//'" not handled'

@@ -15,6 +15,10 @@ New in mfit release 1.4.1
 
 * User can specify a TARGET_ID to use from OIFITS data
 
+* User can specify calibration error (extra fractional error in mod V)
+  to add to OIFITS data. This feature was previously restricted to
+  other formats
+
 
 New in mfit release 1.3.1 (released to COAST team on 2003/09/11)
 =========================
