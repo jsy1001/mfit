@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.13 2004/01/28 12:26:04 jsy1001 Exp $
+!$Id: fit.f90,v 1.14 2004/02/13 16:50:57 jsy1001 Exp $
 
 module Fit
 
@@ -259,10 +259,10 @@ contains
     !uncertainty in second derivative in presence of roundoff error
 
     !find hessian elements (nb Aij=Aji symmetric)
+    deltai = 5D-3
+    deltai = 5D-3
     do i = 1, n
-       deltai = 1D-4
        do j = 1, i
-          deltaj = 1D-4
           temp_x = sol(:,1)
           if (j == i) then
              !P(i)
