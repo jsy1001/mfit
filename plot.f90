@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.8 2003/09/01 12:27:27 jsy1001 Exp $
+!$Id: plot.f90,v 1.9 2003/09/09 15:45:19 jsy1001 Exp $
 
 module Plot
   
@@ -16,6 +16,8 @@ module Plot
   !plot_vis - plot squared visibility against projected baseline
   !
   !plot_uv - plot uv coverage
+  !
+  !plot_post - plot 1d cut through -ln(posterior)
 
   implicit none
 
@@ -131,7 +133,7 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 2)
+    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
     call pgerry(num_flagged, flagged_points(:, 1), &
          flagged_points(:, 3), flagged_points(:, 4), 1.0)
     call pgsci(1)
@@ -250,7 +252,7 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 2)
+    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
     call pgerry(num_flagged, flagged_points(:, 1), &
          flagged_points(:, 3), flagged_points(:, 4), 1.0)
     call pgsci(1)
@@ -391,7 +393,7 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 2)
+    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
     call pgerry(num_flagged, flagged_points(:, 1), &
          flagged_points(:, 3), flagged_points(:, 4), 1.0)
     call pgsci(1)
@@ -457,13 +459,97 @@ contains
     call pgenv(-max, max, -max, max, 1, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 17)
-    call pgpt(num_flagged, -flagged_points(:, 1), -flagged_points(:, 2), 22)
+    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 13)
+    call pgpt(num_flagged, -flagged_points(:, 1), -flagged_points(:, 2), 7)
     call pgsci(1)
     call pgpt(num_data, data_points(:, 1), data_points(:, 2), 17)
     call pgpt(num_data, -data_points(:, 1), -data_points(:, 2), 22)
 
   end subroutine plot_uv
+
+  !============================================================================
+
+  subroutine plot_post(spec, param, index, x_title, y_title, top_title, &
+       uxmin, uxmax, device)
+
+    !index is into x_pos array of variable parameters
+    !x_pos, x_info must be initialised on entry to this routine i.e. must have
+    !called minimiser() from Fit module
+
+    !subroutine arguments
+    character(len=128), dimension(:,:), intent(in) :: spec
+    double precision, dimension(:,:), intent(in) :: param
+    integer, intent(in) :: index
+    character(len=*), intent(in) :: x_title, y_title, top_title
+    double precision, intent(in) :: uxmin, uxmax
+    character(len=*), intent(in), optional :: device
+
+    !local variables
+    double precision, dimension(:), allocatable :: var_param
+    double precision, dimension(:, :), allocatable :: all_param
+    real, dimension(:, :), allocatable :: post_points
+    double precision :: val, lhd, pri
+    integer :: nvar, num_points, i, istat
+    real :: xmin, xmax, ymin, ymax
+    integer, parameter :: grid_size = 200
+
+    !functions
+    integer :: pgopen
+
+    !return if nothing to plot
+    if (uxmax < x_info(index, 2)) return
+    if (uxmin > x_info(index, 3)) return
+
+    !adjust x range if necessary - need to keep within x_info limits
+    if (uxmin < x_info(index, 2)) then
+       xmin = x_info(index, 2)
+    else
+       xmin = uxmin
+    end if
+    if (uxmax > x_info(index, 3)) then
+       xmax = x_info(index, 3)
+    else
+       xmax = uxmax
+    end if
+
+    !copy model parameters
+    allocate(all_param(size(param, 1), 17))
+    all_param = param
+    nvar = size(x_pos, 1)
+    allocate(var_param(nvar))
+    do i = 1, nvar
+       var_param(i) = param(x_pos(i, 1), x_pos(i, 2))
+    end do
+
+    !calculate grid of points
+    num_points = grid_size
+    allocate(post_points(num_points, 2))
+    do i = 1, num_points
+       val = xmin + ((i-1.)/(num_points-1.))*(xmax-xmin)
+       all_param(x_pos(index, 1), x_pos(index, 2)) = val
+       var_param(index) = val
+       lhd = likelihood(vis_data, triple_data, spec, all_param)
+       pri = prior(var_param, x_pos, all_param, model_prior)
+       post_points(i, 1) = val
+       post_points(i, 2) = lhd + pri
+    end do
+
+    !calculate y range
+    ymin = minval(post_points(:, 2))
+    ymax = maxval(post_points(:, 2))
+
+    !plot posterior
+    if (present(device)) then
+       istat = pgopen(device)
+       if (istat <= 0) return
+    end if
+    call pgsci(1)
+    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
+    call pglab(trim(x_title), trim(y_title), trim(top_title))
+    call pgsci(1)
+    call pgline(num_points, post_points(:, 1), post_points(:, 2))
+
+  end subroutine plot_post
 
   !============================================================================
 

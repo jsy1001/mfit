@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.1 2003/06/13 17:25:43 jsy1001 Exp $
+# $Id: fitgui.py,v 1.2 2003/09/09 15:45:19 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.1 $")[1]
+_revision = string.split("$Revision: 1.2 $")[1]
 
 
 class GUI:
@@ -66,9 +66,11 @@ class GUI:
         self.bw = StringVar()
         self.nofit = IntVar()
         self.nofit.set(0)
-        self.plots = ['No plot', 'vis2', 't3amp', 't3phi']
+        self.plots = ['No plot', 'vis2', 't3amp', 't3phi', 'post']
         self.selPlot = StringVar()
         self.selPlot.set(self.plots[1])
+        self.plotIndex = StringVar()
+        self.plotIndex.set('1')
         self.plotFrom = StringVar()
         self.plotTo = StringVar()
 
@@ -104,6 +106,7 @@ class GUI:
         for p in self.plots:
             Radiobutton(plotFrame, text=p, variable=self.selPlot,
                         value=p).pack(side=TOP, anchor=W)
+        Entry(plotFrame, textvariable=self.plotIndex, width=3).pack(side=TOP)
         Label(midFrame1, text='From:').pack(side=LEFT)
         Entry(midFrame1, textvariable=self.plotFrom, width=5).pack(side=LEFT)
         Label(midFrame1, text='To:').pack(side=LEFT)
@@ -219,12 +222,20 @@ class GUI:
         p = self.selPlot.get()
         if p != self.plots[0]: # not 'No plot'
             try:
+                if p == 'post':
+                    index = int(self.plotIndex.get())
                 xmin = float(self.plotFrom.get())
                 xmax = float(self.plotTo.get())
             except ValueError:
-                optText += ' --plot %s' % p
+                if p == 'post':
+                    optText += ' --plot post 1'
+                else:
+                    optText += ' --plot %s' % p
             else:
-                optText += ' --zoomplot %s %.3f %.3f' % (p, xmin, xmax)
+                if p == 'post':
+                    optText += ' --zoomplot %s %d %.3f %.3f' % (p, index, xmin, xmax)
+                else:
+                    optText += ' --zoomplot %s %.3f %.3f' % (p, xmin, xmax)
         if self.nofit.get(): optText += ' --nofit'
         command = '%s%s --device %s %s %s' % (
             self.exe, optText, self.device, self.fileName.get(),

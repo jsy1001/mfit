@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.6 2003/09/01 12:27:27 jsy1001 Exp $
+!$Id: visibility.f90,v 1.7 2003/09/09 15:45:19 jsy1001 Exp $
 
 module Visibility
 
@@ -63,7 +63,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
      B_total = 0D0
   
      !choose number of wavelengths to average over
-     nwave = 1D3*delta_lambda/lambda
+     nwave = 1D2*delta_lambda/lambda
      if (nwave < 2) nwave = 2
      
      !sum over components

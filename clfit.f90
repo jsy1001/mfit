@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.4 2003/09/01 14:24:52 jsy1001 Exp $
+!$Id: clfit.f90,v 1.5 2003/09/09 15:45:19 jsy1001 Exp $
 
 program Main
 
@@ -31,10 +31,10 @@ program Main
   character(len=128) :: switch, arg, device, info, file_name, ext, source, &
        top_title, cvs_rev, revision
   character(len=5) :: sel_plot
-  integer :: narg, iarg, i, j, n, length, flag
+  integer :: narg, iarg, i, j, n, length, flag, index
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
-  double precision :: calib_error, uxmin, uxmax
+  double precision :: calib_error, uxmin, uxmax, x0, sigma
   logical :: force_symm, nofit, zoom
 
   integer :: pgopen, istat
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.4 $'
+  cvs_rev = '$Revision: 1.5 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -94,9 +94,19 @@ program Main
         case('-p', '--plot')
            call get_command_argument(iarg+1, sel_plot)
            iarg = iarg + 1
+           if (sel_plot == 'post') then
+              call get_command_argument(iarg+1, arg)
+              read(arg, *) index
+              iarg = iarg + 1
+           end if
         case('-z', '--zoomplot')
            zoom = .true.
            call get_command_argument(iarg+1, sel_plot)
+           if (sel_plot == 'post') then
+              call get_command_argument(iarg+2, arg)
+              read(arg, *) index
+              iarg = iarg + 1
+           end if
            call get_command_argument(iarg+2, arg)
            read(arg, *) uxmin
            call get_command_argument(iarg+3, arg)
@@ -346,6 +356,7 @@ program Main
                 top_title)
         end if
      end if
+     !cannot do 'post' plot if --nofit
   else
      !-------------------------------------------------------------------------
      !fit model to the data by minimising negative log posterior
@@ -445,6 +456,21 @@ program Main
                    'Longest baseline /M\gl', &
                    'Closure phase /'//char(176), top_title)
            end if
+        end if
+        if (sel_plot == 'post') then
+           if (.not. zoom) then
+              x0 = sol(index, 1)
+              if (sol(index, 2) == 0D0) then
+                 !was problem calculating errors from hessian
+                 sigma = model_prior(x_pos(index, 1), x_pos(index, 2))
+              else
+                 sigma = sol(index, 2)
+              endif
+              uxmin = x0 - 3*sigma
+              uxmax = x0 + 3*sigma
+           end if
+           call plot_post(model_spec, fit_param, index, &
+                desc(index), '-ln(post)', top_title, uxmin, uxmax)
         end if
      end if
   end if
