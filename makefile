@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.12 2003/07/18 17:50:23 jsy1001 Exp $
+# $Id: makefile,v 1.13 2003/08/20 16:56:24 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -32,7 +32,7 @@ pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
 # *** Modify above this line for your system ***
 
 OBJECTS = maths.o fit.o visibility.o inout.o plot.o model.o \
-	gamma.o rjbesl.o
+	gamma.o rjbesl.o numrec.o
 MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
 
 
@@ -70,7 +70,7 @@ maths.o maths.mod: maths.f90
 fit.o fit.mod: fit.f90 maths.mod visibility.mod model.mod
 	$(F90) -c $(FFLAGC) fit.f90
 
-visibility.o visibility.mod: visibility.f90 maths.mod
+visibility.o visibility.mod: visibility.f90 maths.mod model.mod
 	$(F90) -c $(FFLAGC) visibility.f90
 
 inout.o inout.mod: inout.f90
@@ -79,7 +79,7 @@ inout.o inout.mod: inout.f90
 plot.o plot.mod: plot.f90 model.mod fit.mod
 	$(F90) -c $(FFLAGC) plot.f90
 
-model.o model.mod: model.f90
+model.o model.mod: model.f90 maths.mod
 	$(F90) -c $(FFLAGC) model.f90
 
 gamma.o: gamma.f
@@ -87,3 +87,6 @@ gamma.o: gamma.f
 
 rjbesl.o: rjbesl.f
 	$(F90) -c $(FFLAGC) rjbesl.f
+
+numrec.o: numrec.f
+	$(F90) -c $(FFLAGC) numrec.f

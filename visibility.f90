@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.4 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: visibility.f90,v 1.5 2003/08/20 16:56:24 jsy1001 Exp $
 
 module Visibility
 
@@ -21,6 +21,7 @@ module Visibility
 !gauss_hermite     not happy - db thesis seems incorrect
 
 use Maths !picks up pi parameter from here
+use Model
 
 implicit none
 
@@ -32,6 +33,7 @@ function cmplx_vis(spec, param, lambda, u, v)
   !returns complex visibility real and imaginary parts for
   !multiple component model. model component details stored in 
   !the model_spec and model_param arrays.
+  !u, v must be supplied in metres, lambda in nm
   
   !subroutine arguments
   character(len=128), dimension(:,:), intent(in) :: spec
@@ -40,7 +42,7 @@ function cmplx_vis(spec, param, lambda, u, v)
   double complex :: cmplx_vis
   
   !local variables
-  integer :: i, num_comps, nmax, j
+  integer :: i, num_comps, nmax
   double precision :: r, theta, B, a, phi, B_total
   double precision :: epsilon, rho, F, x1, x2, x3
   double precision, dimension(0:10) :: alpha
@@ -96,24 +98,27 @@ function cmplx_vis(spec, param, lambda, u, v)
            F = 1D0
         else
            select case (trim(spec(i,3)))
-              case ('uniform')
-                 F = uniform(a, rho)
-              case ('taylor')
-                 !alpha is array of taylor coeffs 0-20 (0th defined as -1)
-                 alpha(0) = -1D0
-                 F = taylor(a, rho, nmax, alpha)
-              case ('square-root')
-                 !alpha(1) and alpha(2) are sqroot coeffs alpha and beta
-                 F = square_root(a, rho, alpha(1), alpha(2))
-              case ('gaussian')
-                 F = gaussian(a, rho)
-              case ('hestroffer')
-                 !alpha(1) is hestroffer power law parameter
-                 F = hestroffer(a, rho, alpha(1))
-              case ('gauss-hermite')
-                 !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
-                 alpha(0) = 1D0
-                 F = gauss_hermite(a, rho, nmax, alpha)
+           case ('uniform')
+              F = uniform(a, rho)
+           case ('taylor')
+              !alpha is array of taylor coeffs 0-20 (0th defined as -1)
+              alpha(0) = -1D0
+              F = taylor(a, rho, nmax, alpha)
+           case ('square-root')
+              !alpha(1) and alpha(2) are sqroot coeffs alpha and beta
+              F = square_root(a, rho, alpha(1), alpha(2))
+           case ('gaussian')
+              F = gaussian(a, rho)
+           case ('hestroffer')
+              !alpha(1) is hestroffer power law parameter
+              F = hestroffer(a, rho, alpha(1))
+           case ('gauss-hermite')
+              !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
+              alpha(0) = 1D0
+              F = gauss_hermite(a, rho, nmax, alpha)
+           case default
+              !must be numerical CLV
+              F = clvvis(a, rho)
            end select
         end if
         
@@ -338,6 +343,32 @@ function gauss_hermite(a, rho, nmax, alpha)
   gauss_hermite = (x1/x2)
 
 end function gauss_hermite
+
+!==============================================================================
+
+function clvvis(a, rho)
+
+  !subroutine arguments
+  double precision :: clvvis, a, rho
+
+  !local variables
+  real bas_scaled, frac
+  integer ifind
+
+  bas_scaled = a*rho*1D-6/(mas2rad*clv_mdiam) !scaled baseline in Mega-lambda
+
+  call locate(clv_mbase, nxsiz+1, bas_scaled, ifind)
+  if (ifind == 0) then
+     clvvis = clv_mvis(1)
+  else if (ifind == nxsiz+1) then
+     clvvis = clv_mvis(nxsiz+1)
+  else
+     frac = (bas_scaled - clv_mbase(ifind)) / &
+          (clv_mbase(ifind+1) - clv_mbase(ifind))
+     clvvis = clv_mvis(ifind) + frac*(clv_mvis(ifind+1) - clv_mvis(ifind))
+  end if
+
+end function clvvis
 
 !==============================================================================
 

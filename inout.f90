@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.7 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: inout.f90,v 1.8 2003/08/20 16:56:24 jsy1001 Exp $
 
 module Inout
 
@@ -17,7 +17,7 @@ module Inout
 
 implicit none
 
-character(len=5), parameter :: release = '1.2.1'
+character(len=5), parameter :: release = '1.3.1'
 
 contains
 

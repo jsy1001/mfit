@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.3 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: model.f90,v 1.4 2003/08/20 16:56:24 jsy1001 Exp $
 
 module Model
 
@@ -8,6 +8,11 @@ module Model
 !print_model
 !write_model
 !free_model
+!read_clv
+!calcvis_clv
+!free_clv
+
+use Maths
 
 implicit none
 
@@ -34,6 +39,14 @@ character(len=128) :: model_name
 !centrosymmetric model?
 logical symm
 
+!numerical CLV data
+real, dimension(:), allocatable :: clv_rad, clv_inten
+integer nclv, clvcomp
+!model visibilities calculated from numerical CLV
+integer, parameter :: nxsiz = 4096, modelsize = 120
+real, dimension(nxsiz+1) :: clv_mbase, clv_mvis
+real clv_mdiam
+
 contains
 
 !==============================================================================
@@ -50,7 +63,9 @@ subroutine read_model(info, file_name)
   !local variables
   integer, parameter :: max_lines = 1000
   character(len=32) :: dummy, source1, source2
-  integer :: i, j, k, lines, comps, order
+  character(len=128) :: clv_filename
+  character(len=256) :: line
+  integer :: i, j, k, nlines, comps, order, pos
   
   !check for zero length filename
   if (file_name == '') then
@@ -69,7 +84,7 @@ subroutine read_model(info, file_name)
   close (11)
   return
 
-1 lines = i-1
+1 nlines = i-1
   close (11)
   
   !check if legal number of components
@@ -85,6 +100,7 @@ subroutine read_model(info, file_name)
   allocate(model_prior(comps,17))
   model_param = 0D0
   model_prior = 0D0
+  clvcomp = 0 !no model component yet has numerical CLV
 
   !Limits array stores the lower and upper acceptable limits
   !on the parameter values, it is passed into the minimising routines
@@ -98,7 +114,7 @@ subroutine read_model(info, file_name)
   !read source name
   open (unit=11, action='read', file=file_name)
   open (unit=12, action='read', file=file_name)
-  do i = 1, lines
+  do i = 1, nlines
      read (11, *, err=94) dummy
      if (dummy == 'source') then
         read (12, *, err=94) dummy, source1, source2
@@ -113,7 +129,7 @@ subroutine read_model(info, file_name)
   !read spec and param info for components
   open (unit=11, action='read', file=file_name)
   j = 0 !component counter
-  do i = 1, lines
+  do i = 1, nlines
      read (11,*,err=94,end=2) dummy
      if (dummy == 'component') then
         j = j+1
@@ -132,7 +148,10 @@ subroutine read_model(info, file_name)
               read (11,*,err=95) dummy
               model_spec(j,3) = 'uniform'
            case default
-              read (11,*,err=95,end=95) dummy, model_spec(j,3)
+              read (11,'(a)',err=95,end=95) line
+              read (line,*,err=95,end=95) dummy
+              pos = scan(trim(line), ' '//achar(9), back=.true.) + 1
+              model_spec(j,3) = line(pos:)
         end select
         if (dummy /= 'ld_type') goto 96
         
@@ -151,9 +170,27 @@ subroutine read_model(info, file_name)
            case ('taylor','gauss-hermite') 
               read (11,*,err=95,end=95) dummy, order
            case default
-              info = 'invalid limb darkening type'
-              close (11)
-              return
+              if (model_spec(j,3)(1:1) == '<') then
+                 if (clvcomp /= 0) then
+                    info = 'only one numerical CLV component allowed'
+                    close (11)
+                    return
+                 end if
+                 clvcomp = j
+                 clv_filename = model_spec(j,3)(2:(len_trim(model_spec(j,3))-1))
+                 call read_clv(info, clv_filename)
+                 if (info /= '') then
+                    close (11)
+                    return
+                 end if
+                 read (11,*,err=95,end=95) dummy
+                 order = 0
+              else
+                 !not <filename>
+                 info = 'invalid limb darkening type'
+                 close (11)
+                 return
+              end if
            end select
         if (dummy /= 'ld_order') goto 96
         model_param(j,1) = dble(order)
@@ -223,6 +260,9 @@ subroutine read_model(info, file_name)
            case('hestroffer')
               if (.not.(model_param(j,8) > 0D0)) goto 100
         end select
+        !if numerical CLV, calculate visibilities for initial guess diameter
+        if (model_spec(j,3)(1:1) == '<') &
+             call calcvis_clv(model_param(j,5))
 
         if (dummy /= 'ld_param_prior') goto 96
         
@@ -242,12 +282,13 @@ subroutine read_model(info, file_name)
      if (.not.((model_param(i,2)==0D0).and.(model_prior(i,2)==0D0))) &
           symm = .false.
   end do
+
   return
   
   !error trapping 
-91 info = 'cannot open file'
+91 info = 'cannot open file '//trim(file_name)
   return
-92 info = 'cannot read from file'
+92 info = 'cannot read from file '//trim(file_name)
   close(11)
   return
 94 info = 'unknown read problem - possible invalid file format'
@@ -277,8 +318,13 @@ subroutine print_model()
      print *,' '
      print *,'component:',i
      print *,'name     : ',trim(model_spec(i,1))
-     print *,'LD type  : ',trim(model_spec(i,3)), &
-          ' of order',int(model_param(i,1))
+     if (model_spec(i,3)(1:1) == '<') then
+        print *,'LD type  : ',trim(model_spec(i,3)), &
+             ' :',nclv,'points'
+     else
+        print *,'LD type  : ',trim(model_spec(i,3)), &
+             ' of order',int(model_param(i,1))
+     end if
      print *,'shape    : ',trim(model_spec(i,2))
      print 10,'position :',real(model_param(i,2:3))
      print 10,'    prior:',real(model_prior(i,2:3))
@@ -315,8 +361,167 @@ subroutine free_model()
   if (allocated(model_spec)) deallocate(model_spec)
   if (allocated(model_param)) deallocate(model_param)
   if (allocated(model_prior)) deallocate(model_prior)
+  call free_clv()
 
 end subroutine free_model
+
+!==============================================================================
+
+subroutine read_clv(info, file_name)
+
+  !Read numerical CLV from file and calculate model visibilities
+
+  !subroutine arguments
+  character(len=128), intent(out) :: info
+  character(len=*), intent(in) :: file_name
+
+  !local variables
+  integer, parameter :: iunit = 12
+  integer iclv
+  character(len=256) :: line
+
+  !count number of data lines, allocate storage
+  open (unit=iunit, file=file_name, action='read', err=91)
+  nclv = 0
+  do while(.true.)
+     read(iunit,*,end=20) line
+     !don't count comments or blank lines
+     if (line(1:1) /= '#' .and. len_trim(line) > 0) nclv = nclv + 1
+  end do
+20 close (iunit)
+  if (nclv == 0) then
+     info = 'file contains no data'
+     return
+  end if
+  allocate(clv_rad(nclv))
+  allocate(clv_inten(nclv))
+
+  !read two columns of data
+  open (unit=iunit, file=file_name, action='read', err=91)
+  iclv = 1
+  do while(.true.)
+     read(iunit,'(a)',end=30) line
+     if (line(1:1) /= '#' .and. len_trim(line) > 0) then
+        read(line,*) clv_rad(iclv), clv_inten(iclv)
+        !print *, iclv, clv_rad(iclv), clv_inten(iclv)
+        iclv = iclv + 1
+     end if
+  end do
+30  close (iunit)
+  return
+
+  !error trapping 
+91 info = 'cannot open file '//trim(file_name)
+  return
+
+end subroutine read_clv
+
+!==============================================================================
+
+subroutine calcvis_clv(model_diam)
+
+  !subroutine arguments
+  double precision, intent(in) :: model_diam
+
+  !local variables
+  integer threshold, ixcen, iycen, ix, iy, i, j, lookup, sign
+  real flux, radius, max_rad, frac, delta, factor
+  real, dimension(:,:), allocatable :: map2d
+  real, dimension(:), allocatable :: map1d
+
+  !allocate storage
+  allocate(map2d(nxsiz+1, nxsiz+1))
+  allocate(map1d(nxsiz+1))
+
+  !limits
+  max_rad = clv_rad(nclv)
+  threshold = nint(max_rad*modelsize) + 2
+
+  !do a brute force Hankel transform:
+  !first, make a 2d image of the top left quadrant of the disk
+  map2d = 0.
+  flux = 0.
+  ixcen = nxsiz + 1
+  iycen = nxsiz + 1
+  do i = 1, nxsiz + 1
+     ix = i - ixcen
+     if (abs(ix) <= threshold) then
+        do j = 1, nxsiz + 1
+           iy = j - iycen
+           if (abs(iy) <= threshold) then
+              !radius in units of photospheric radius
+              !(modelsize is photospheric radius in pixels)
+              radius = sqrt(real(ix*ix + iy*iy))/real(modelsize)
+              if (radius <= max_rad) then
+                 !use linear interpolation here
+                 call locate(clv_rad, nclv, radius, lookup)
+                 if (lookup == 0) then
+                    map2d(i,j) = clv_inten(1)
+                 else if (lookup == nclv) then
+                    map2d(i,j) = clv_inten(nclv)
+                 else
+                    !CAH had this wrong
+                    if (clv_rad(lookup+1) == clv_rad(lookup)) then
+                       map2d(i,j) = clv_inten(lookup)
+                    else
+                       frac = (radius - clv_rad(lookup)) / &
+                            (clv_rad(lookup+1) - clv_rad(lookup))
+                       delta = clv_inten(lookup+1) - clv_inten(lookup)
+                       map2d(i,j) = clv_inten(lookup) + (frac*delta)
+                    end if
+                 end if
+                 flux = flux + map2d(i,j)
+              end if
+           end if
+        end do
+     end if
+  end do
+
+  !now project to 1 dimension
+  do i = 1, nxsiz + 1
+     map1d(i) = 0.
+     ix = i - ixcen
+     if (abs(ix) <= threshold) then
+        do j = 1, nxsiz + 1
+           map1d(i) = map1d(i) + map2d(i,j)
+        end do
+        map1d(i) = map1d(i)/flux
+     end if
+  end do
+
+  !and take the cosine transform
+  call cosft1(map1d, nxsiz)
+  sign = 1
+  do i = 1, nxsiz + 1
+     !normalise to zero freq. value and fudge the sign
+     clv_mvis(i) = sign*map1d(i)/map1d(1)
+     sign = -sign
+  end do
+
+  !scale baselines (which are in Mega-lambda) so that the model
+  !corresponds to a star with photospheric diameter model_diam mas
+  clv_mdiam = model_diam
+  factor = 1.0e-6*modelsize/(clv_mdiam*mas2rad)/nxsiz
+  do i = 1, nxsiz + 1
+     clv_mbase(i) = real(i-1)*factor
+     write(20, *) clv_mbase(i), clv_mvis(i)
+  end do
+
+  !free storage
+  deallocate(map2d)
+  deallocate(map1d)
+
+end subroutine calcvis_clv
+
+!==============================================================================
+
+subroutine free_clv()
+
+  !Deallocate numerical clv storage
+  if (allocated(clv_rad)) deallocate(clv_rad)
+  if (allocated(clv_inten)) deallocate(clv_inten)
+
+end subroutine free_clv
 
 !==============================================================================
 
