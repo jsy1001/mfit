@@ -5,10 +5,10 @@ module Plot
 
   !subroutines contained:
   !
-  !plot_vis - plot squared visibility against projected baseline
-  !
   !plot_triple - plot closure phase against longest projected baseline
   !in triangle
+
+  !plot_vis - plot squared visibility against projected baseline
   !
   !plot_uv - plot uv coverage
 
@@ -16,7 +16,7 @@ module Plot
 
 contains
 
-  !==============================================================================
+  !============================================================================
 
   subroutine plot_triple(spec, param, x_title, y_title, top_title, device)
 
@@ -48,13 +48,13 @@ contains
     num_flagged = 0
     do i = 1, size(triple_data, 1)
        lambda = triple_data(i, 1)
-       u1 = triple_data(i, 2)
-       v1 = triple_data(i, 3)
-       u2 = triple_data(i, 4)
-       v2 = triple_data(i, 5)
-       phase = modulo(triple_data(i, 8), 360D0)
+       u1 = triple_data(i, 3)
+       v1 = triple_data(i, 4)
+       u2 = triple_data(i, 5)
+       v2 = triple_data(i, 6)
+       phase = modulo(triple_data(i, 9), 360D0)
        if (phase > 180.) phase = phase - 360.
-       phase_err = triple_data(i, 9)
+       phase_err = triple_data(i, 10)
        bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
        bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
        bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
@@ -65,7 +65,7 @@ contains
        model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
        if (model_phase > 180.) model_phase = model_phase - 360.
        model_points(i, 2) = model_phase
-       if (phase_err < 0D0) then
+       if (phase_err <= 0D0) then
           num_flagged = num_flagged + 1
           flagged_points(num_flagged, 1) = maxval(bas)
           flagged_points(num_flagged, 2) = phase
@@ -115,7 +115,7 @@ contains
 
   end subroutine plot_triple
 
-  !==============================================================================
+  !============================================================================
 
   subroutine plot_vis(spec, param, symm, x_title, y_title, top_title, device)
 
@@ -144,12 +144,12 @@ contains
     num_flagged = 0
     do i = 1, size(vis_data, 1)
        lambda = vis_data(i, 1)
-       u = vis_data(i, 2)
-       v = vis_data(i, 3)
+       u = vis_data(i, 3)
+       v = vis_data(i, 4)
        bas = 1000.*sqrt(u**2. + v**2.)/lambda
-       vsq = vis_data(i, 4)
-       err = vis_data(i, 5)
-       if (err < 0D0) then
+       vsq = vis_data(i, 5)
+       err = vis_data(i, 6)
+       if (err <= 0D0) then
           num_flagged = num_flagged + 1
           flagged_points(num_flagged, 1) = bas
           flagged_points(num_flagged, 2) = vsq
@@ -171,16 +171,14 @@ contains
     ymax = maxval(data_points(:num_data, 3))
     
     !change ranges
-    xmin = 0.0
+    xmin = xmin*0.9
     xmax = xmax*1.1
     if (ymin > 0) then
        ymin = ymin*0.9
-    else if (ymin < 0) then
+    else if (ymin < 0) then !yes, may be -ve
        ymin = ymin*1.2
     end if
-    if (ymax < 1.1) then
-       ymax = 1.1
-    end if
+    ymax = ymax*1.1
 
     if (symm) then !and single wavelength
        !calculate grid of model points
@@ -198,8 +196,8 @@ contains
        allocate(model_points(num_model, 2))
        do i = 1, num_model
           lambda = vis_data(i, 1)
-          u = vis_data(i, 2)
-          v = vis_data(i, 3)
+          u = vis_data(i, 3)
+          v = vis_data(i, 4)
           model_points(i, 1) = 1000.*sqrt(u**2. + v**2.)/lambda
           model_points(i, 2) = modulus(cmplx_vis(spec, param, lambda, u, v))**2.
        end do
@@ -229,7 +227,7 @@ contains
 
   end subroutine plot_vis
 
-  !==============================================================================
+  !============================================================================
 
   subroutine plot_uv(x_title, y_title, top_title, device)
 
@@ -254,11 +252,11 @@ contains
     max = 0.
     do i = 1, size(vis_data, 1)
        lambda = vis_data(i, 1)
-       u = 1000.*vis_data(i, 2)/lambda
-       v = 1000.*vis_data(i, 3)/lambda
+       u = 1000.*vis_data(i, 3)/lambda
+       v = 1000.*vis_data(i, 4)/lambda
        bas = sqrt(u**2. + v**2.)
        if (bas > max) max = bas
-       if (vis_data(i, 5) < 0D0) then
+       if (vis_data(i, 6) <= 0D0) then
           num_flagged = num_flagged + 1
           flagged_points(num_flagged, 1) = u
           flagged_points(num_flagged, 2) = v
@@ -285,6 +283,6 @@ contains
 
   end subroutine plot_uv
 
-  !==============================================================================
+  !============================================================================
 
 end module Plot

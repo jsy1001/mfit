@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.6 2002/11/29 10:40:05 jsy1001 Exp $
+!$Id: fit.f90,v 1.7 2003/02/17 13:20:02 jsy1001 Exp $
 
 module Fit
 
@@ -388,10 +388,10 @@ do i = 1, size(vis_data,1)
    
    !extract points
    lambda = vis_data(i,1)
-   u = vis_data(i,2)
-   v = vis_data(i,3)
-   data_vis = vis_data(i,4)
-   data_vis_err = vis_data(i,5)
+   u = vis_data(i,3)
+   v = vis_data(i,4)
+   data_vis = vis_data(i,5)
+   data_vis_err = vis_data(i,6)
 
    !ignore if -ve or zero error:
    if (data_vis_err>0D0) then
@@ -413,14 +413,14 @@ do i = 1, size(triple_data,1)
 
    !extract points
    lambda = triple_data(i,1)
-   u1 = triple_data(i,2)
-   v1 = triple_data(i,3)
-   u2 = triple_data(i,4)
-   v2 = triple_data(i,5)
-   data_amp = triple_data(i,6)
-   data_amp_err = triple_data(i,7)
-   data_phase = triple_data(i,8)
-   data_phase_err = triple_data(i,9)
+   u1 = triple_data(i,3)
+   v1 = triple_data(i,4)
+   u2 = triple_data(i,5)
+   v2 = triple_data(i,6)
+   data_amp = triple_data(i,7)
+   data_amp_err = triple_data(i,8)
+   data_phase = triple_data(i,9)
+   data_phase_err = triple_data(i,10)
 
    if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
       !compute model-predicted triple amplitude
@@ -515,10 +515,10 @@ do i = 1, size(vis_data,1)
    
    !extract points
    lambda = vis_data(i,1)
-   u = vis_data(i,2)
-   v = vis_data(i,3)
-   data_vis = vis_data(i,4)
-   data_vis_err = vis_data(i,5)
+   u = vis_data(i,3)
+   v = vis_data(i,4)
+   data_vis = vis_data(i,5)
+   data_vis_err = vis_data(i,6)
 
    if (data_vis_err>0D0) then
       
@@ -539,14 +539,14 @@ do i = 1, size(triple_data,1)
 
    !extract points
    lambda = triple_data(i,1)
-   u1 = triple_data(i,2)
-   v1 = triple_data(i,3)
-   u2 = triple_data(i,4)
-   v2 = triple_data(i,5)
-   data_amp = triple_data(i,6)
-   data_amp_err = triple_data(i,7)
-   data_phase = triple_data(i,8)
-   data_phase_err = triple_data(i,9)
+   u1 = triple_data(i,3)
+   v1 = triple_data(i,4)
+   u2 = triple_data(i,5)
+   v2 = triple_data(i,6)
+   data_amp = triple_data(i,7)
+   data_amp_err = triple_data(i,8)
+   data_phase = triple_data(i,9)
+   data_phase_err = triple_data(i,10)
 
    if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
       !compute model-predicted triple product

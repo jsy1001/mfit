@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.8 2002/11/29 10:40:05 jsy1001 Exp $
+# $Id: makefile,v 1.9 2003/02/17 13:20:02 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -24,7 +24,7 @@ pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
 
 
 mfit: $(OBJECTS)
-	$(F90) $^ -o $@ `pgplotlink` $(pda_libs) -dalign -lf77compat
+	$(F90) $^ -o $@ `pgplotlink` $(pda_libs) -lfitsio -dalign -lf77compat
 
 calc: calc.o maths.o gamma.o rjbesl.o
 	$(F90) $^ -o $@ $(pda_libs) -dalign -lf77compat

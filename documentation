@@ -5,7 +5,8 @@ Compiling mfit
 ==============
 
 The following commands assume that 'f90' invokes the Sun Workshop f90/f95
-compiler, and that the 'pgplotlink' command is somewhere in the path.
+compiler, that the 'pgplotlink' command is somewhere in the path, and that all
+the required libraries will be found by the compiler.
 
 [On the Cavendish Astrophysics Sun systems, the pgplotlink
 shell script sends the following to standard output:
@@ -22,7 +23,7 @@ f90 -c -dalign model.f90
 f90 -c -dalign gamma.f
 f90 -c -dalign rjbesl.f
 f90 -o mfit main.f90 maths.o visibility.o fit.o inout.o plot.o model.o gamma.o
-rjbesl.o -dalign `pgplotlink` -lpda -lemsf -lems -lcnf -lf77compat
+rjbesl.o -dalign `pgplotlink` -lpda -lemsf -lems -lcnf -lfitsio -lf77compat
 
 The '-lpda -lemsf -lems -lcnf' arguments are needed to link all the components
 of the Starlink PDA library. The resulting executable will be called 'mfit'.
@@ -61,7 +62,8 @@ any closure phase measurements in explicitly (you will need to create a mapdat
 file for this).
 
 The capability to read the OI Exchange format
-(see http://www.mrao.cam.ac.uk/~jsy1001/exchange/) will be added to mfit later.
+(see http://www.mrao.cam.ac.uk/~jsy1001/exchange/) has been added in mfit
+v1.2. Only the squared visibility and triple product data types are used.
 
 
 Model file format
@@ -273,7 +275,7 @@ Wavebands with the same lambda but different delta(lambda) are not
 distinguished in mapdat files.
 
 
-$Id: documentation,v 1.4 2002/11/18 10:28:58 jsy1001 Exp $
+$Id: documentation,v 1.5 2003/02/17 13:20:02 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
