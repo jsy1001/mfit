@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.17 2005/01/07 14:02:02 jsy1001 Exp $
+!$Id: main.f90,v 1.18 2005/01/07 16:02:44 jsy1001 Exp $
 
 program Main
 
@@ -32,7 +32,7 @@ program Main
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
   double precision :: calib_error, uxmin, uxmax, temp
-  logical :: force_symm
+  logical :: force_symm, mod_line
 
   integer :: pgopen, istat
 
@@ -131,8 +131,10 @@ program Main
         force_symm = .true.
 
      else if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') then
+        !read_oi_fits allocates vis_data, triple_data, and wavebands
         call read_oi_fits(info, file_name, -1, source, &
              vis_data, triple_data, wavebands, calib_error)
+        force_symm = .false.
 
      else
         info = 'file type "'//trim(ext)//'" not handled'
@@ -287,9 +289,10 @@ program Main
 
      !-------------------------------------------------------------------------
      ! plot initial model
+     mod_line = (symm .and. size(sel_wavebands, 1) == 1)
      top_title = trim(source)//' - initial model: '//trim(model_name)
      if (useful_vis > 0) &
-          call plot_vis_bas(model_spec, model_param, symm, &
+          call plot_vis_bas(model_spec, model_param, mod_line, &
           'Baseline /M\gl', 'Squared visibility', top_title)
      if (useful_amp > 0) &
           call plot_triple_amp_bas(model_spec, model_param, &
@@ -310,7 +313,7 @@ program Main
 
      info = ''
      ! minimiser allocates fit_param, x, x_pos, sol, desc, hes, cov, cor
-     call minimiser(info, symm, sol, flag, desc, &
+     call minimiser(info, force_symm, sol, flag, desc, &
           hes, cov, cor, chisqrd, nlposterior, nlevidence)
      if (info /= '') then
         print *,'*****'
@@ -382,15 +385,16 @@ program Main
         !----------------------------------------------------------------------
         !plot
 
+        mod_line = (symm .and. size(sel_wavebands, 1) == 1)
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (useful_vis > 0) then
-           call plot_vis_bas(model_spec, fit_param, symm, 'Baseline /M\gl', &
+           call plot_vis_bas(model_spec, fit_param, mod_line, 'Baseline /M\gl', &
                 'Squared Visibility', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_vis_bas(model_spec, fit_param, symm, 'Baseline /M\gl', &
+              call plot_vis_bas(model_spec, fit_param, mod_line, 'Baseline /M\gl', &
                    'Squared Visibility', top_title, uxmin, uxmax)
            end if
         end if

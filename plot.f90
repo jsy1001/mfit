@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.11 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: plot.f90,v 1.12 2005/01/07 16:02:44 jsy1001 Exp $
 
 module Plot
   
@@ -43,7 +43,7 @@ contains
 
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
-    real :: xmin, xmax, ymin, ymax
+    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
     double precision :: lambda, delta_lambda, u1, v1, u2, v2
     double complex :: vis1, vis2, vis3
     real :: phase, phase_err, model_phase
@@ -100,13 +100,19 @@ contains
     end do
 
     !calculate y range required
+    dymin = minval(data_points(:num_data, 4))
+    dymax = maxval(data_points(:num_data, 3))
+    fymin = minval(flagged_points(:num_flagged, 4))
+    fymax = maxval(flagged_points(:num_flagged, 3))
+    mymin = minval(model_points(:num_model, 2))
+    mymax = maxval(model_points(:num_model, 2))
     if (num_data > 0) then
        !exclude flagged extrema by default
-       ymin = minval(data_points(:num_data, 4))
-       ymax = maxval(data_points(:num_data, 3))
+       ymin = min(dymin, mymin)
+       ymax = max(dymax, mymax)
     else if (num_flagged > 0) then
-       ymin = minval(flagged_points(:num_flagged, 4))
-       ymax = maxval(flagged_points(:num_flagged, 3))
+       ymin = min(fymin, mymin)
+       ymax = max(fymax, mymax)
     else
        !nothing to plot
        return
@@ -164,7 +170,7 @@ contains
 
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
-    real :: xmin, xmax, ymin, ymax
+    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
     double precision :: lambda, delta_lambda, u1, v1, u2, v2
     double complex :: vis1, vis2, vis3
     real :: amp, amp_err
@@ -173,7 +179,6 @@ contains
 
     !functions
     integer :: pgopen
-
     ! make up real arrays for unflagged & flagged data points plus model points
     ! columns are x, y, (y+delta, y-delta)
     allocate(data_points(size(triple_data, 1), 4))
@@ -218,13 +223,19 @@ contains
     end do
 
     !calculate y range required
+    dymin = minval(data_points(:num_data, 4))
+    dymax = maxval(data_points(:num_data, 3))
+    fymin = minval(flagged_points(:num_flagged, 4))
+    fymax = maxval(flagged_points(:num_flagged, 3))
+    mymin = minval(model_points(:num_model, 2))
+    mymax = maxval(model_points(:num_model, 2))
     if (num_data > 0) then
        !exclude flagged extrema by default
-       ymin = minval(data_points(:num_data, 4))
-       ymax = maxval(data_points(:num_data, 3))
+       ymin = min(dymin, mymin)
+       ymax = max(dymax, mymax)
     else if (num_flagged > 0) then
-       ymin = minval(flagged_points(:num_flagged, 4))
-       ymax = maxval(flagged_points(:num_flagged, 3))
+       ymin = min(fymin, mymin)
+       ymax = max(fymax, mymax)
     else
        !nothing to plot
        return
@@ -272,13 +283,13 @@ contains
 
   !============================================================================
 
-  subroutine plot_vis_bas(spec, param, symm, x_title, y_title, top_title, &
+  subroutine plot_vis_bas(spec, param, mod_line, x_title, y_title, top_title, &
        uxmin, uxmax, device)
 
     !subroutine arguments
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
-    logical, intent(in) :: symm
+    logical, intent(in) :: mod_line !plot continuous line for model?
     character(len=*), intent(in) :: x_title, y_title, top_title
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
@@ -288,7 +299,8 @@ contains
          model_points
     double precision :: u, v, lambda, delta_lambda
     integer :: num_data, num_flagged, num_model, i, istat
-    real :: bas, vsq, err, xmin, xmax, ymin, ymax
+    real :: bas, vsq, err, xmin, xmax
+    real :: ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
     integer, parameter :: grid_size = 200
 
     !functions
@@ -337,7 +349,7 @@ contains
        xmax = 1.1*maxval(data_points(:num_data, 1))
     end if
 
-    if (symm) then !and single wavelength
+    if (mod_line) then
        !calculate grid of model points
        num_model = grid_size
        allocate(model_points(num_model, 2))
@@ -367,17 +379,23 @@ contains
     end if
 
     !calculate y range
+    dymin = minval(data_points(:num_data, 4))
+    dymax = maxval(data_points(:num_data, 3))
+    fymin = minval(flagged_points(:num_flagged, 4))
+    fymax = maxval(flagged_points(:num_flagged, 3))
+    mymin = minval(model_points(:num_model, 2))
+    mymax = maxval(model_points(:num_model, 2))
     if (num_data > 0) then
        !exclude flagged extrema by default
-       ymin = minval(data_points(:num_data, 4))
-       ymax = maxval(data_points(:num_data, 3))
+       ymin = min(dymin, mymin)
+       ymax = max(dymax, mymax)
     else if (num_flagged > 0) then
-       ymin = minval(flagged_points(:num_flagged, 4))
-       ymax = maxval(flagged_points(:num_flagged, 3))
+       ymin = min(fymin, mymin)
+       ymax = max(fymax, mymax)
     else if (num_model > 0) then
        !user x range excludes all data, ensure model points in range
-       ymin = minval(model_points(:, 2))
-       ymax = maxval(model_points(:, 2))
+       ymin = mymin
+       ymax = mymax
     else
        !nothing to plot
        return
@@ -407,7 +425,7 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    if (symm) then
+    if (mod_line) then
        call pgline(num_model, model_points(:, 1), model_points(:, 2))
     else
        call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
@@ -579,7 +597,8 @@ contains
          model_points
     double precision :: u, v, lambda, delta_lambda
     integer :: num_data, num_flagged, num_model, i, istat
-    real :: vsq, err, xmin, xmax, ymin, ymax
+    real :: vsq, err, xmin, xmax
+    real :: ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
 
     !functions
     integer :: pgopen
@@ -643,17 +662,19 @@ contains
     end do
 
     !calculate y range
+    dymin = minval(data_points(:num_data, 4))
+    dymax = maxval(data_points(:num_data, 3))
+    fymin = minval(flagged_points(:num_flagged, 4))
+    fymax = maxval(flagged_points(:num_flagged, 3))
+    mymin = minval(model_points(:num_model, 2))
+    mymax = maxval(model_points(:num_model, 2))
     if (num_data > 0) then
        !exclude flagged extrema by default
-       ymin = minval(data_points(:num_data, 4))
-       ymax = maxval(data_points(:num_data, 3))
+       ymin = min(dymin, mymin)
+       ymax = max(dymax, mymax)
     else if (num_flagged > 0) then
-       ymin = minval(flagged_points(:num_flagged, 4))
-       ymax = maxval(flagged_points(:num_flagged, 3))
-    else if (num_model > 0) then
-       !user x range excludes all data, ensure model points in range
-       ymin = minval(model_points(:, 2))
-       ymax = maxval(model_points(:, 2))
+       ymin = min(fymin, mymin)
+       ymax = max(fymax, mymax)
     else
        !nothing to plot
        return
@@ -706,7 +727,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
-    real :: xmin, xmax, ymin, ymax
+    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
     double precision :: lambda, delta_lambda, u1, v1, u2, v2
     double complex :: vis1, vis2, vis3
     real :: phase, phase_err, model_phase
@@ -760,13 +781,19 @@ contains
     end do
 
     !calculate y range required
+    dymin = minval(data_points(:num_data, 4))
+    dymax = maxval(data_points(:num_data, 3))
+    fymin = minval(flagged_points(:num_flagged, 4))
+    fymax = maxval(flagged_points(:num_flagged, 3))
+    mymin = minval(model_points(:num_model, 2))
+    mymax = maxval(model_points(:num_model, 2))
     if (num_data > 0) then
        !exclude flagged extrema by default
-       ymin = minval(data_points(:num_data, 4))
-       ymax = maxval(data_points(:num_data, 3))
+       ymin = min(dymin, mymin)
+       ymax = max(dymax, mymax)
     else if (num_flagged > 0) then
-       ymin = minval(flagged_points(:num_flagged, 4))
-       ymax = maxval(flagged_points(:num_flagged, 3))
+       ymin = min(fymin, mymin)
+       ymax = max(fymax, mymax)
     else
        !nothing to plot
        return
@@ -830,7 +857,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
-    real :: xmin, xmax, ymin, ymax
+    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
     double precision :: lambda, delta_lambda, u1, v1, u2, v2
     double complex :: vis1, vis2, vis3
     real :: amp, amp_err
@@ -881,13 +908,19 @@ contains
     end do
 
     !calculate y range required
+    dymin = minval(data_points(:num_data, 4))
+    dymax = maxval(data_points(:num_data, 3))
+    fymin = minval(flagged_points(:num_flagged, 4))
+    fymax = maxval(flagged_points(:num_flagged, 3))
+    mymin = minval(model_points(:num_model, 2))
+    mymax = maxval(model_points(:num_model, 2))
     if (num_data > 0) then
        !exclude flagged extrema by default
-       ymin = minval(data_points(:num_data, 4))
-       ymax = maxval(data_points(:num_data, 3))
+       ymin = min(dymin, mymin)
+       ymax = max(dymax, mymax)
     else if (num_flagged > 0) then
-       ymin = minval(flagged_points(:num_flagged, 4))
-       ymax = maxval(flagged_points(:num_flagged, 3))
+       ymin = min(fymin, mymin)
+       ymax = max(fymax, mymax)
     else
        !nothing to plot
        return

@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.11 2005/01/07 14:02:02 jsy1001 Exp $
+!$Id: clfit.f90,v 1.12 2005/01/07 16:02:44 jsy1001 Exp $
 
 program Main
 
@@ -35,7 +35,7 @@ program Main
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
   double precision :: calib_error, uxmin, uxmax, x0, sigma
-  logical :: force_symm, nofit, zoom
+  logical :: force_symm, nofit, zoom, mod_line
 
   integer :: pgopen, istat
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.11 $'
+  cvs_rev = '$Revision: 1.12 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -205,6 +205,7 @@ program Main
      !read_oi_fits allocates vis_data, triple_data, and wavebands
      call read_oi_fits(info, file_name, user_target_id, source, &
           vis_data, triple_data, wavebands, calib_error)
+     force_symm = .false.
 
   else
      info = 'file type "'//trim(ext)//'" not handled'
@@ -353,14 +354,15 @@ program Main
         normchisqrd = chisqrd/degfreedom
         print *, 'chi sqrd / deg freedom =',real(normchisqrd)
      end if
+     mod_line = (symm .and. size(sel_wavebands, 1) == 1)
      top_title = trim(source)//' - initial model: '//trim(model_name)
      if (sel_plot == 'vis2' .and. useful_vis > 0) then
         if (zoom) then 
-           call plot_vis_bas(model_spec, model_param, symm, &
+           call plot_vis_bas(model_spec, model_param, mod_line, &
                 'Baseline /M\gl', 'Squared visibility', top_title, &
                 uxmin, uxmax)
         else
-           call plot_vis_bas(model_spec, model_param, symm, &
+           call plot_vis_bas(model_spec, model_param, mod_line, &
                 'Baseline /M\gl', 'Squared visibility', top_title)
         end if
      end if
@@ -429,7 +431,7 @@ program Main
 
      info = ''
      ! minimiser allocates fit_param, x, x_pos, sol, desc, hes, cov, cor
-     call minimiser(info, symm, sol, flag, desc, &
+     call minimiser(info, force_symm, sol, flag, desc, &
           hes, cov, cor, chisqrd, nlposterior, nlevidence)
      if (info /= '') then
         print *,'*****'
@@ -497,14 +499,15 @@ program Main
 
         !----------------------------------------------------------------------
         !plot
+        mod_line = (symm .and. size(sel_wavebands, 1) == 1)
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (sel_plot == 'vis2' .and. useful_vis > 0) then
            if (zoom) then 
-              call plot_vis_bas(model_spec, fit_param, symm, &
+              call plot_vis_bas(model_spec, fit_param, mod_line, &
                    'Baseline /M\gl', 'Squared visibility', top_title, &
                    uxmin, uxmax)
            else
-              call plot_vis_bas(model_spec, fit_param, symm, &
+              call plot_vis_bas(model_spec, fit_param, mod_line, &
                    'Baseline /M\gl', 'Squared visibility', top_title)
            end if
         end if
