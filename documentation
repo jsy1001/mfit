@@ -36,13 +36,17 @@ clfit will generate at most one plot for each invocation. Use the '-p'
 argument to specify the plot type, or the '-z' argument to specify the plot
 type and x-axis range. Valid plot types are:
 
-uv     uv coverage for squared-visibility data
-vis2   squared visibility against projected baseline
-t3amp  triple product amplitude against longest projected baseline in triangle
-t3phi  triple product phase against longest projected baseline in triangle
-post n one-dimensional cut through the minimum of the negative log posterior,
-       along the axis of variable parameter n (i.e. not a marginalised
-       posterior)
+uv      uv coverage for squared-visibility data
+vis2    squared visibility against projected baseline
+t3amp   triple product amplitude against longest projected baseline in triangle
+t3phi   triple product phase against longest projected baseline in triangle
+post n  one-dimensional cut through the minimum of the negative log posterior,
+        along the axis of variable parameter n (i.e. not a marginalised
+        posterior)
+vis2wl  squared visibility against wavelength (for data with multiple
+        spectral channels)
+t3ampwl triple product amplitude against wavelength
+t3phiwl triple product phase against wavelength
 
 fitgui will similarly make up to one plot each time 'Go' is clicked. The plot
 types are as listed above.
@@ -79,6 +83,10 @@ mfit ignores these signs and works with squared visibilities. You should put
 any closure phase measurements in explicitly (you will need to create a mapdat
 or OI-FITS file for this).
 
+Model visibilities are coherently averaged over a top-hat bandpass with the
+bandwidth from the data file (or supplied by the user), to take into account
+bandwidth smearing.
+
 
 Model file format
 =================
@@ -99,6 +107,8 @@ of the line followed by the values associated with it.
 Maximum number of components is set to 10.  Maximum order of taylor and
 gauss-hermite LD types is also set to 10.
 
+Currently, all models are wavelength-independent.
+
 Keyword            Parameter information
 -------            ---------------------
 
@@ -114,6 +124,13 @@ ld_type            One word specifying limb darkening type of the component,
 	           'gauss-hermite' or 'gaussian'. Hankel transform functions 
 		   all as defined in the maths work. if 'point' is specified 
 	           as the shape_type then nothing should be put here.
+
+		   Alternatively a filename in angle brackets <> may be given
+		   (only for one model component). This should be a text file
+		   specifying a limb-darkening profile numerically, i.e. r and
+		   I(r), perhaps as a function of wavelength. Acceptable
+		   formats for the file are described under 'Numerical
+		   limb-darkening' below.
 
 ld_order           A single integer (1-10) specifying the order of the
 		   expansion in the 'taylor' and 'gauss-hermite' LD cases.
@@ -160,6 +177,50 @@ ld_param           Up to twenty limb darkening parameters may be put here.
                    of parameters as specified in the ld_order field above.
 
 ld_param_prior     Prior widths associated with each number supplied above
+
+
+Numerical limb-darkening
+========================
+
+A filename in angle brackets <> may be given as the 'ld_type', for at most
+one component of the model. The file should conform to one of the following
+formats. The format corresponding to the filename extension (see below) will be
+assumed.
+
+As a side-effect of fitting the model to the data, fake visibility data for a
+star with the initial diameter from the model file is written to a file
+'fort.20' (this is a hidden feature!). The output is a text file with two
+columns: visibility, and baseline in mega-lambda.
+
+.clv file - Wavelength-independent limb-darkening:
+--------------------------------------------------
+
+This should be a two-column text file specifying r and I(r). The best-fit
+diameter will correspond to the r=1 point. r should increase monotonically
+through the file, and the first and last lines should have r=0 and I=0
+respectively. Comment lines beginning with '#' and blank lines will be ignored.
+
+Any other extension - Wavelength-dependent limb-darkening:
+----------------------------------------------------------
+
+This text file format specifies I(mu, lambda), where mu=sqrt(1-r**2). An
+example of the top part of a file in this format follows (beware long lines):
+
+# No. of mu values, followed by values themselves
+18
+0.000  0.010  0.025  0.050  0.075  0.100  0.125  0.150  0.200  0.250  0.300  0.400  0.500  0.600  0.700  0.800  0.900  1.000
+# Each line consists of temperature(K) logg wavelength(nm) I(0) ... I(1.00)
+4000    1.0     401     0.005680  0.006544  0.007839  0.009456  0.010797  0.012004  0.013138  0.014233  0.016391  0.018591  0.020900  0.025952  0.031787  0.038499  0.046143  0.054775  0.064395  0.075003
+4000    1.0     403     0.005695  0.006484  0.007667  0.009172  0.010437  0.011581  0.012664  0.013717  0.015802  0.017946  0.020194  0.025215  0.031029  0.037786  0.045538  0.054343  0.064201  0.075128
+...
+
+Again, comment lines beginning with '#' and blank lines will be ignored. Any
+number of lines giving I(mu) for a particular wavelength may be present, but
+wavelength should increase monotonically through the file. The temperature and
+logg values are ignored by mfit.
+
+The wavelength-dependent format is derived from that used for the Kurucz models
+supplied to Chris Haniff by Bill Tango in 2001 (I think).
 
 
 Illegal minimisations
@@ -264,6 +325,13 @@ set to zero.
 The "hessian-based error" of a parameter is the square root of the variance in
 the quantity.
 
+Newer mfit releases also quote a second set of error bars for the best-fit
+parameters. These assume the error bars on the data should be scaled (by a
+common factor for squared visibilities, triple amplitudes, and closure
+phases) such that the reduced chi-squared at the solution point is unity.
+This second set of estimates will be more conservative than the first in
+the (usual) case of chi-squared > 1.
+
 
 Model selection
 ===============
@@ -281,15 +349,17 @@ between models to be compared have been neglected.
 Known deficiencies
 ==================
 
-Other plot choices (e.g. versus hour angle - need to read OI_TARGET for this)
-should be added.
+Other plot choices (e.g. versus hour angle) should be added.
 
 Ignores complex visibilities from OI-FITS file.
 
-Assumes single target in OI-FITS file.
+If closure phase data are supplied, these can result in discontinuities in the
+posterior. The numerical calculation of the Hessian matrix can sometimes
+erroneously cross such discontinuities. If you suspect this is happening, it is
+advisable to plot cuts through the posterior.
 
 
-$Id: documentation,v 1.10 2004/01/28 12:26:04 jsy1001 Exp $
+$Id: documentation,v 1.11 2005/01/06 18:45:12 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

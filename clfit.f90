@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.9 2004/02/13 16:50:57 jsy1001 Exp $
+!$Id: clfit.f90,v 1.10 2005/01/06 18:45:12 jsy1001 Exp $
 
 program Main
 
@@ -26,12 +26,12 @@ program Main
 
   !other local variables
   double precision, dimension(:, :), allocatable :: wavebands
-  double precision, dimension(2) :: wb
+  double precision, dimension(2) :: wb, wl
   character(len=width) :: spacer_line
   character(len=128) :: switch, arg, device, info, file_name, ext, source, &
        top_title, cvs_rev, revision
-  character(len=5) :: sel_plot
-  integer :: narg, iarg, i, j, n, length, flag, index
+  character(len=6) :: sel_plot
+  integer :: narg, iarg, i, j, n, length, flag, index, user_target_id
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
   double precision :: calib_error, uxmin, uxmax, x0, sigma
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.9 $'
+  cvs_rev = '$Revision: 1.10 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -68,6 +68,8 @@ program Main
   nofit = .false.
   zoom = .false.
   wb = (/-1.0D0, -1.0D0/)
+  wl = (/-1.0D0, -1.0D0/)
+  user_target_id = -1 !default to 1st target in OI_TARGET
   calib_error = 0D0
   do
      if (iarg == narg - 1) exit
@@ -92,6 +94,12 @@ program Main
            call get_command_argument(iarg+2, arg)
            read(arg, *) wb(2)
            iarg = iarg + 2
+        case('-r', '--waverange')
+           call get_command_argument(iarg+1, arg)
+           read(arg, *) wl(1)
+           call get_command_argument(iarg+2, arg)
+           read(arg, *) wl(2)
+           iarg = iarg + 2
         case('-p', '--plot')
            call get_command_argument(iarg+1, sel_plot)
            iarg = iarg + 1
@@ -113,6 +121,10 @@ program Main
            call get_command_argument(iarg+3, arg)
            read(arg, *) uxmax
            iarg = iarg + 3
+        case('-t', '--target_id')
+           call get_command_argument(iarg+1, arg)
+           read(arg, *) user_target_id
+           iarg = iarg + 1
         case default
            print *, 'Ignoring invalid command-line argument: ', arg
         end select
@@ -170,6 +182,8 @@ program Main
      call read_vis(info, file_name, source, max_lines, vis_data, wb, &
           calib_error)
      allocate(triple_data(0, 0))
+     allocate(wavebands(1, 2))
+     wavebands(1, :) = wb
      force_symm = .true.
 
   else if (ext == 'nvis') then
@@ -183,15 +197,17 @@ program Main
      call read_nvis(info, file_name, source, max_lines, vis_data, wb, &
           calib_error)
      allocate(triple_data(0, 0))
+     allocate(wavebands(1, 2))
+     wavebands(1, :) = wb
      force_symm = .true.
 
-  else if (ext == 'fits') then
+  else if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') then
      !read_oi_fits allocates vis_data, triple_data, and wavebands
-     call read_oi_fits(info, file_name, source, &
+     call read_oi_fits(info, file_name, user_target_id, source, &
           vis_data, triple_data, wavebands)
 
   else
-     info = 'file type not handled'
+     info = 'file type "'//trim(ext)//'" not handled'
 
   end if
   if (info /= '') then
@@ -199,25 +215,37 @@ program Main
      stop
   end if
 
-  !Filter here to reduce vis and triple data to single waveband, selected
-  !by user, this will not be necessary if multi-waveband fitting is
-  !implemented
+  !Filter here to reduce vis and triple data to chosen waveband(s)
   if (size(wavebands,1) > 1) then
      print *,' '
      print *,'multiple waveband data found with the following wavelengths'
      do i = 1, size(wavebands,1)
         print 59, 'waveband', i, 'wavelength (nm)', real(wavebands(i, 1)), &
              'bandwidth (nm)', real(wavebands(i, 2))
-59      format(a, 1x, i2, 1x, a, 1x, f6.2, 1x, a, 1x, f6.2)
+59      format(a, 1x, i3, 1x, a, 1x, f8.2, 1x, a, 1x, f7.2)
      end do
 
      if (wb(1) /= -1.0D0) then
         call filt_by_wb(vis_data, wb, sig)
         call filt_by_wb(triple_data, wb, sig)
+        allocate(sel_wavebands(1, 2))
+        sel_wavebands(1, :) = wb
         print *, ' '
-        print '(1x, a, 1x, 2f6.2)', 'Using specified waveband:', wb
+        print '(1x, a, 1x, 2f8.2)', 'Using specified waveband:', wb
+     end if
+     if (wl(1) /= -1.0D0) then
+        call filt_by_wl(vis_data, wl(1), wl(2))
+        call filt_by_wl(triple_data, wl(1), wl(2))
+        allocate(sel_wavebands(size(wavebands, 1), 2))
+        sel_wavebands = wavebands
+        call filt_by_wl(sel_wavebands, wl(1), wl(2))
+        print *, ' '
+        print '(1x, a, 1x, 2f8.2)', 'Using specified wavelength range:', wl
      end if
 
+  else
+     allocate(sel_wavebands(1, 2))
+     sel_wavebands = wavebands
   end if
 
   !Count number of useful data points (i.e. with +ve errors, points with
@@ -293,7 +321,7 @@ program Main
   call get_command_argument(narg, file_name)
   print *, 'reading model...'
   info = ''
-  call read_model(info, file_name)
+  call read_model(info, file_name, sel_wavebands)
   if (info /= '') then
      print *, info
      stop
@@ -328,33 +356,65 @@ program Main
      top_title = trim(source)//' - initial model: '//trim(model_name)
      if (sel_plot == 'vis2' .and. useful_vis > 0) then
         if (zoom) then 
-           call plot_vis(model_spec, model_param, symm, &
+           call plot_vis_bas(model_spec, model_param, symm, &
                 'Baseline /M\gl', 'Squared visibility', top_title, &
                 uxmin, uxmax)
         else
-           call plot_vis(model_spec, model_param, symm, &
+           call plot_vis_bas(model_spec, model_param, symm, &
                 'Baseline /M\gl', 'Squared visibility', top_title)
+        end if
+     end if
+     if (sel_plot == 'vis2wl' .and. useful_vis > 0) then
+        if (zoom) then 
+           call plot_vis(1, model_spec, model_param, &
+                'Wavelength /nm', 'Squared visibility', top_title, &
+                uxmin, uxmax)
+        else
+           call plot_vis(1, model_spec, model_param, &
+                'Wavelength /nm', 'Squared visibility', top_title)
         end if
      end if
      if (sel_plot == 't3amp' .and. useful_amp > 0) then
         if (zoom) then 
-           call plot_triple_amp(model_spec, model_param, &
+           call plot_triple_amp_bas(model_spec, model_param, &
                 'Longest baseline /M\gl', 'Triple amplitude', top_title, &
                 uxmin, uxmax)
         else
-           call plot_triple_amp(model_spec, model_param, &
+           call plot_triple_amp_bas(model_spec, model_param, &
                 'Longest baseline /M\gl', 'Triple amplitude', top_title)
+        end if
+     end if
+     if (sel_plot == 't3ampwl' .and. useful_amp > 0) then
+        if (zoom) then 
+           call plot_triple_amp(1, model_spec, model_param, &
+                'Wavelength /nm', &
+                'Triple amplitude', top_title, uxmin, uxmax)
+        else
+           call plot_triple_amp(1, model_spec, model_param, &
+                'Wavelength /nm', &
+                'Triple amplitude', top_title)
         end if
      end if
      if (sel_plot == 't3phi' .and. useful_cp > 0) then
         if (zoom) then 
-           call plot_triple_phase(model_spec, model_param, &
+           call plot_triple_phase_bas(model_spec, model_param, &
                 'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                 top_title, uxmin, uxmax)
         else
-           call plot_triple_phase(model_spec, model_param, &
+           call plot_triple_phase_bas(model_spec, model_param, &
                 'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                 top_title)
+        end if
+     end if
+     if (sel_plot == 't3phiwl' .and. useful_cp > 0) then
+        if (zoom) then 
+           call plot_triple_phase(1, model_spec, model_param, &
+                'Wavelength /nm', &
+                'Closure phase /'//char(176), top_title, uxmin, uxmax)
+        else
+           call plot_triple_phase(1, model_spec, model_param, &
+                'Wavelength /nm', &
+                'Closure phase /'//char(176), top_title)
         end if
      end if
      !cannot do 'post' plot if --nofit
@@ -440,33 +500,65 @@ program Main
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (sel_plot == 'vis2' .and. useful_vis > 0) then
            if (zoom) then 
-              call plot_vis(model_spec, fit_param, symm, &
+              call plot_vis_bas(model_spec, fit_param, symm, &
                    'Baseline /M\gl', 'Squared visibility', top_title, &
                    uxmin, uxmax)
            else
-              call plot_vis(model_spec, fit_param, symm, &
+              call plot_vis_bas(model_spec, fit_param, symm, &
                    'Baseline /M\gl', 'Squared visibility', top_title)
+           end if
+        end if
+        if (sel_plot == 'vis2wl' .and. useful_vis > 0) then
+           if (zoom) then 
+              call plot_vis(1, model_spec, fit_param, &
+                   'Wavelength /nm', 'Squared visibility', top_title, &
+                   uxmin, uxmax)
+           else
+              call plot_vis(1, model_spec, fit_param, &
+                   'Wavelength /nm', 'Squared visibility', top_title)
            end if
         end if
         if (sel_plot == 't3amp' .and. useful_amp > 0) then
            if (zoom) then 
-              call plot_triple_amp(model_spec, fit_param, &
+              call plot_triple_amp_bas(model_spec, fit_param, &
                    'Longest baseline /M\gl', 'Triple amplitude', &
                    top_title, uxmin, uxmax)
            else
-              call plot_triple_amp(model_spec, fit_param, &
+              call plot_triple_amp_bas(model_spec, fit_param, &
                    'Longest baseline /M\gl', 'Triple amplitude', &
                    top_title)
            end if
         end if
+        if (sel_plot == 't3ampwl' .and. useful_amp > 0) then
+           if (zoom) then 
+              call plot_triple_amp(1, model_spec, fit_param, &
+                   'Wavelength /nm', &
+                   'Triple amplitude', top_title, uxmin, uxmax)
+           else
+              call plot_triple_amp(1, model_spec, fit_param, &
+                   'Wavelength /nm', &
+                   'Triple amplitude', top_title)
+           end if
+        end if
         if (sel_plot == 't3phi' .and. useful_cp > 0) then
            if (zoom) then 
-              call plot_triple_phase(model_spec, fit_param, &
+              call plot_triple_phase_bas(model_spec, fit_param, &
                    'Longest baseline /M\gl', &
                    'Closure phase /'//char(176), top_title, uxmin, uxmax)
            else
-              call plot_triple_phase(model_spec, fit_param, &
+              call plot_triple_phase_bas(model_spec, fit_param, &
                    'Longest baseline /M\gl', &
+                   'Closure phase /'//char(176), top_title)
+           end if
+        end if
+        if (sel_plot == 't3phiwl' .and. useful_cp > 0) then
+           if (zoom) then 
+              call plot_triple_phase(1, model_spec, fit_param, &
+                   'Wavelength /nm', &
+                   'Closure phase /'//char(176), top_title, uxmin, uxmax)
+           else
+              call plot_triple_phase(1, model_spec, fit_param, &
+                   'Wavelength /nm', &
                    'Closure phase /'//char(176), top_title)
            end if
         end if
@@ -478,7 +570,7 @@ program Main
                  sigma = model_prior(x_pos(index, 1), x_pos(index, 2))
               else
                  sigma = sol(index, 2)
-              endif
+              end if
               uxmin = x0 - 3*sigma
               uxmax = x0 + 3*sigma
            end if
@@ -546,6 +638,36 @@ contains
 
 !==============================================================================
 
+  subroutine filt_by_wl(data, wlmin, wlmax)
+
+    !Filter 2d double precision data array by 1st column
+    !Rows are kept if 1st column between wlmin and wlmax
+    !Reallocates data array
+    double precision, dimension(:, :), allocatable :: data
+    double precision :: wlmin, wlmax
+    integer dim2
+
+    !local variables
+    integer nfilt
+    logical, dimension(:), allocatable :: mask
+    double precision, dimension(:, :), allocatable :: filt_data
+
+    dim2 = size(data,2)
+    allocate(mask(size(data,1)))
+    mask = (data(:, 1) >= wlmin .and. data(:, 1) <= wlmax)
+    nfilt = count(mask)
+    allocate(filt_data(nfilt, dim2))
+    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/nfilt, dim2/))
+    deallocate(data)
+    allocate(data(nfilt, dim2))
+    data = filt_data
+    deallocate(filt_data)
+    deallocate(mask)
+
+  end subroutine filt_by_wl
+
+!==============================================================================
+
   subroutine print_usage()
 
     print *, 'Usage:'
@@ -554,12 +676,18 @@ contains
     print *, ' '
     print *, 'Options (may appear in any order):'
     print *, ' '
-    print *, "-n|--nofit            just report initial chi^2 and make plot (if specified) for initial model"
-    print *, '-w|--waveband CWL BW  select this waveband; must specify wb this way for .(n)vis data'
-    print *, '-c|--calerr FRAC      add calibration error (frac. error in system visibility)'
-    print *, '-p|--plot  uv|post N|vis2|t3amp|t3phi  make specified plot'
-    print *, '-z|--zoomplot  uv|post N|vis2|t3amp|t3phi| XMIN XMAX  plot with specified x-axis range'
-    print *, '-d|--device DEV       PGPLOT device to use'
+    print *, '-n|--nofit              just report initial chi^2 and make plot (if specified)'
+    print *, '                        for initial model'
+    print *, '-w|--waveband CWL BW    select this waveband;'
+    print *, '                        must specify wb this way for .(n)vis data'
+    print *, '-r|--waverange WL1 WL2  select all wavebands in this range'
+    print *, '-t|--target_id ID       select this target (default is 1st in OI_TARGET table)'
+    print *, '-c|--calerr FRAC        add calibration error (frac. err. in system visib.)'
+    print *, '-p|--plot      uv|post N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl'
+    print *, '                        make specified plot'
+    print *, '-z|--zoomplot  uv|post N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl XMIN XMAX'
+    print *, '                        plot with specified x-axis range'
+    print *, '-d|--device DEV         PGPLOT device to use'
     print *, ' '
 
   end subroutine print_usage

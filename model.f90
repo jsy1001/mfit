@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.5 2003/09/01 14:24:28 jsy1001 Exp $
+!$Id: model.f90,v 1.6 2005/01/06 18:45:12 jsy1001 Exp $
 
 module Model
 
@@ -15,6 +15,8 @@ module Model
 use Maths
 
 implicit none
+
+include 'fftw_f77.i'
 
 !module variables contained:
 
@@ -40,18 +42,20 @@ character(len=128) :: model_name
 logical symm
 
 !numerical CLV data
-real, dimension(:), allocatable :: clv_rad, clv_inten
+real, dimension(:), allocatable :: clv_rad
+real, dimension(:, :), allocatable :: clv_inten
 integer nclv, clvcomp
 !model visibilities calculated from numerical CLV
 integer, parameter :: nxsiz = 4096, modelsize = 120
-real, dimension(nxsiz+1) :: clv_mbase, clv_mvis
+real, dimension(nxsiz+1) :: clv_mbase
+real, dimension(:, :), allocatable :: clv_mvis, clv_wb
 real clv_mdiam
 
 contains
 
 !==============================================================================
 
-subroutine read_model(info, file_name)
+subroutine read_model(info, file_name, wavebands)
     
   !Reads model files
   !(Re-)Allocates and assigns to module variables
@@ -59,6 +63,7 @@ subroutine read_model(info, file_name)
   !subroutine arguments
   character(len=128), intent(out) :: info
   character(len=*), intent(in) :: file_name
+  double precision, dimension(:, :), intent(in) :: wavebands
   
   !local variables
   integer, parameter :: max_lines = 1000
@@ -179,7 +184,7 @@ subroutine read_model(info, file_name)
                  end if
                  clvcomp = j
                  clv_filename = model_spec(j,3)(2:(len_trim(model_spec(j,3))-1))
-                 call read_clv(info, clv_filename)
+                 call read_clv(info, clv_filename, wavebands)
                  if (info /= '') then
                     close (11)
                     return
@@ -368,50 +373,131 @@ end subroutine free_model
 
 !==============================================================================
 
-subroutine read_clv(info, file_name)
+subroutine read_clv(info, file_name, wavebands)
 
   !Read numerical CLV from file and calculate model visibilities
 
   !subroutine arguments
   character(len=128), intent(out) :: info
   character(len=*), intent(in) :: file_name
+  double precision, dimension(:, :), intent(in) :: wavebands !model can be wavelength-dependent
 
   !local variables
-  integer, parameter :: iunit = 12
-  integer iclv
-  character(len=256) :: line
+  integer, parameter :: iunit = 12, iunit2 = 13
+  integer iclv, iwl, nwl, iwb, nwb, start, end
+  character(len=256) :: line, ext
+  real dummy1, dummy2
+  real, dimension(:), allocatable :: wl
+  real, dimension(:, :), allocatable :: inten
 
-  !count number of data lines, allocate storage
-  open (unit=iunit, file=file_name, action='read', err=91)
-  nclv = 0
-  do while(.true.)
-     read(iunit,*,end=20) line
-     !don't count comments or blank lines
-     if (line(1:1) /= '#' .and. len_trim(line) > 0) nclv = nclv + 1
-  end do
-20 close (iunit)
-  if (nclv == 0) then
-     info = 'file contains no data'
-     return
-  end if
-  allocate(clv_rad(nclv))
-  allocate(clv_inten(nclv))
+  !decide what sort of CLV file we have
+  ext = trim(file_name(scan(file_name,'.',.true.)+1:len(file_name)))
 
-  !read two columns of data
-  open (unit=iunit, file=file_name, action='read', err=91)
-  iclv = 1
-  do while(.true.)
-     read(iunit,'(a)',end=30) line
-     if (line(1:1) /= '#' .and. len_trim(line) > 0) then
-        read(line,*) clv_rad(iclv), clv_inten(iclv)
-        !print *, iclv, clv_rad(iclv), clv_inten(iclv)
-        iclv = iclv + 1
+  if (ext == 'clv') then
+
+     !wavelength-independent CLV; two columns giving r, I(r)
+     
+     !count number of data lines, allocate storage
+     open (unit=iunit, file=file_name, status='old', action='read', err=91)
+     nclv = 0
+     do while(.true.)
+        read(iunit,'(a)',end=20) line
+        !don't count comments or blank lines
+        if (line(1:1) /= '#' .and. len_trim(line) > 0) nclv = nclv + 1
+     end do
+20   close (iunit)
+     if (nclv == 0) then
+        info = 'file contains no data'
+        return
      end if
-  end do
-30  close (iunit)
+     allocate(clv_rad(nclv))
+     allocate(clv_inten(nclv, 1))
+     allocate(clv_mvis(nxsiz+1, 1))
+     !clv_wb not required
+
+     !read two columns of data
+     open (unit=iunit, file=file_name, action='read', err=91)
+     iclv = 1
+     do while(.true.)
+        read(iunit,'(a)',end=30) line
+        if (line(1:1) /= '#' .and. len_trim(line) > 0) then
+           read(line,*) clv_rad(iclv), clv_inten(iclv, 1)
+           iclv = iclv + 1
+        end if
+     end do
+30   close (iunit)
+
+  else
+
+     !wavelength-dependent CLV
+     !format as in Kurucz models supplied to Chris Haniff by Bill Tango!
+
+     open (unit=iunit, file=file_name, status='old', action='read', err=91)
+     open (unit=iunit2, file=file_name, action='read')
+
+     !1st non-comment line gives no. of mu values
+     do while(.true.)
+        read(iunit,'(a)',end=90) line
+        read(iunit2,'(a)') line
+        if (line(1:1) /= '#' .and. len_trim(line) > 0) exit
+     end do
+     read (line,*) nclv
+     nclv = nclv + 1 !extra point for intensity beyond mu=0
+     allocate(clv_rad(nclv))
+     allocate(clv_inten(nclv, size(wavebands, 1)))
+     allocate(clv_mvis(nxsiz+1, size(wavebands, 1)))
+     allocate(clv_wb(size(wavebands, 1), 2))
+     clv_wb = wavebands
+     read (iunit,'(a)') line
+     read (iunit2,*) clv_rad(2:nclv)
+     !convert from mu to r
+     do iclv = 2, nclv
+        clv_rad(iclv) = sqrt(1. - clv_rad(iclv)**2)
+     end do
+     clv_rad(1) = 1.0001
+
+     !subsequent lines give Temp(K) logg wavelength(nm) I(mu=0) ... I(mu=1)
+     !count number of data lines, allocate local storage
+     nwl = 0
+     do while(.true.)
+        read(iunit,'(a)',end=40) line
+        !don't count comments or blank lines
+        if (line(1:1) /= '#' .and. len_trim(line) > 0) nwl = nwl + 1
+     end do
+40   close (iunit)
+     allocate(wl(nwl))
+     allocate(inten(nclv, nwl))
+
+     !read CLV data (typically on fine wavelength grid)
+     iwl = 0
+     do while(.true.)
+        read(iunit2,'(a)',end=50) line
+        if (line(1:1) /= '#' .and. len_trim(line) > 0) then
+           iwl = iwl + 1
+           inten(1, iwl) = 0.0
+           read(line,*) dummy1, dummy2, wl(iwl), inten(2:nclv, iwl)
+        end if
+     end do
+50   close (iunit2)
+
+     !integrate to get required (top-hat) bandpasses
+     do iwb = 1, size(clv_wb, 1)
+        start = locate(wl, clv_wb(iwb, 1)-0.5*clv_wb(iwb, 2))
+        end = locate(wl, clv_wb(iwb, 1)+0.5*clv_wb(iwb, 2))
+        clv_inten(:, iwb) = 0.
+        do iwl = start, end
+           clv_inten(:, iwb) = clv_inten(:, iwb) + inten(:, iwl)
+        end do
+        clv_inten(:, iwb) = clv_inten(:, iwb) / (end-start+1)
+     end do
+
+  end if
+
   return
 
   !error trapping 
+90 info = 'file contains no data'
+  return
 91 info = 'cannot open file '//trim(file_name)
   return
 
@@ -425,78 +511,97 @@ subroutine calcvis_clv(model_diam)
   double precision, intent(in) :: model_diam
 
   !local variables
-  integer threshold, ixcen, iycen, ix, iy, i, j, lookup, sign
+  integer threshold, ixcen, iycen, ix, iy, i, j, lookup, sign, plan
+  integer icalc, ncalc
   real flux, radius, max_rad, frac, delta, factor
-  real, dimension(:,:), allocatable :: map2d
-  real, dimension(:), allocatable :: map1d
+  double precision, dimension(:,:), allocatable :: map2d
+  double precision, dimension(:), allocatable :: map1d, map1d_rft
 
   !allocate storage
   allocate(map2d(nxsiz+1, nxsiz+1))
-  allocate(map1d(nxsiz+1))
+  allocate(map1d(2*nxsiz+1))
+  allocate(map1d_rft(2*nxsiz+1))
 
   !limits
-  max_rad = clv_rad(nclv)
+  max_rad = maxval(clv_rad)
   threshold = nint(max_rad*modelsize) + 2
+  ncalc = size(clv_inten, 2) !either unity or no. of wavebands
 
-  !do a brute force Hankel transform:
-  !first, make a 2d image of the top left quadrant of the disk
-  map2d = 0.
-  flux = 0.
-  ixcen = nxsiz + 1
-  iycen = nxsiz + 1
-  do i = 1, nxsiz + 1
-     ix = i - ixcen
-     if (abs(ix) <= threshold) then
-        do j = 1, nxsiz + 1
-           iy = j - iycen
-           if (abs(iy) <= threshold) then
-              !radius in units of photospheric radius
-              !(modelsize is photospheric radius in pixels)
-              radius = sqrt(real(ix*ix + iy*iy))/real(modelsize)
-              if (radius <= max_rad) then
-                 !use linear interpolation here
-                 call locate(clv_rad, nclv, radius, lookup)
-                 if (lookup == 0) then
-                    map2d(i,j) = clv_inten(1)
-                 else if (lookup == nclv) then
-                    map2d(i,j) = clv_inten(nclv)
-                 else
-                    !CAH had this wrong
-                    if (clv_rad(lookup+1) == clv_rad(lookup)) then
-                       map2d(i,j) = clv_inten(lookup)
+  if (ncalc > 20) then
+     call rfftw_f77_create_plan(plan, 2*nxsiz+1, FFTW_REAL_TO_COMPLEX, &
+          FFTW_MEASURE)
+  else
+     call rfftw_f77_create_plan(plan, 2*nxsiz+1, FFTW_REAL_TO_COMPLEX, &
+          FFTW_ESTIMATE)
+  end if
+
+  do icalc = 1, ncalc
+
+     !do a brute force Hankel transform:
+     !first, make a 2d image of the top left quadrant of the disk
+     map2d = 0.
+     flux = 0.
+     ixcen = nxsiz + 1
+     iycen = nxsiz + 1
+     do i = 1, nxsiz + 1
+        ix = i - ixcen
+        if (abs(ix) <= threshold) then
+           do j = 1, nxsiz + 1
+              iy = j - iycen
+              if (abs(iy) <= threshold) then
+                 !radius in units of photospheric radius
+                 !(modelsize is photospheric radius in pixels)
+                 radius = sqrt(real(ix*ix + iy*iy))/real(modelsize)
+                 if (radius <= max_rad) then
+                    !use linear interpolation here
+                    lookup = locate(clv_rad, radius)
+                    if (lookup == 0) then
+                       map2d(i,j) = clv_inten(1, icalc)
+                    else if (lookup == nclv) then
+                       map2d(i,j) = clv_inten(nclv, icalc)
                     else
-                       frac = (radius - clv_rad(lookup)) / &
-                            (clv_rad(lookup+1) - clv_rad(lookup))
-                       delta = clv_inten(lookup+1) - clv_inten(lookup)
-                       map2d(i,j) = clv_inten(lookup) + (frac*delta)
+                       !CAH had this wrong
+                       if (clv_rad(lookup+1) == clv_rad(lookup)) then
+                          map2d(i,j) = clv_inten(lookup, icalc)
+                       else
+                          frac = (radius - clv_rad(lookup)) / &
+                               (clv_rad(lookup+1) - clv_rad(lookup))
+                          delta = clv_inten(lookup+1, icalc) &
+                               - clv_inten(lookup, icalc)
+                          map2d(i,j) = clv_inten(lookup, icalc) + (frac*delta)
+                       end if
                     end if
+                    flux = flux + map2d(i,j)
                  end if
-                 flux = flux + map2d(i,j)
               end if
-           end if
-        end do
-     end if
-  end do
+           end do
+        end if
+     end do
 
-  !now project to 1 dimension
-  do i = 1, nxsiz + 1
-     map1d(i) = 0.
-     ix = i - ixcen
-     if (abs(ix) <= threshold) then
-        do j = 1, nxsiz + 1
-           map1d(i) = map1d(i) + map2d(i,j)
-        end do
-        map1d(i) = map1d(i)/flux
-     end if
-  end do
+     !now project to 1 dimension, and reflect
+     do i = 1, nxsiz + 1
+        map1d(i) = 0D0
+        ix = i - ixcen
+        if (abs(ix) <= threshold) then
+           do j = 1, nxsiz + 1
+              map1d(i) = map1d(i) + map2d(i,j)
+           end do
+           map1d(i) = map1d(i)/flux
+           map1d(2*nxsiz + 2 - i) = map1d(i)
+        end if
+        write(30, *) i, map1d(i)
+     end do
 
-  !and take the cosine transform
-  call cosft1(map1d, nxsiz)
-  sign = 1
-  do i = 1, nxsiz + 1
+     !and take the fourier transform of this real (symmetric) array
+     call rfftw_f77_one(plan, map1d, map1d_rft)
+
      !normalise to zero freq. value and fudge the sign
-     clv_mvis(i) = sign*map1d(i)/map1d(1)
-     sign = -sign
+     sign = 1
+     do i = 1, nxsiz + 1
+        clv_mvis(i, icalc) = sign*map1d_rft(i)/map1d_rft(1)
+        sign = -sign
+     end do
+
   end do
 
   !scale baselines (which are in Mega-lambda) so that the model
@@ -505,12 +610,14 @@ subroutine calcvis_clv(model_diam)
   factor = 1.0e-6*modelsize/(clv_mdiam*mas2rad)/nxsiz
   do i = 1, nxsiz + 1
      clv_mbase(i) = real(i-1)*factor
-     write(20, *) clv_mbase(i), clv_mvis(i)
+     write(20, *) clv_mbase(i), clv_mvis(i, 1)
   end do
 
+  call rfftw_f77_destroy_plan(plan)
   !free storage
   deallocate(map2d)
   deallocate(map1d)
+  deallocate(map1d_rft)
 
 end subroutine calcvis_clv
 
@@ -521,6 +628,8 @@ subroutine free_clv()
   !Deallocate numerical clv storage
   if (allocated(clv_rad)) deallocate(clv_rad)
   if (allocated(clv_inten)) deallocate(clv_inten)
+  if (allocated(clv_mvis)) deallocate(clv_mvis)
+  if (allocated(clv_wb)) deallocate(clv_wb)
 
 end subroutine free_clv
 

@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.13 2004/03/25 13:49:01 jsy1001 Exp $
+!$Id: inout.f90,v 1.14 2005/01/06 18:45:12 jsy1001 Exp $
 
 module Inout
 
@@ -16,7 +16,7 @@ module Inout
 
 implicit none
 
-character(len=5), parameter :: release = '1.3.6'
+character(len=5), parameter :: release = '1.4.1'
 
 contains
 
@@ -383,10 +383,10 @@ end subroutine read_mapdat
 
 !==============================================================================
 
-subroutine read_oi_fits(info, file_name, source, &
+subroutine read_oi_fits(info, file_name, user_target_id, source, &
      vis_data, triple_data, wavebands)
 
-  !Reads OI FITS format
+  !Reads OIFITS format
   !
   !(Re)Allocates and fills in vis_data and triple_data arrays:
   !
@@ -395,9 +395,9 @@ subroutine read_oi_fits(info, file_name, source, &
   !triple_data: lambda, u1, v1, u2, v2, amp, err, cp, err
   !
   !wavebands array (allocated here) gives different (wavelength, bandwidth)
-  !pairs encountered. Currently doesn't read OI_TARGET table, and so returns
-  ! '(unknown)' in source.
-  !Doesn't check TARGET_ID columns either, just reads all data
+  !pairs encountered.
+  !Reads rows with TARGET_ID == user_target_id,
+  !unless user_target_id is -1, when 1st TARGET_ID in OI_TARGET table is used
   !
   !Deals with arbitrary table positions in file, and references to
   !OI_WAVELENGTH tables via INSNAME. Code to actually read the data is quite
@@ -409,32 +409,77 @@ subroutine read_oi_fits(info, file_name, source, &
   !subroutine arguments
   character(len=128), intent(out) :: info, source
   character(len=*), intent(in) :: file_name
+  integer, intent(in) :: user_target_id
   double precision, dimension(:, :), allocatable, intent(out) :: vis_data
   double precision, dimension(:, :), allocatable, intent(out) :: triple_data
   double precision, dimension(:, :), allocatable, intent(out) :: wavebands
 
   !local variables
-  integer, parameter :: maxhdu = 10 !must exceed no. of tables in file
+  integer, parameter :: maxhdu = 20 !must exceed no. of tables in file
   integer, dimension(maxhdu) :: vis2_hdus, t3_hdus, wl_hdus
   integer, dimension(maxhdu) :: vis2_rows, t3_rows, vis2_nwave, t3_nwave
   character(len=80), dimension(maxhdu) :: vis2_insname, t3_insname, wl_insname
-  integer :: status, unit, blocksize, hdutype, nhdu, maxwave
-  integer :: nvis2, nt3, nwl, iwl, irow, nwave, iwave, itab, j
+  integer :: status, unit, blocksize, hdutype, nhdu, maxwave, ntarget
+  integer :: nvis2, nt3, nwl, iwl, irow, ntot, nwave, iwave, itab, j
   integer :: vis_rows, triple_rows, colnum, naxis, count, num_wb
-  integer, dimension(3) :: naxes
+  integer :: target_id, sel_target_id
+  integer, dimension(2) :: vis2sta
+  integer, dimension(3) :: naxes, t3sta
   character(len=80) :: keyval, comment
   real, dimension(:, :), allocatable :: tab_wb, all_wb
   double precision, dimension(:), allocatable :: vis2data, vis2err
   double precision, dimension(:), allocatable :: t3amp, t3amperr
   double precision, dimension(:), allocatable :: t3phi, t3phierr
   logical, dimension(:), allocatable :: flag
-  double precision :: ucoord, vcoord, u2coord, v2coord
+  integer, dimension(:), allocatable :: all_ids
+  character (len=16), dimension(:), allocatable :: all_names
+  double precision :: mjd, ucoord, vcoord, u2coord, v2coord
 
   !Open FITS file
   status = 0
   call ftgiou(unit, status) !get unused unit number
   call ftopen(unit, file_name, 0, blocksize, status)
   if (status /= 0) then
+     print *, 'FITSIO Error opening file:'
+     call ftgerr(status, info)
+     return
+  end if
+
+  !Get name & target_id of chosen target
+  !call ftmnhd(unit, 2, 'OI_TARGET', 0, status) !move to OI_TARGET
+  !can't link to ftmnhd for some reason, so find OI_TARGET by brute force
+  nhdu = 1
+  hduloop0: do
+     call ftmrhd(unit, 1, hdutype, status)
+     if (status /= 0) exit hduloop0 !most likely EOF
+     nhdu = nhdu + 1
+     call ftgkys(unit, 'EXTNAME', keyval, comment, status)
+     if (trim(keyval) == 'OI_TARGET') then
+        call ftgkyj(unit, 'NAXIS2', ntarget, comment, status)
+        allocate(all_ids(ntarget))
+        allocate(all_names(ntarget))
+        call read_oi_target(unit, ntarget, all_ids, all_names, status)
+        if (user_target_id == -1) then
+           sel_target_id = all_ids(1)
+        else
+           sel_target_id = user_target_id
+        end if
+        print *, 'Read OI_TARGET table containing:'
+        do irow = 1, ntarget
+           print '(i4, 2x, a16)', all_ids(irow), all_names(irow)
+           if (all_ids(irow) == sel_target_id) then
+              print *, '^^^^^^^^^^^^^^^^^^^^^^'
+              source = all_names(irow)
+           end if
+        end do
+        deallocate(all_ids)
+        deallocate(all_names)
+        exit hduloop0
+     end if
+  end do hduloop0
+  if (status /= 0 .and. status /= 107) then
+     !return if error wasn't EOF
+     print *, 'FITSIO Error scanning for OI_TARGET:'
      call ftgerr(status, info)
      return
   end if
@@ -445,8 +490,9 @@ subroutine read_oi_fits(info, file_name, source, &
   nvis2 = 0
   nt3 = 0
   nwl = 0
-  nhdu = 1
   maxwave = 0 !will be upper limit on number of distinct wavebands in file
+  nhdu = 1
+  call ftmahd(unit, nhdu, hdutype, status) !go back to start
   hduloop: do
      call ftmrhd(unit, 1, hdutype, status)
      if (status /= 0) exit hduloop !most likely EOF
@@ -456,39 +502,71 @@ subroutine read_oi_fits(info, file_name, source, &
         !Get table size & INSNAME for OI_VIS2
         nvis2 = nvis2 + 1
         vis2_hdus(nvis2) = nhdu !remember position
-        call ftgkyj(unit, 'NAXIS2', vis2_rows(nvis2), comment, status)
+        call ftgkyj(unit, 'NAXIS2', ntot, comment, status)
         call ftgcno(unit, .false., 'VIS2DATA', colnum, status)
         call ftgtdm(unit, colnum, 3, naxis, naxes, status)
         vis2_nwave(nvis2) = naxes(1)
         maxwave = maxwave + vis2_nwave(nvis2)
+        !read all rows to find no. matching sel_target_id
+        vis2_rows(nvis2) = 0
+        allocate(vis2data(vis2_nwave(nvis2)))
+        allocate(vis2err(vis2_nwave(nvis2)))
+        allocate(flag(vis2_nwave(nvis2)))
+        do irow = 1, ntot
+           call read_oi_vis2(unit, irow, vis2_nwave(nvis2), target_id, mjd, &
+                vis2data, vis2err, ucoord, vcoord, vis2sta, flag, status)
+           if (target_id == sel_target_id) vis2_rows(nvis2) = vis2_rows(nvis2) + 1
+        end do
         call ftgkys(unit, 'INSNAME', vis2_insname(nvis2), comment, status)
-        print *, 'Found OI_VIS2 table with', vis2_rows(nvis2), 'rows, INSNAME=', & 
-             trim(vis2_insname(nvis2))
+        print *, nhdu, ': OI_VIS2 table with', vis2_rows(nvis2), &
+             'matching rows, INSNAME=', trim(vis2_insname(nvis2))
+        deallocate(vis2data)
+        deallocate(vis2err)
+        deallocate(flag)
      else if (trim(keyval) == 'OI_T3') then
         !Get table size & INSNAME for OI_T3
         nt3 = nt3 + 1
         t3_hdus(nt3) = nhdu !remember position
-        call ftgkyj(unit, 'NAXIS2', t3_rows(nt3), comment, status)
+        call ftgkyj(unit, 'NAXIS2', ntot, comment, status)
         call ftgcno(unit, .false., 'T3AMP', colnum, status)
         call ftgtdm(unit, colnum, 3, naxis, naxes, status)
         t3_nwave(nt3) = naxes(1)
         maxwave = maxwave + t3_nwave(nt3)
+        !read all rows to find no. matching sel_target_id
+        t3_rows(nt3) = 0
+        allocate(t3amp(t3_nwave(nt3)))
+        allocate(t3amperr(t3_nwave(nt3)))
+        allocate(t3phi(t3_nwave(nt3)))
+        allocate(t3phierr(t3_nwave(nt3)))
+        allocate(flag(t3_nwave(nt3)))
+        do irow = 1, ntot
+           call read_oi_t3(unit, irow, t3_nwave(nt3), target_id, mjd, &
+                t3amp, t3amperr, t3phi, t3phierr, &
+                ucoord, vcoord, u2coord, v2coord, t3sta, flag, status)
+           if (target_id == sel_target_id) t3_rows(nt3) = t3_rows(nt3) + 1
+        end do
         call ftgkys(unit, 'INSNAME', t3_insname(nt3), comment, status)
-        print *, 'Found OI_T3 table with', t3_rows(nt3), 'rows, INSNAME=', &
-             trim(t3_insname(nt3))
+        print *, nhdu, ': OI_T3 table with', t3_rows(nt3), &
+             'matching rows, INSNAME=', trim(t3_insname(nt3))
+        deallocate(t3amp)
+        deallocate(t3amperr)
+        deallocate(t3phi)
+        deallocate(t3phierr)
+        deallocate(flag)
      else if (trim(keyval) == 'OI_WAVELENGTH') then
         !Get INSNAME for OI_WAVELENGTH
         nwl = nwl + 1
         wl_hdus(nwl) = nhdu !remember position
         call ftgkys(unit, 'INSNAME', wl_insname(nwl), comment, status)
-        print *, 'Found OI_WAVELENGTH table with INSNAME=', &
+        print *, nhdu, ': OI_WAVELENGTH table with INSNAME=', &
              trim(wl_insname(nwl))
      else
-        print *, 'Skipping ', trim(keyval), ' table'
+        print *, nhdu, ': Skipping ', trim(keyval), ' table'
      end if
   end do hduloop
   if (status /= 107) then
      !return if error wasn't EOF
+     print *, 'FITSIO Error in Pass 1:'
      call ftgerr(status, info)
      return
   end if
@@ -512,6 +590,7 @@ subroutine read_oi_fits(info, file_name, source, &
 
   !Pass 2 - read the data
   !Read OI_VIS2 tables in turn
+  count = 1
   do itab = 1, nvis2
      nwave = vis2_nwave(itab)
      do iwl = 1, nwl
@@ -535,11 +614,10 @@ subroutine read_oi_fits(info, file_name, source, &
      allocate(vis2err(nwave))
      allocate(flag(nwave))
      call ftmahd(unit, vis2_hdus(itab), hdutype, status)
-     count = 1
      !read 1 row at a time to save memory
      do irow = 1, vis2_rows(itab)
-        call read_oi_vis2(unit, irow, nwave, vis2data, vis2err, &
-             ucoord, vcoord, flag, status)
+        call read_oi_vis2(unit, irow, nwave, target_id, mjd, vis2data, vis2err, &
+             ucoord, vcoord, vis2sta, flag, status)
         !map each binary table row to nwave rows of vis_data array
         wave1: do iwave = 1, nwave
            vis_data(count, 1:2) = tab_wb(iwave, :)
@@ -549,7 +627,7 @@ subroutine read_oi_fits(info, file_name, source, &
            vis_data(count, 4) = -vcoord
            vis_data(count, 5) = vis2data(iwave)
            if (flag(iwave)) then
-              vis_data(count, 6)= -vis2err(iwave)
+              vis_data(count, 6) = -vis2err(iwave)
            else
               vis_data(count, 6) = vis2err(iwave)
            end if
@@ -570,6 +648,7 @@ subroutine read_oi_fits(info, file_name, source, &
   end do
 
   !Read OI_T3 tables in turn
+  count = 1
   do itab = 1, nt3
      nwave = t3_nwave(itab)
      do iwl = 1, nwl
@@ -595,10 +674,10 @@ subroutine read_oi_fits(info, file_name, source, &
      allocate(t3phierr(nwave))
      allocate(flag(nwave))
      call ftmahd(unit, t3_hdus(itab), hdutype, status)
-     count = 1
      do irow = 1, t3_rows(itab)
-        call read_oi_t3(unit, irow, nwave, t3amp, t3amperr, t3phi, t3phierr, &
-             ucoord, vcoord, u2coord, v2coord, flag, status)
+        call read_oi_t3(unit, irow, nwave, target_id, mjd, &
+             t3amp, t3amperr, t3phi, t3phierr, &
+             ucoord, vcoord, u2coord, v2coord, t3sta, flag, status)
         !map each binary table row to nwave rows of vis_data array
         wave2: do iwave = 1, nwave
            triple_data(count, 1:2) = tab_wb(iwave, :)
@@ -638,14 +717,39 @@ subroutine read_oi_fits(info, file_name, source, &
 
   allocate(wavebands(num_wb, 2))
   wavebands = all_wb(:num_wb, :)
-  !would need to read OI_TARGET table to get source name
-  !use filename instead
-  source = file_name
   deallocate(all_wb)
   call ftclos(unit, status)
   call ftfiou(unit, status) !free unit number
 
 end subroutine read_oi_fits
+
+!==============================================================================
+
+subroutine read_oi_target(unit, ntarget, target_id, target_name, status)
+  
+  !Read OI_TARGET table: TARGET_ID and TARGET columns
+  !OI_TARGET must be current HDU
+  !To read all rows, set ntarget equal to value of NAXIS2
+
+  integer, intent(in) :: unit
+  integer, intent(in) :: ntarget
+  integer, dimension(ntarget), intent(out) :: target_id
+  character (len=16), dimension(ntarget), intent(out) :: target_name
+  integer, intent(inout) :: status
+
+  !local variables
+  integer colnum, nullint
+  character (len=1) :: nullstr
+  logical anyf
+
+  call ftgcno(unit, .false., 'TARGET_ID', colnum, status)
+  call ftgcvj(unit, colnum, 1, 1, ntarget, nullint, &
+       target_id, anyf, status)
+  call ftgcno(unit, .false., 'TARGET', colnum, status)
+  call ftgcvs(unit, colnum, 1, 1, ntarget, nullstr, &
+       target_name, anyf, status)
+
+end subroutine read_oi_target
 
 !==============================================================================
 
@@ -660,58 +764,70 @@ subroutine read_oi_wavelength(unit, nwave, eff_wave, eff_band, status)
 
   !local variables
   integer colnum
-  real nullval
+  real nullreal
   logical anyf
 
   call ftgcno(unit, .false., 'EFF_WAVE', colnum, status)
-  call ftgcve(unit, colnum, 1, 1, nwave, nullval, &
+  call ftgcve(unit, colnum, 1, 1, nwave, nullreal, &
        eff_wave, anyf, status)
   call ftgcno(unit, .false., 'EFF_BAND', colnum, status)
-  call ftgcve(unit, colnum, 1, 1, nwave, nullval, &
+  call ftgcve(unit, colnum, 1, 1, nwave, nullreal, &
        eff_band, anyf, status)
 
 end subroutine read_oi_wavelength
 
 !==============================================================================
 
-subroutine read_oi_vis2(unit, row, nwave, vis2data, vis2err, &
-     ucoord, vcoord, flag, status)
+subroutine read_oi_vis2(unit, row, nwave, target_id, mjd, &
+     vis2data, vis2err, ucoord, vcoord, sta_index, flag, status)
   
   !Read specified row of OI_VIS2 FITS binary table using fitsio calls
   !OI_VIS2 must be current HDU
 
   integer, intent(in) :: unit, row, nwave
   double precision, dimension(nwave), intent(out) :: vis2data, vis2err
-  double precision, intent(out) :: ucoord, vcoord
+  double precision, intent(out) :: mjd, ucoord, vcoord
+  integer, intent(out) :: target_id
+  integer, dimension(2), intent(out) :: sta_index
   logical, dimension(nwave), intent(out) :: flag
   integer, intent(inout) :: status
 
   !local variables
-  integer colnum
+  integer colnum, nullint
   double precision nullval
   logical anyf
   
+  call ftgcno(unit, .false., 'TARGET_ID', colnum, status)
+  call ftgcvj(unit, colnum, row, 1, 1, nullint, &
+       target_id, anyf, status)
+  call ftgcno(unit, .false., 'MJD', colnum, status)
+  call ftgcvd(unit, colnum, row, 1, 1, nullval, &
+       mjd, anyf, status)
   call ftgcno(unit, .false., 'VIS2DATA', colnum, status)
   call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
        vis2data, anyf, status)
   call ftgcno(unit, .false., 'VIS2ERR', colnum, status)
   call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
        vis2err, anyf, status)
-  call ftgcno(unit, .false., 'FLAG', colnum, status)
-  call ftgcl(unit, colnum, row, 1, nwave, flag, status)
   call ftgcno(unit, .false., 'UCOORD', colnum, status)
   call ftgcvd(unit, colnum, row, 1, 1, nullval, &
        ucoord, anyf, status)
   call ftgcno(unit, .false., 'VCOORD', colnum, status)
   call ftgcvd(unit, colnum, row, 1, 1, nullval, &
        vcoord, anyf, status)
+  call ftgcno(unit, .false., 'STA_INDEX', colnum, status)
+  call ftgcvj(unit, colnum, row, 1, 2, nullint, &
+       sta_index, anyf, status)
+  call ftgcno(unit, .false., 'FLAG', colnum, status)
+  call ftgcl(unit, colnum, row, 1, nwave, flag, status)
 
 end subroutine read_oi_vis2
 
 !==============================================================================
 
-subroutine read_oi_t3(unit, row, nwave, t3amp, t3amperr, t3phi, t3phierr, &
-     u1coord, v1coord, u2coord, v2coord, flag, status)
+subroutine read_oi_t3(unit, row, nwave, target_id, mjd, &
+     t3amp, t3amperr, t3phi, t3phierr, &
+     u1coord, v1coord, u2coord, v2coord, sta_index, flag, status)
 
   !Read specified row of OI_T3 FITS binary table using fitsio calls
   !OI_T3 must be current HDU
@@ -719,16 +835,24 @@ subroutine read_oi_t3(unit, row, nwave, t3amp, t3amperr, t3phi, t3phierr, &
   integer, intent(in) :: unit, row, nwave
   double precision, dimension(nwave), intent(out) :: t3amp, t3amperr
   double precision, dimension(nwave), intent(out) :: t3phi, t3phierr
-  double precision, intent(out) :: u1coord, v1coord, u2coord, v2coord
+  double precision, intent(out) :: mjd, u1coord, v1coord, u2coord, v2coord
+  integer, intent(out) :: target_id
+  integer, dimension(3), intent(out) :: sta_index
   logical, dimension(nwave), intent(out) :: flag
   integer, intent(inout) :: status
 
   !local variables
-  integer colnum, iwave
+  integer colnum, iwave, nullint
   double precision nullval
   logical anyf, anynullamp
   logical, dimension(:), allocatable :: isnull
 
+  call ftgcno(unit, .false., 'TARGET_ID', colnum, status)
+  call ftgcvj(unit, colnum, row, 1, 1, nullint, &
+       target_id, anyf, status)
+  call ftgcno(unit, .false., 'MJD', colnum, status)
+  call ftgcvd(unit, colnum, row, 1, 1, nullval, &
+       mjd, anyf, status)
   allocate(isnull(nwave))
   call ftgcno(unit, .false., 'T3AMP', colnum, status)
   call ftgcfd(unit, colnum, row, 1, nwave, &
@@ -751,8 +875,6 @@ subroutine read_oi_t3(unit, row, nwave, t3amp, t3amperr, t3phi, t3phierr, &
   call ftgcno(unit, .false., 'T3PHIERR', colnum, status)
   call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
        t3phierr, anyf, status)
-  call ftgcno(unit, .false., 'FLAG', colnum, status)
-  call ftgcl(unit, colnum, row, 1, nwave, flag, status)
   call ftgcno(unit, .false., 'U1COORD', colnum, status)
   call ftgcvd(unit, colnum, row, 1, 1, nullval, &
        u1coord, anyf, status)
@@ -765,6 +887,11 @@ subroutine read_oi_t3(unit, row, nwave, t3amp, t3amperr, t3phi, t3phierr, &
   call ftgcno(unit, .false., 'V2COORD', colnum, status)
   call ftgcvd(unit, colnum, row, 1, 1, nullval, &
        v2coord, anyf, status)
+  call ftgcno(unit, .false., 'STA_INDEX', colnum, status)
+  call ftgcvj(unit, colnum, row, 1, 3, nullint, &
+       sta_index, anyf, status)
+  call ftgcno(unit, .false., 'FLAG', colnum, status)
+  call ftgcl(unit, colnum, row, 1, nwave, flag, status)
   deallocate(isnull)
 
 end subroutine read_oi_t3

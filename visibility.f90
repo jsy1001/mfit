@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.8 2004/01/28 12:26:04 jsy1001 Exp $
+!$Id: visibility.f90,v 1.9 2005/01/06 18:45:12 jsy1001 Exp $
 
 module Visibility
 
@@ -42,8 +42,11 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
   double precision, intent(in) :: lambda, delta_lambda, u, v
   double complex :: cmplx_vis
   
+  !parameters
+  double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
+
   !local variables
-  integer :: i, iwave, nwave, num_comps, nmax
+  integer :: i, iwave, nwave, num_comps, nmax, iwb
   double precision :: r, theta, B, a, phi, B_total, lambda1
   double precision :: epsilon, rho, F, x1, x2, x3
   double precision, dimension(0:10) :: alpha
@@ -88,6 +91,26 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
         !configure array of ld parameters
         !nb alpha(0) set differently for different models
         alpha(1:10) = param(i,8:nmax+7)
+
+        !find index into clv_wb
+        if (spec(i,3)(1:1) == '<') then
+           if (size(clv_inten, 2) > 1) then
+              !wavelength-dependent CLV
+              iwb = -1
+              do iwave = 1, size(clv_wb, 1)
+                 if (lambda  >= clv_wb(iwave, 1)-sig &
+                      .and. lambda <= clv_wb(iwave, 1)+sig &
+                      .and. delta_lambda >= clv_wb(iwave, 2)-sig &
+                      .and. delta_lambda <= clv_wb(iwave, 2)+sig) then
+                    iwb = iwave
+                    exit
+                 end if
+              end do
+              if (iwb == -1) stop 'Datum has no matching waveband'
+           else
+              iwb = 1
+           end if
+        end if
         
         !loop over wavelengths within bandpass (will normalise later)
         sumvis = 0D0
@@ -125,7 +148,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
                  F = gauss_hermite(a, rho, nmax, alpha)
               case default
                  !must be numerical CLV
-                 F = clvvis(a, rho)
+                 F = clvvis(a, rho, iwb)
               end select
            end if
 
@@ -356,10 +379,11 @@ end function gauss_hermite
 
 !==============================================================================
 
-function clvvis(a, rho)
+function clvvis(a, rho, iwb)
 
   !subroutine arguments
   double precision :: clvvis, a, rho
+  integer :: iwb
 
   !local variables
   real bas_scaled, frac
@@ -367,15 +391,16 @@ function clvvis(a, rho)
 
   bas_scaled = a*rho*1D-6/(mas2rad*clv_mdiam) !scaled baseline in Mega-lambda
 
-  call locate(clv_mbase, nxsiz+1, bas_scaled, ifind)
+  ifind = locate(clv_mbase, bas_scaled)
   if (ifind == 0) then
-     clvvis = clv_mvis(1)
+     clvvis = clv_mvis(1, iwb)
   else if (ifind == nxsiz+1) then
-     clvvis = clv_mvis(nxsiz+1)
+     clvvis = clv_mvis(nxsiz+1, iwb)
   else
      frac = (bas_scaled - clv_mbase(ifind)) / &
           (clv_mbase(ifind+1) - clv_mbase(ifind))
-     clvvis = clv_mvis(ifind) + frac*(clv_mvis(ifind+1) - clv_mvis(ifind))
+     clvvis = clv_mvis(ifind, iwb) &
+          + frac*(clv_mvis(ifind+1, iwb) - clv_mvis(ifind, iwb))
   end if
 
 end function clvvis

@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.15 2004/02/13 16:50:57 jsy1001 Exp $
+!$Id: main.f90,v 1.16 2005/01/06 18:45:12 jsy1001 Exp $
 
 program Main
 
@@ -25,13 +25,13 @@ program Main
 
   !other local variables
   double precision, dimension(:, :), allocatable :: wavebands
-  double precision, dimension(2) :: wb
+  double precision, dimension(2) :: wb, wave
   character(len=width) :: spacer_line
-  character(len=128) :: info, file_name, ext, source, top_title, xrange
-  integer :: i, j, length, flag
+  character(len=128) :: info, file_name, ext, source, top_title, xrange, wavestr
+  integer :: i, length, flag
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
-  double precision :: calib_error, uxmin, uxmax
+  double precision :: calib_error, uxmin, uxmax, temp
   logical :: force_symm
 
   integer :: pgopen, istat
@@ -77,7 +77,7 @@ program Main
      read (*, '(a)') file_name
      ext = trim(file_name(scan(file_name,'.',.true.)+1:len(file_name)))
 
-     if (ext /= 'fits') then
+     if (ext(len_trim(ext)-3:len_trim(ext)) /= 'fits') then
         do
            print *, ' '
            print *, 'enter calibration error (fractional error in system visibility)'
@@ -90,6 +90,8 @@ program Main
      if (ext == 'vis' .or. ext == 'nvis') then
         print *, 'enter observing wavelength and bandwidth (nm) for (n)vis-format data'
         read *, wb
+        allocate(wavebands(1, 2))
+        wavebands(1, :) = wb
      end if
 
      !call appropriate reading routine for the file type
@@ -128,12 +130,12 @@ program Main
         allocate(triple_data(0, 0))
         force_symm = .true.
 
-     else if (ext == 'fits') then
-        call read_oi_fits(info, file_name, source, &
+     else if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') then
+        call read_oi_fits(info, file_name, -1, source, &
              vis_data, triple_data, wavebands)
 
      else
-        info = 'file type not handled'
+        info = 'file type "'//trim(ext)//'" not handled'
 
      end if
      if (info == '') exit
@@ -141,31 +143,52 @@ program Main
 
   end do read_data
 
-  !Filter here to reduce vis and triple data to single waveband, selected
-  !by user, this will not be necessary if multi-waveband fitting is
-  !implemented
+  !Filter here to reduce vis and triple data to chosen wavebands
   if (size(wavebands,1) > 1) then
      print *,' '
      print *,'multiple waveband data found with the following wavelengths'
      do i = 1, size(wavebands,1)
-        print 59, 'waveband', i, 'wavelength (nm)', real(wavebands(i, 1)), &
+        print 57, 'waveband', i, 'wavelength (nm)', real(wavebands(i, 1)), &
              'bandwidth (nm)', real(wavebands(i, 2))
-59      format(a, 1x, i2, 1x, a, 1x, f6.2, 1x, a, 1x, f6.2)
+57      format(a, 1x, i3, 1x, a, 1x, f8.2, 1x, a, 1x, f7.2)
      end do
-     do
+     choose_wave: do
         print *, ' '
-        print *, 'enter waveband number to be used in fitting'
-        read *, j
-        if (j >= 1 .and. j <= size(wavebands,1)) then
-           exit
-        else
-           print *, 'illegal selection'
+        print *, 'enter waveband number or wavelength range to be used in fitting'
+        wave = (/-1.0D0, -1.0D0/)
+        read (*, '(a)') wavestr
+        read (wavestr, *, end=58) wave(1), wave(2)
+        !two values - wavelength range
+        if (wave(2) .lt. wave(1)) then
+           temp = wave(2)
+           wave(2) = wave(1)
+           wave(1) = temp
         end if
-     end do
+        call filt_by_wl(vis_data, wave(1), wave(2))
+        call filt_by_wl(triple_data, wave(1), wave(2))
+        allocate(sel_wavebands(size(wavebands,1), 2))
+        sel_wavebands = wavebands
+        call filt_by_wl(sel_wavebands, wave(1), wave(2))
+        exit choose_wave
+58      if (wave(1) .eq. -1.0D0) then
+           !nothing entered
+           cycle choose_wave
+        end if
+        !one value - waveband number
+        if (wave(1) < 1 .or. wave(1) > size(wavebands, 1)) then
+           print *, 'Waveband number should be in range 1 to ', size(wavebands, 1)
+           cycle choose_wave
+        end if
+        call filt_by_wb(vis_data, wavebands(int(wave(1)), :), sig)
+        call filt_by_wb(triple_data, wavebands(int(wave(1)), :), sig)
+        allocate(sel_wavebands(1, 2))
+        sel_wavebands(1, :) = wavebands(int(wave(1)), :)
+        exit choose_wave
+     end do choose_wave
 
-     call filt_by_wb(vis_data, wavebands(j, :), sig)
-     call filt_by_wb(triple_data, wavebands(j, :), sig)
-
+  else
+     allocate(sel_wavebands(1, 2))
+     sel_wavebands = wavebands
   end if
 
   !Count number of useful data points (i.e. with +ve errors, points with
@@ -250,7 +273,7 @@ program Main
         print *, ' '
         print *, 'reading model...'
         info = ''
-        call read_model(info, file_name)
+        call read_model(info, file_name, sel_wavebands)
         if (info == '') exit
         print *, info
      end do
@@ -266,13 +289,13 @@ program Main
      ! plot initial model
      top_title = trim(source)//' - initial model: '//trim(model_name)
      if (useful_vis > 0) &
-          call plot_vis(model_spec, model_param, symm, &
+          call plot_vis_bas(model_spec, model_param, symm, &
           'Baseline /M\gl', 'Squared visibility', top_title)
      if (useful_amp > 0) &
-          call plot_triple_amp(model_spec, model_param, &
+          call plot_triple_amp_bas(model_spec, model_param, &
           'Longest baseline /M\gl', 'Triple amplitude', top_title)
      if (useful_cp > 0) &
-          call plot_triple_phase(model_spec, model_param, &
+          call plot_triple_phase_bas(model_spec, model_param, &
           'Longest baseline /M\gl', &
           'Closure phase /'//char(176), top_title)
 
@@ -361,37 +384,37 @@ program Main
 
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (useful_vis > 0) then
-           call plot_vis(model_spec, fit_param, symm, 'Baseline /M\gl', &
+           call plot_vis_bas(model_spec, fit_param, symm, 'Baseline /M\gl', &
                 'Squared Visibility', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_vis(model_spec, fit_param, symm, 'Baseline /M\gl', &
+              call plot_vis_bas(model_spec, fit_param, symm, 'Baseline /M\gl', &
                    'Squared Visibility', top_title, uxmin, uxmax)
            end if
         end if
         if (useful_amp > 0) then 
-           call plot_triple_amp(model_spec, fit_param, &
+           call plot_triple_amp_bas(model_spec, fit_param, &
                 'Longest baseline /M\gl', 'Triple amplitude', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_triple_amp(model_spec, fit_param, &
+              call plot_triple_amp_bas(model_spec, fit_param, &
                    'Longest baseline /M\gl', 'Triple amplitude', top_title, &
                    uxmin, uxmax)
              end if
         end if
         if (useful_cp > 0) then
-           call plot_triple_phase(model_spec, fit_param, &
+           call plot_triple_phase_bas(model_spec, fit_param, &
                 'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                 top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_triple_phase(model_spec, fit_param, &
+              call plot_triple_phase_bas(model_spec, fit_param, &
                    'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                    top_title, uxmin, uxmax)
              end if
@@ -451,5 +474,35 @@ contains
     deallocate(mask)
 
   end subroutine filt_by_wb
+
+!==============================================================================
+
+  subroutine filt_by_wl(data, wlmin, wlmax)
+
+    !Filter 2d double precision data array by 1st column
+    !Rows are kept if 1st column between wlmin and wlmax
+    !Reallocates data array
+    double precision, dimension(:, :), allocatable :: data
+    double precision :: wlmin, wlmax
+    integer dim2
+
+    !local variables
+    integer nfilt
+    logical, dimension(:), allocatable :: mask
+    double precision, dimension(:, :), allocatable :: filt_data
+
+    dim2 = size(data,2)
+    allocate(mask(size(data,1)))
+    mask = (data(:, 1) >= wlmin .and. data(:, 1) <= wlmax)
+    nfilt = count(mask)
+    allocate(filt_data(nfilt, dim2))
+    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/nfilt, dim2/))
+    deallocate(data)
+    allocate(data(nfilt, dim2))
+    data = filt_data
+    deallocate(filt_data)
+    deallocate(mask)
+
+  end subroutine filt_by_wl
 
 end program Main

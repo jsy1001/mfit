@@ -1,4 +1,4 @@
-# $Id: makefile.coast,v 1.1 2003/07/18 17:50:23 jsy1001 Exp $
+# $Id: makefile.coast,v 1.2 2005/01/06 18:45:12 jsy1001 Exp $
 #
 # COAST-specific makefile for installing mfit
 #
@@ -10,9 +10,11 @@ prefix = /coast/depot-sparc/$(package)
 
 EXES = mfit clfit
 TEST_EXES = calc
-PACKAGE_DOCS = README documentation ChangeLog
+PACKAGE_DOCS = README NEWS documentation ChangeLog
 SCRIPTS = fitgui
 PYTHONSCRIPTS = fitgui.py
+
+REMOVE_TARGETS = ChangeLog ChangeLog.bak
 
 tarfile = $(package).tar
 distdir = /ftp/pub/jsy1001/mfit
@@ -28,6 +30,7 @@ clfit: makefile
 
 calc: makefile
 	$(MAKE) -f $< $@
+
 
 # Expand the 'clean' rule from defaults.mk
 clean ::

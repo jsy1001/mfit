@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.15 2004/02/25 13:56:10 jsy1001 Exp $
+!$Id: fit.f90,v 1.16 2005/01/06 18:45:12 jsy1001 Exp $
 
 module Fit
 
@@ -24,6 +24,9 @@ implicit none
 
 !data arrays
 double precision, dimension(:,:), allocatable :: vis_data, triple_data
+
+!wavebands included in data (for wavelength-dependent models)
+double precision, dimension(:, :), allocatable :: sel_wavebands
 
 !storage for model parameters (both variable and non-variable) during fit
 double precision, dimension(:,:), allocatable :: fit_param

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.3 2003/09/11 13:53:34 jsy1001 Exp $
+# $Id: fitgui.py,v 1.4 2005/01/06 18:45:12 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.3 $")[1]
+_revision = string.split("$Revision: 1.4 $")[1]
 
 
 class GUI:
@@ -64,9 +64,12 @@ class GUI:
         self.calErr.set('0.0')
         self.cwl = StringVar()
         self.bw = StringVar()
+        self.wlmin = StringVar()
+        self.wlmax = StringVar()
+        self.target_id = StringVar()
         self.nofit = IntVar()
         self.nofit.set(0)
-        self.plots = ['No plot', 'vis2', 't3amp', 't3phi', 'post']
+        self.plots = ['No plot', 'uv', 'vis2', 't3amp', 't3phi', 'vis2wl', 't3ampwl', 't3phiwl', 'post']
         self.selPlot = StringVar()
         self.selPlot.set(self.plots[1])
         self.plotIndex = StringVar()
@@ -84,7 +87,7 @@ class GUI:
         self.ChangeFileButton.pack(side=LEFT)
         calErrFrame = Frame(parent)
         calErrFrame.pack(side=TOP, fill=X, pady=4)
-        Label(calErrFrame, text='Calibration Error (extra frac. error in system vis.)').pack(side=LEFT, anchor=W)
+        Label(calErrFrame, text='Calibration Error (extra frac. error in system vis.) [NOT OIFITS]').pack(side=LEFT, anchor=W)
         Entry(calErrFrame, textvariable=self.calErr, width=5).pack(
             side=LEFT, anchor=W, padx=4)
         wbFrame = Frame(parent)
@@ -94,6 +97,16 @@ class GUI:
                                                             anchor=W, padx=4)
         Entry(wbFrame, textvariable=self.bw, width=5).pack(side=LEFT,
                                                            anchor=W, padx=4)
+        Label(wbFrame, text='or Wavelength range:').pack(side=LEFT, anchor=W)
+        Entry(wbFrame, textvariable=self.wlmin,
+              width=5).pack(side=LEFT, anchor=W, padx=4)
+        Entry(wbFrame, textvariable=self.wlmax,
+              width=5).pack(side=LEFT, anchor=W, padx=4)
+        targetFrame = Frame(parent)
+        targetFrame.pack(side=TOP, fill=X, pady=4)
+        Label(targetFrame, text='TARGET_ID (blank to use 1st in OI_TARGET table):').pack(side=LEFT, anchor=W)
+        Entry(targetFrame, textvariable=self.target_id,
+              width=5).pack(side=LEFT, anchor=W, padx=4)
         Label(parent, text='Model:').pack(side=TOP, anchor=W)
         self.ModelText = ScrolledText(parent, height=19, width=40,
                                       font=('Helvetica', 10))
@@ -216,9 +229,19 @@ class GUI:
             cwl = float(self.cwl.get())
             bw = float(self.bw.get())
         except ValueError:
-            pass
+            try:
+                wlmin = float(self.wlmin.get())
+                wlmax = float(self.wlmax.get())
+                optText += ' --waverange %.2f %.2f' % (wlmin, wlmax)
+            except ValueError:
+                pass # don't specify waveband(s)
         else:
             optText += ' --waveband %.2f %.2f' % (cwl, bw)
+        try:
+            target_id = int(self.target_id.get())
+            optText += ' --target_id %d' % target_id
+        except ValueError:
+            pass
         p = self.selPlot.get()
         if p != self.plots[0]: # not 'No plot'
             if p == 'post':
@@ -270,7 +293,7 @@ class GUI:
                 self.postFitCallback()
     
 
-def _main():
+def _main(altExe=None):
     """Main routine."""
 
     # Find out if Python Megawidgets are installed
@@ -290,6 +313,7 @@ def _main():
         main = GUI(root)
         #main.fileName.set('/net/oberon/home/jsy1001/reductions/alp_ori_02/alp_ori_0203-04_corr2.mapdat')
         #main.ReadModel('/net/oberon/home/jsy1001/reductions/alp_ori_02/alpOri.model')
+        if altExe is not None: main.exe = altExe
         root.mainloop()
     else:
         # Too many arguments
