@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.12 2004/02/25 13:56:10 jsy1001 Exp $
+!$Id: inout.f90,v 1.13 2004/03/25 13:49:01 jsy1001 Exp $
 
 module Inout
 
@@ -16,7 +16,7 @@ module Inout
 
 implicit none
 
-character(len=5), parameter :: release = '1.3.5'
+character(len=5), parameter :: release = '1.3.6'
 
 contains
 
@@ -281,7 +281,7 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
         !"vis" error in file is the modulus of the fractional error
         !(in the squared visibility) divided by 2. Need to add calibration error
         !and convert to absolute error
-        vis_data(i1,6) = vis_data(i1,5) * sqrt((2D0*calib_error)**2D0 + &
+        vis_data(i1,6) = abs(vis_data(i1,5)) * sqrt((2D0*calib_error)**2D0 + &
                          (2D0*vis_err)**2D0 )
 
         if (vis_err<0D0) vis_data(i1,6) = -vis_data(i1,6)
