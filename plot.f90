@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.6 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: plot.f90,v 1.7 2003/08/20 16:55:34 jsy1001 Exp $
 
 module Plot
   
@@ -90,25 +90,35 @@ contains
        end if
     end do
 
-    !calculate ranges required
-    if (present(uxmin)) then
-       xmin = uxmin
+    !calculate y range required
+    if (num_data > 0) then
+       !exclude flagged extrema by default
+       ymin = minval(data_points(:num_data, 4))
+       ymax = maxval(data_points(:num_data, 3))
+    else if (num_flagged > 0) then
+       ymin = minval(flagged_points(:num_flagged, 4))
+       ymax = maxval(flagged_points(:num_flagged, 3))
     else
-       xmin = 0.9*minval(data_points(:num_data, 1))
+       !nothing to plot
+       return
     end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = 1.1*maxval(data_points(:num_data, 1))
-    end if
-    ymin = minval(data_points(:num_data, 4))
-    ymax = maxval(data_points(:num_data, 3))
-    
     !change y range
     if (ymax > 180.) then
        ymax = 180.
     else if (ymax < -180.) then
        ymax = -180.
+    end if
+
+    !calculate x range required
+    if (present(uxmin)) then
+       xmin = uxmin
+    else
+       xmin = 0.9*minval(model_points(:num_model, 1))
+    end if
+    if (present(uxmax)) then
+       xmax = uxmax
+    else
+       xmax = 1.1*maxval(model_points(:num_model, 1))
     end if
 
     !plot data
@@ -197,7 +207,27 @@ contains
        end if
     end do
 
-    !calculate ranges required
+    !calculate y range required
+    if (num_data > 0) then
+       !exclude flagged extrema by default
+       ymin = minval(data_points(:num_data, 4))
+       ymax = maxval(data_points(:num_data, 3))
+    else if (num_flagged > 0) then
+       ymin = minval(flagged_points(:num_flagged, 4))
+       ymax = maxval(flagged_points(:num_flagged, 3))
+    else
+       !nothing to plot
+       return
+    end if
+    !change y range
+    if (ymin > 0) then
+       ymin = ymin*0.9
+    else if (ymin < 0) then !yes, may be -ve
+       ymin = ymin*1.2
+    end if
+    ymax = ymax*1.1
+
+    !calculate x range required
     if (present(uxmin)) then
        xmin = uxmin
     else
@@ -208,16 +238,6 @@ contains
     else
        xmax = 1.1*maxval(data_points(:num_data, 1))
     end if
-    ymin = minval(data_points(:num_data, 4))
-    ymax = maxval(data_points(:num_data, 3))
-
-    !change y range
-    if (ymin > 0) then
-       ymin = ymin*0.9
-    else if (ymin < 0) then !yes, may be -ve
-       ymin = ymin*1.2
-    end if
-    ymax = ymax*1.1
 
     !plot data
     if (present(device)) then
@@ -294,7 +314,7 @@ contains
        end if
     end do
 
-    !calculate ranges required
+    !calculate x range required
     if (present(uxmin)) then
        xmin = uxmin
     else
@@ -305,16 +325,6 @@ contains
     else
        xmax = 1.1*maxval(data_points(:num_data, 1))
     end if
-    ymin = minval(data_points(:num_data, 4))
-    ymax = maxval(data_points(:num_data, 3))
-    
-    !change y range
-    if (ymin > 0) then
-       ymin = ymin*0.9
-    else if (ymin < 0) then !yes, may be -ve
-       ymin = ymin*1.2
-    end if
-    ymax = ymax*1.1
 
     if (symm) then !and single wavelength
        !calculate grid of model points
@@ -342,6 +352,30 @@ contains
           end if
        end do
     end if
+
+    !calculate y range
+    if (num_data > 0) then
+       !exclude flagged extrema by default
+       ymin = minval(data_points(:num_data, 4))
+       ymax = maxval(data_points(:num_data, 3))
+    else if (num_flagged > 0) then
+       ymin = minval(flagged_points(:num_flagged, 4))
+       ymax = maxval(flagged_points(:num_flagged, 3))
+    else if (num_model > 0) then
+       !user x range excludes all data, ensure model points in range
+       ymin = minval(model_points(:, 2))
+       ymax = maxval(model_points(:, 2))
+    else
+       !nothing to plot
+       return
+    end if
+    !change y range
+    if (ymin > 0) then
+       ymin = ymin*0.9
+    else if (ymin < 0) then !yes, may be -ve
+       ymin = ymin*1.2
+    end if
+    ymax = ymax*1.1
 
     !plot data
     if (present(device)) then
