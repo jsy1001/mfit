@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.6 2002/11/18 10:28:58 jsy1001 Exp $
+# $Id: makefile,v 1.7 2002/11/18 10:30:50 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -27,7 +27,7 @@ mfit: $(OBJECTS)
 	$(F90) $^ -o $@ `pgplotlink` $(pda_libs) -dalign -lf77compat
 
 calc: calc.o maths.o gamma.o rjbesl.o
-	$(F90) $^ -o $@ `$(pda_link)` -dalign -lf77compat
+	$(F90) $^ -o $@ $(pda_libs) -dalign -lf77compat
 
 # source files containing module definitions must be compiled before source
 # files that USE those modules
