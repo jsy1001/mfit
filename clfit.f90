@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.6 2003/09/09 16:55:03 jsy1001 Exp $
+!$Id: clfit.f90,v 1.7 2003/09/29 15:50:00 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.6 $'
+  cvs_rev = '$Revision: 1.7 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -68,6 +68,7 @@ program Main
   nofit = .false.
   zoom = .false.
   wb = (/-1.0D0, -1.0D0/)
+  calib_error = 0D0
   do
      if (iarg == narg - 1) exit
      if (iarg > narg - 1) then
