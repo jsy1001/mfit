@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.5 2003/02/17 13:20:02 jsy1001 Exp $
+!$Id: inout.f90,v 1.6 2003/06/12 14:50:09 jsy1001 Exp $
 
 module Inout
 
@@ -268,6 +268,10 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
         read (12,*,err=95) (dummy, dummy, dummy, vis_data(i1,1:2), &
              dummy, dummy, dummy, vis_data(i1,3:4), vis, vis_err)
 
+        !reverse signs of u, v, to correct for inconsistent sign in FT
+        !doesn't actually matter for V^2 data
+        vis_data(i1,3:4) = -vis_data(i1,3:4)
+
         !V^2 positive stored as sqroot(V^2) in file
         !V^2 negative stored as -sqroot(-V^2) in file
         vis_data(i1,5) = vis**2D0
@@ -288,8 +292,7 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
              dummy, dummy, dummy, triple_data(i2,3:6), &
              amp, amp_err, cp, cp_err)
 
-        !reverse signs of u1, v1, u2, v2 as Caltech baseline convention is
-        !opposite to the one used here
+        !reverse signs of u1, v1, u2, v2 to correct for inconsistent sign in FT
         triple_data(i2,3:6) = -triple_data(i2,3:6)
 
         !amplitude in file is cube root of amplitude
@@ -539,12 +542,13 @@ subroutine read_oi_fits(info, file_name, source, &
         !map each binary table row to nwave rows of vis_data array
         wave1: do iwave = 1, nwave
            vis_data(count, 1:2) = tab_wb(iwave, :)
-           vis_data(count, 3) = ucoord
-           vis_data(count, 4) = vcoord
+           !reverse signs of u, v, to correct for inconsistent sign in FT
+           !doesn't actually matter for V^2 data
+           vis_data(count, 3) = -ucoord
+           vis_data(count, 4) = -vcoord
            vis_data(count, 5) = vis2data(iwave)
            if (flag(iwave)) then
-              !vis_data(count, 6)= -vis2err(iwave) !internally -ve err=>flagged
-              vis_data(count, 6) = vis2err(iwave)
+              vis_data(count, 6)= -vis2err(iwave)
            else
               vis_data(count, 6) = vis2err(iwave)
            end if
@@ -597,19 +601,18 @@ subroutine read_oi_fits(info, file_name, source, &
         !map each binary table row to nwave rows of vis_data array
         wave2: do iwave = 1, nwave
            triple_data(count, 1:2) = tab_wb(iwave, :)
-           !need to change u,v signs?
-           triple_data(count, 3) = ucoord
-           triple_data(count, 4) = vcoord
-           triple_data(count, 5) = u2coord
-           triple_data(count, 6) = v2coord
+           !reverse signs of u1, v1, u2, v2 to correct for inconsistent sign in FT
+           triple_data(count, 3) = -ucoord
+           triple_data(count, 4) = -vcoord
+           triple_data(count, 5) = -u2coord
+           triple_data(count, 6) = -v2coord
            triple_data(count, 7) = t3amp(iwave)
            triple_data(count, 9) = t3phi(iwave)
+           !read_oi_t3 returns -ve t3amperr if NULL t3amp
            if (flag(iwave)) then
-              !internally -ve err=>flagged
-              !triple_data(count, 8) = -t3amperr(iwave)
-              !triple_data(count, 10)= -t3phierr(iwave)
-              triple_data(count, 8) = t3amperr(iwave)
-              triple_data(count, 10) = t3phierr(iwave)
+              !flag amplitude and phase
+              triple_data(count, 8) = -abs(t3amperr(iwave))
+              triple_data(count, 10)= -t3phierr(iwave)
            else
               triple_data(count, 8) = t3amperr(iwave)
               triple_data(count, 10) = t3phierr(iwave)
@@ -634,7 +637,9 @@ subroutine read_oi_fits(info, file_name, source, &
 
   allocate(wavebands(num_wb, 2))
   wavebands = all_wb(:num_wb, :)
-  source = '(unknown)' !would need to read OI_TARGET table
+  !would need to read OI_TARGET table to get source name
+  !use filename instead
+  source = file_name
   deallocate(all_wb)
   call ftclos(unit, status)
   call ftfiou(unit, status) !free unit number
@@ -718,16 +723,27 @@ subroutine read_oi_t3(unit, row, nwave, t3amp, t3amperr, t3phi, t3phierr, &
   integer, intent(inout) :: status
 
   !local variables
-  integer colnum
+  integer colnum, iwave
   double precision nullval
-  logical anyf
+  logical anyf, anynullamp
+  logical, dimension(:), allocatable :: isnull
 
+  allocate(isnull(nwave))
   call ftgcno(unit, .false., 'T3AMP', colnum, status)
-  call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
-       t3amp, anyf, status)
+  call ftgcfd(unit, colnum, row, 1, nwave, &
+       t3amp, isnull, anynullamp, status)
   call ftgcno(unit, .false., 'T3AMPERR', colnum, status)
   call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
        t3amperr, anyf, status)
+  ! make errors for NULL T3AMP values -ve, put dummy values in for T3AMP
+  if (anynullamp) then
+     do iwave = 1, nwave
+        if (isnull(iwave)) then
+           t3amperr(iwave) = -t3amperr(iwave) !zero error => ignored also
+           t3amp(iwave) = 1.0D0
+        end if
+     end do
+  end if
   call ftgcno(unit, .false., 'T3PHI', colnum, status)
   call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
        t3phi, anyf, status)
@@ -748,6 +764,7 @@ subroutine read_oi_t3(unit, row, nwave, t3amp, t3amperr, t3phi, t3phierr, &
   call ftgcno(unit, .false., 'V2COORD', colnum, status)
   call ftgcvd(unit, colnum, row, 1, 1, nullval, &
        v2coord, anyf, status)
+  deallocate(isnull)
 
 end subroutine read_oi_t3
 
