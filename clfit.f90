@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.3 2003/08/20 16:51:53 jsy1001 Exp $
+!$Id: clfit.f90,v 1.4 2003/09/01 14:24:52 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.3 $'
+  cvs_rev = '$Revision: 1.4 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -154,7 +154,7 @@ program Main
 
      if (wb(1) .eq. -1.0D0) &
           stop 'need observing wavelength and bandwidth (nm) for vis-format data'
-     print *, 'Assuming waveband for data is', wb
+     print '(1x, a, 2f8.2, a)', 'Assuming waveband for data is', wb, ' nm'
      !read_vis allocates vis_data
      call read_vis(info, file_name, source, max_lines, vis_data, wb, &
           calib_error)
@@ -167,7 +167,7 @@ program Main
      !projected baselines sqrt(u**2 + v**2), stored in u column
      if (wb(1) .eq. -1.0D0) &
           stop 'need observing wavelength and bandwidth (nm) for nvis-format data'
-     print *, 'Assuming waveband for data is', wb
+     print '(1x, a, 2f8.2, a)', 'Assuming waveband for data is', wb, ' nm'
      !read_nvis allocates vis_data
      call read_nvis(info, file_name, source, max_lines, vis_data, wb, &
           calib_error)
