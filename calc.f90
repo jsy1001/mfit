@@ -1,3 +1,5 @@
+!$Id: calc.f90,v 1.3 2003/07/18 17:50:23 jsy1001 Exp $
+
 program calc
 
 use maths
@@ -5,12 +7,8 @@ use maths
 implicit none
 
 !variables
-double precision :: nu, x, y, res, resx, resy, mu, sigma
+double precision :: nu, x, y, res
 double precision, dimension(:,:), allocatable :: A
-double precision, dimension(2) :: xx
-integer :: yyyy, mm, dd, h, m, s, hah, ham
-double precision :: sum, sqrdsum, mean, var, stdev, unbvar, unbstdev
-double precision :: sqrdmean, fourmean, sixmean, foursum, sixsum
 double precision, dimension(:), allocatable :: routput
 integer :: i, j, n, p, k
 character(len=1) :: choice

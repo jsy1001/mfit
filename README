@@ -1,0 +1,130 @@
+       mfit: Model Fitting Software for Optical Interferometry
+
+                       package release 1.2.1
+
+
+                           Release notes
+			   
+LICENSING
+
+This software is released into the public domain, in the hope that it
+will be useful. There is of course no warranty of any sort.
+
+
+DESCRIPTION
+
+mfit is a tool for fitting simple parametrisations of the sky
+brightness distribution to optical (visible/IR) interferometry data.
+
+Features of mfit include:
+
+* Asymmetric, multi-component models 
+* Four limb-darkening parametrizations (Taylor and Gauss-Hermite
+  expansions, Hestroffer and square-root models)
+* Interactive, command-line, and GUI interfaces 
+* Plots of data and model
+
+The graphical interface, fitgui, can straightforwardly be integrated
+into other applications written in python.
+
+
+REQUIREMENTS
+
+You will need a Fortran 90 compiler to build mfit.
+
+mfit must be linked with the following libraries (not supplied):
+
+* PGPLOT - http://www.astro.caltech.edu/~tjp/pgplot/
+
+* FITSIO - http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html
+
+* Starlink PDA - http://star-www.rl.ac.uk/cgi-store/storeform1?PDA
+
+To run the fitgui graphical interface, you will need a working
+installation of Python 2.2 or above and Tkinter (see
+http://www.python.org).
+
+
+FILES
+
+You can download the files from ftp://ftp.mrao.cam.ac.uk - login as
+anonymous and get everything in pub/jsy1001/mfit.
+
+Alternatively follow the link from
+http://www.mrao.cam.ac.uk/~jsy1001/mfit/
+
+The files in this package are as follows:
+
+ChangeLog       Package ChangeLog (automatically generated from CVS
+		log messages)
+README	        This file
+documentation   Instructions for using mfit
+maths.f90, fit.f90, visibility.f90, inout.f90, plot.f90, model.f90
+		Routines used by mfit and clfit
+main.f90	mfit main function
+clfit.f90	clfit main function
+calc.f90	Test code for maths module
+gamma.f	        Gamma function from SPECFUN 2.5 - see readme.specfun
+rjbesl.f        Bessel function from SPECFUN 2.5 - see readme.specfun
+readme.specfun	Readme for SPECFUN 2.5 routines
+f2kcli.f90	Fortran 200x Command Line Interface, (c) Interactive
+		Software Services Ltd. - see f2kcli.txt
+f2kcli.txt	manual.txt from f2kcli distribution
+fitgui.py	GUI interface to clfit
+fitgui		Wrapper script for fitgui.py - put this in PATH
+
+
+BUILDING MFIT
+
+Use the supplied 'makefile' (makefile.coast is probably not
+useful). Edit the lines above the comment
+'# *** Modify above this line for your system ***'.
+
+Various example configurations are included; comment out the most
+appropriate one as a starting point. If any of the external libraries
+PGPLOT, FITSIO, or PDA were compiled with a Fortran 77 compiler
+(likely, unless you compile them yourself) you will have to add the
+Fortran 77 standard libraries to FFLAGL.
+
+mfit has been tested using Sun Workshop Fortran 95 and NAGWare Fortran
+95 on Solaris, but should work on any other Unix-like system with a
+Fortran 90 compiler. Please report successes or failures with other
+compilers/operating systems.
+
+
+INSTALLING MFIT
+
+Build the executables as described above.
+
+Edit the command following '#!' at the top of 'fitgui' so that it
+starts the Python interpreter on your system. Put the 'mfit' and
+'clfit' executables and the 'fitgui' script somewhere in the PATH. Put
+'fitgui.py' somewhere in your python module search path (e.g. in one
+of the directories in $PYTHONPATH).
+
+[If you are a COASTie, the following commands should accomplish the
+ above for our complicated install scheme (make sure you have checked
+ the 'build' package out of CVS; refer to the Data Reduction Manual,
+ 'Maintaining the Software'):
+
+ > gmake -f makefile.coast install
+ > gmake -f makefile.coast stow
+]
+
+
+USING MFIT
+
+Please refer to the instructions in the 'documentation' file.
+
+
+BUGS
+
+Please report the inevitable bugs to jsy1001@cam.ac.uk. Various
+missing features are listed in 'documentation'.
+
+
+$Id: README,v 1.1 2003/07/18 17:50:23 jsy1001 Exp $
+
+Local variables:
+fill-column: 79
+End:

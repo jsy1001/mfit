@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.10 2003/06/12 14:53:11 jsy1001 Exp $
+!$Id: fit.f90,v 1.11 2003/07/18 17:50:23 jsy1001 Exp $
 
 module Fit
 
@@ -462,8 +462,8 @@ subroutine posterior(n, x, post)
 ! Everything else needed comes from module variables
 
 !subroutine arguments
-double precision, dimension(n), intent(in) :: x
 integer, intent(in) :: n
+double precision, dimension(n), intent(in) :: x
 double precision, intent(out) :: post
 
 !local variables

@@ -1,3 +1,5 @@
+!$Id: plot.f90,v 1.6 2003/07/18 17:50:23 jsy1001 Exp $
+
 module Plot
   
   use Model

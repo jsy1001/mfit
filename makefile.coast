@@ -1,0 +1,52 @@
+# $Id: makefile.coast,v 1.1 2003/07/18 17:50:23 jsy1001 Exp $
+#
+# COAST-specific makefile for installing mfit
+#
+# requires Gnu Make (often installed as gmake) and ../build/defaults.mk from
+# 'build' module in CVS
+
+package = mfit
+prefix = /coast/depot-sparc/$(package)
+
+EXES = mfit clfit
+TEST_EXES = calc
+PACKAGE_DOCS = README documentation ChangeLog
+SCRIPTS = fitgui
+PYTHONSCRIPTS = fitgui.py
+
+tarfile = $(package).tar
+distdir = /ftp/pub/jsy1001/mfit
+
+# Use 'makefile' to build executables
+all :: $(EXES) $(TEST_EXES) $(PACKAGE_DOCS) ;
+
+mfit: makefile
+	$(MAKE) -f $< $@
+
+clfit: makefile
+	$(MAKE) -f $< $@
+
+calc: makefile
+	$(MAKE) -f $< $@
+
+# Expand the 'clean' rule from defaults.mk
+clean ::
+	rm -f *.mod *.lst
+
+distclean: clean
+	rm -f *~ *.pyc ChangeLog.bak TAGS $(tarfile) $(tarfile).gz
+
+# Nasty find command to exclude CVS/* and tarfile itself!
+# Working directory must be called $(package) for tar command to work
+dist: distclean
+	cd .. && tar cvf $(package)/$(tarfile) `find $(package) -name "CVS" -prune -o -name $(tarfile) -prune -o -type f -print`
+	gzip $(tarfile)
+	-cp * $(distdir)
+
+
+# standard include file defines targets 'install', 'stow' etc:
+include ../build/defaults.mk
+
+# Local Variables:
+# mode: Makefile
+# End:

@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.1 2003/06/13 17:25:43 jsy1001 Exp $
+!$Id: clfit.f90,v 1.2 2003/07/18 17:50:23 jsy1001 Exp $
 
 program Main
 
@@ -29,21 +29,15 @@ program Main
   double precision, dimension(2) :: wb
   character(len=width) :: spacer_line
   character(len=128) :: switch, arg, device, info, file_name, ext, source, &
-       top_title, xrange
+       top_title, cvs_rev, revision
   character(len=5) :: sel_plot
-  integer :: narg, iarg, i, j, n, length, flag, degfreedom
+  integer :: narg, iarg, i, j, n, length, flag
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
-  double precision :: version, calib_error, uxmin, uxmax
+  double precision :: calib_error, uxmin, uxmax
   logical :: force_symm, nofit, zoom
 
-  external myhandler
-  integer :: ieeer, ieee_handler, myhandler
   integer :: pgopen, istat
-
-  !----------------------------------------------------------------------------
-  !Set up Floating Point Exception handler
-  ieeer = ieee_handler('set', 'common', myhandler)
 
   !----------------------------------------------------------------------------
   !Formatting stuff
@@ -52,12 +46,14 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  version = 1.00D0
+  cvs_rev = '$Revision: 1.2 $'
+  revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
   print *,' '
   print *,'  clfit - command-line mfit'
-  print *,'  version ',version
+  print *,'  package release ',release
+  print *,'  [clfit revision ',trim(revision),']'
   print *,' '
   print *,spacer_line
 
@@ -187,7 +183,10 @@ program Main
      info = 'file type not handled'
 
   end if
-  if (info /= '') stop(info)
+  if (info /= '') then
+     print *, info
+     stop
+  end if
 
   !Filter here to reduce vis and triple data to single waveband, selected
   !by user, this will not be necessary if multi-waveband fitting is
@@ -198,14 +197,14 @@ program Main
      do i = 1, size(wavebands,1)
         print 59, 'waveband', i, 'wavelength (nm)', real(wavebands(i, 1)), &
              'bandwidth (nm)', real(wavebands(i, 2))
-59      format(a, x, i2, x, a, x, f6.2, x, a, x, f6.2)
+59      format(a, 1x, i2, 1x, a, 1x, f6.2, 1x, a, 1x, f6.2)
      end do
 
      if (wb(1) /= -1.0D0) then
         call filt_by_wb(vis_data, wb, sig)
         call filt_by_wb(triple_data, wb, sig)
         print *, ' '
-        print *, 'Using specified waveband:', wb
+        print '(1x, a, 1x, 2f6.2)', 'Using specified waveband:', wb
      end if
 
   end if
@@ -284,7 +283,10 @@ program Main
   print *, 'reading model...'
   info = ''
   call read_model(info, file_name)
-  if (info /= '') stop(info)
+  if (info /= '') then
+     print *, info
+     stop
+  end if
 
   print *, '...done'
   print *, ' '
@@ -306,7 +308,7 @@ program Main
      end do
      degfreedom = useful_vis + useful_amp + useful_cp - n
      normchisqrd = chisqrd/degfreedom
-     print *,' '
+     print *, ' '
      print *, '           chi squared =',real(chisqrd) 
      print *, '    degrees of freedom =',degfreedom
      print *, 'chi sqrd / deg freedom =',real(normchisqrd)
@@ -380,7 +382,7 @@ program Main
         print *, 'num  parameter name                             ', &
              ' value        error'
         do i = 1, size(sol,1)
-           write(*,62) (i, desc(i), sol(i,:))
+           write(*,62) i, desc(i), sol(i,:)
         end do
 62      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6) 
 
@@ -388,19 +390,19 @@ program Main
         print *, ' '
         print *, 'hessian matrix'
         do i = 1, length
-           write(*,64) (hes(i,:))
+           write(*,64) hes(i,:)
         end do
 
         print *, ' '
         print *, 'covariance matrix'
         do i = 1, length
-           write(*,64) (cov(i,:))
+           write(*,64) cov(i,:)
         end do
 
         print *, ' '
         print *, 'correlation matrix'
         do i = 1, length
-           write(*,64) (cor(i,:))
+           write(*,64) cor(i,:)
         end do
 
 64      format(1x, 10(e11.4,1x))
@@ -477,21 +479,22 @@ contains
     double precision, dimension(:, :), allocatable :: data
     double precision, dimension(2) :: wb
     double precision :: sig
+    integer dim2
 
     !local variables
     integer nfilt
     logical, dimension(:), allocatable :: mask
     double precision, dimension(:, :), allocatable :: filt_data
 
+    dim2 = size(data,2)
     allocate(mask(size(data,1)))
     mask = (data(:, 1) >= wb(1)-sig .and. data(:, 1) <= wb(1)+sig &
          .and. data(:, 2) >= wb(2)-sig .and. data(:, 2) <= wb(2)+sig)
     nfilt = count(mask)
-    allocate(filt_data(nfilt, size(data,2)))
-    filt_data = reshape(pack(data, spread(mask, 2, size(data,2))), &
-         (/nfilt, size(data,2)/))
+    allocate(filt_data(nfilt, dim2))
+    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/nfilt, dim2/))
     deallocate(data)
-    allocate(data(nfilt, size(data,2)))
+    allocate(data(nfilt, dim2))
     data = filt_data
     deallocate(filt_data)
     deallocate(mask)
@@ -509,8 +512,8 @@ contains
     print *, 'Options (may appear in any order):'
     print *, ' '
     print *, "-n|--nofit            just report initial chi^2 and make plot (if specified) for initial model"
-    print *, '-w|--waveband CWL BW  select this waveband; must specify waveband this way for .(n)vis data'
-    print *, '-c|--calerr FRAC      add calibration error (frac. error in system visibility'
+    print *, '-w|--waveband CWL BW  select this waveband; must specify wb this way for .(n)vis data'
+    print *, '-c|--calerr FRAC      add calibration error (frac. error in system visibility)'
     print *, '-p|--plot  uv|vis2|t3amp|t3phi  make specified plot'
     print *, '-z|--zoomplot  uv|vis2|t3amp|t3phi XMIN XMAX  plot with specified x-axis range'
     print *, '-d|--device DEV       PGPLOT device to use'
@@ -519,11 +522,3 @@ contains
   end subroutine print_usage
 
 end program Main
-
-!==============================================================================
-integer function myhandler(sig, code, context) 
-  integer sig, code, context(5)
-  myhandler = 0 !avoids compiler warning
-  call abort()
-end function myhandler
-

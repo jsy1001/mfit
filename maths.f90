@@ -1,3 +1,5 @@
+!$Id: maths.f90,v 1.5 2003/07/18 17:50:23 jsy1001 Exp $
+
 module Maths
 
 !subroutines contained
@@ -172,7 +174,7 @@ function argument(z)
   double precision :: argument
   
   !find argument
-  argument = atan2(dimag(z), dble(z))
+  argument = atan2(aimag(z), dble(z))
 
 end function argument
 
@@ -312,7 +314,7 @@ function modulus(z)
   double precision :: re, imag, a, b
 
   re = abs(dble(z))
-  imag = abs(dimag(z))
+  imag = abs(aimag(z))
 
   if (re .eq. 0D0 .and. imag .eq. 0D0) then
      modulus = 0D0

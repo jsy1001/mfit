@@ -1,3 +1,5 @@
+!$Id: model.f90,v 1.3 2003/07/18 17:50:23 jsy1001 Exp $
+
 module Model
 
 !callable subroutines contained
@@ -99,7 +101,7 @@ subroutine read_model(info, file_name)
   do i = 1, lines
      read (11, *, err=94) dummy
      if (dummy == 'source') then
-        read (12, *, err=94) (dummy, source1, source2)
+        read (12, *, err=94) dummy, source1, source2
         model_name = trim(source1) // ' ' // trim(source2)
      else
         read (12, *, err=94)
@@ -117,11 +119,11 @@ subroutine read_model(info, file_name)
         j = j+1
         
         !read component name
-        read (11,*,err=95,end=95) (dummy, model_spec(j,1))
+        read (11,*,err=95,end=95) dummy, model_spec(j,1)
         if (dummy /= 'name') goto 96
         
         !read shape type
-        read (11,*,err=95,end=95) (dummy, model_spec(j,2))
+        read (11,*,err=95,end=95) dummy, model_spec(j,2)
         if (dummy /= 'shape_type') goto 96
         
         !read LD type (set as uniform for point case)
@@ -130,7 +132,7 @@ subroutine read_model(info, file_name)
               read (11,*,err=95) dummy
               model_spec(j,3) = 'uniform'
            case default
-              read (11,*,err=95,end=95) (dummy, model_spec(j,3))
+              read (11,*,err=95,end=95) dummy, model_spec(j,3)
         end select
         if (dummy /= 'ld_type') goto 96
         
@@ -147,7 +149,7 @@ subroutine read_model(info, file_name)
               read (11,*,err=95,end=95) dummy
               order = 1
            case ('taylor','gauss-hermite') 
-              read (11,*,err=95,end=95) (dummy, order)
+              read (11,*,err=95,end=95) dummy, order
            case default
               info = 'invalid limb darkening type'
               close (11)
@@ -157,19 +159,19 @@ subroutine read_model(info, file_name)
         model_param(j,1) = dble(order)
         
         !read position r and theta
-        read (11,*,err=95,end=95) (dummy, model_param(j,2:3))
+        read (11,*,err=95,end=95) dummy, model_param(j,2:3)
         if (dummy /= 'position') goto 96
         
         !read position prior, must be non-negative
-        read (11,*,err=95,end=95) (dummy, model_prior(j,2:3))
+        read (11,*,err=95,end=95) dummy, model_prior(j,2:3)
         if (dummy /= 'position_prior') goto 96
         
         !read flux
-        read (11,*,err=95,end=95) (dummy, model_param(j,4))
+        read (11,*,err=95,end=95) dummy, model_param(j,4)
         if (dummy /= 'flux') goto 96
         
         !read flux prior, must be non-negative
-        read (11,*,err=95,end=95) (dummy, model_prior(j,4))
+        read (11,*,err=95,end=95) dummy, model_prior(j,4)
         if (dummy /= 'flux_prior') goto 96  
         
         !Read shape parameters a, phi, epsilon depending on
@@ -185,13 +187,13 @@ subroutine read_model(info, file_name)
               if (dummy /= 'shape_param') goto 96
               read (11,*,err=95,end=95) dummy
            case ('disc')
-              read (11,*,err=95,end=95) (dummy, model_param(j,5))
+              read (11,*,err=95,end=95) dummy, model_param(j,5)
               if (dummy /= 'shape_param') goto 96
-              read (11,*,err=95,end=95) (dummy, model_prior(j,5))
+              read (11,*,err=95,end=95) dummy, model_prior(j,5)
            case ('ellipse')
-              read (11,*,err=95,end=95) (dummy, model_param(j,5:7))
+              read (11,*,err=95,end=95) dummy, model_param(j,5:7)
               if (dummy /= 'shape_param') goto 96
-              read (11,*,err=95,end=95) (dummy, model_prior(j,5:7))
+              read (11,*,err=95,end=95) dummy, model_prior(j,5:7)
            case default
               info = 'invalid shape type'
               close (11)
@@ -206,9 +208,9 @@ subroutine read_model(info, file_name)
               if (dummy /= 'ld_param') goto 96
               read (11,*,err=95,end=95) dummy
            case default
-              read (11,*,err=95,end=95) (dummy, model_param(j,8:7+order))
+              read (11,*,err=95,end=95) dummy, model_param(j,8:7+order)
               if (dummy /= 'ld_param') goto 96
-              read (11,*,err=95,end=95) (dummy, model_prior(j,8:7+order))
+              read (11,*,err=95,end=95) dummy, model_prior(j,8:7+order)
         end select
 
         !check to ensure everything inside limits
@@ -278,14 +280,16 @@ subroutine print_model()
      print *,'LD type  : ',trim(model_spec(i,3)), &
           ' of order',int(model_param(i,1))
      print *,'shape    : ',trim(model_spec(i,2))
-     print *,'position :',real(model_param(i,2:3))
-     print *,'    prior:',real(model_prior(i,2:3))
-     print *,'flux     :',real(model_param(i,4))
-     print *,'    prior:',real(model_prior(i,4))
-     print *,'shape par:',real(model_param(i,5:7))
-     print *,'    prior:',real(model_prior(i,5:7))
-     print *,'LD params:',real(model_param(i,8:17))
-     print *,'    prior:',real(model_prior(i,8:17))
+     print 10,'position :',real(model_param(i,2:3))
+     print 10,'    prior:',real(model_prior(i,2:3))
+     print 10,'flux     :',real(model_param(i,4))
+     print 10,'    prior:',real(model_prior(i,4))
+     print 10,'shape par:',real(model_param(i,5:7))
+     print 10,'    prior:',real(model_prior(i,5:7))
+     print 20,'LD params:',real(model_param(i,8:17))
+     print 20,'    prior:',real(model_prior(i,8:17))
+10   format (1x, a, 3f10.3)
+20   format (1x, a, 10f7.3)
   end do
 
 end subroutine print_model

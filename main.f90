@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.11 2003/06/12 14:53:11 jsy1001 Exp $
+!$Id: main.f90,v 1.12 2003/07/18 17:50:23 jsy1001 Exp $
 
 program Main
 
@@ -28,19 +28,13 @@ program Main
   double precision, dimension(2) :: wb
   character(len=width) :: spacer_line
   character(len=128) :: info, file_name, ext, source, top_title, xrange
-  integer :: i, j, length, flag, degfreedom
+  integer :: i, j, length, flag
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
-  double precision :: version, calib_error, uxmin, uxmax
+  double precision :: calib_error, uxmin, uxmax
   logical :: force_symm
 
-  external myhandler
-  integer :: ieeer, ieee_handler, myhandler
   integer :: pgopen, istat
-
-  !----------------------------------------------------------------------------
-  !Set up Floating Point Exception handler
-  ieeer = ieee_handler('set', 'common', myhandler)
 
   !----------------------------------------------------------------------------
   !Formatting stuff
@@ -49,12 +43,11 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  version = 1.20D0
   print *,' '
   print *,spacer_line
   print *,' '
   print *,'  mfit model fitting program'
-  print *,'  version ',version
+  print *,'  package release ',release
   print *,' '
   print *,spacer_line
 
@@ -157,7 +150,7 @@ program Main
      do i = 1, size(wavebands,1)
         print 59, 'waveband', i, 'wavelength (nm)', real(wavebands(i, 1)), &
              'bandwidth (nm)', real(wavebands(i, 2))
-59      format(a, x, i2, x, a, x, f6.2, x, a, x, f6.2)
+59      format(a, 1x, i2, 1x, a, 1x, f6.2, 1x, a, 1x, f6.2)
      end do
      do
         print *, ' '
@@ -321,7 +314,7 @@ program Main
         print *, 'num  parameter name                             ', &
              ' value        error'
         do i = 1, size(sol,1)
-           write(*,62) (i, desc(i), sol(i,:))
+           write(*,62) i, desc(i), sol(i,:)
         end do
 62      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6) 
 
@@ -329,19 +322,19 @@ program Main
         print *, ' '
         print *, 'hessian matrix'
         do i = 1, length
-           write(*,64) (hes(i,:))
+           write(*,64) hes(i,:)
         end do
 
         print *, ' '
         print *, 'covariance matrix'
         do i = 1, length
-           write(*,64) (cov(i,:))
+           write(*,64) cov(i,:)
         end do
 
         print *, ' '
         print *, 'correlation matrix'
         do i = 1, length
-           write(*,64) (cor(i,:))
+           write(*,64) cor(i,:)
         end do
 
 64      format(1x, 10(e11.4,1x))
@@ -423,21 +416,22 @@ contains
     double precision, dimension(:, :), allocatable :: data
     double precision, dimension(2) :: wb
     double precision :: sig
+    integer dim2
 
     !local variables
     integer nfilt
     logical, dimension(:), allocatable :: mask
     double precision, dimension(:, :), allocatable :: filt_data
 
+    dim2 = size(data,2)
     allocate(mask(size(data,1)))
     mask = (data(:, 1) >= wb(1)-sig .and. data(:, 1) <= wb(1)+sig &
          .and. data(:, 2) >= wb(2)-sig .and. data(:, 2) <= wb(2)+sig)
     nfilt = count(mask)
-    allocate(filt_data(nfilt, size(data,2)))
-    filt_data = reshape(pack(data, spread(mask, 2, size(data,2))), &
-         (/nfilt, size(data,2)/))
+    allocate(filt_data(nfilt, dim2))
+    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/nfilt, dim2/))
     deallocate(data)
-    allocate(data(nfilt, size(data,2)))
+    allocate(data(nfilt, dim2))
     data = filt_data
     deallocate(filt_data)
     deallocate(mask)
@@ -445,11 +439,3 @@ contains
   end subroutine filt_by_wb
 
 end program Main
-
-!==============================================================================
-integer function myhandler(sig, code, context) 
-  integer sig, code, context(5)
-  myhandler = 0 !avoids compiler warning
-  call abort()
-end function myhandler
-

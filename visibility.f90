@@ -1,3 +1,5 @@
+!$Id: visibility.f90,v 1.4 2003/07/18 17:50:23 jsy1001 Exp $
+
 module Visibility
 
 !callable function contained
@@ -56,7 +58,7 @@ function cmplx_vis(spec, param, lambda, u, v)
   
   !trap zero baseline case
   if ((u == 0D0) .and. (v == 0D0)) then 
-     cmplx_vis = dcmplx(1D0,0D0)
+     cmplx_vis = cmplx(1D0,0D0)
      B_total = 1D0
 
   else
@@ -122,7 +124,7 @@ function cmplx_vis(spec, param, lambda, u, v)
         x3 = B*F*sin(x1)
 
         !add this component visibility to sum
-        cmplx_vis = cmplx_vis + dcmplx(x2,x3)
+        cmplx_vis = cmplx_vis + cmplx(x2,x3)
 
      end do
    

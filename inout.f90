@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.6 2003/06/12 14:50:09 jsy1001 Exp $
+!$Id: inout.f90,v 1.7 2003/07/18 17:50:23 jsy1001 Exp $
 
 module Inout
 
@@ -16,6 +16,8 @@ module Inout
 !read_oi_t3
 
 implicit none
+
+character(len=5), parameter :: release = '1.2.1'
 
 contains
 
@@ -55,7 +57,7 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, &
   
   !read file header
   open (unit=11, err=91, status='old', action='read', file=file_name)
-  read (11, *, err=92, end=92) (source, data_items)
+  read (11, *, err=92, end=92) source, data_items
   source = trim(source(1:index(source,'~')-1))
   close (11)
   
@@ -76,9 +78,9 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, &
   !read vis data properly and close
   !vis_data: lambda, delta_lambda, u, v, (vis^2), err
   open (unit=11, action='read', file=file_name)
-  read (11, *, err=94) (dummy, dummy) !skip header
+  read (11, *, err=94) dummy, dummy !skip header
   do i = 1, data_items
-     read (11, *, err=94) (vis, baseline)
+     read (11, *, err=94) vis, baseline
        vis_data(i,1:2) = waveband
        vis_data(i,3) = abs(baseline)/1D+3
        vis_data(i,4) = 0D0
@@ -162,7 +164,7 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, &
   do
      read (11, '(a)', err=92, end=2) line
      if (line(1:1) /= '#' .and. len_trim(line) > 0) then
-        read (line, *, err=94) (vis, err, baseline)
+        read (line, *, err=94) vis, err, baseline
         vis_data(i,1:2) = waveband
         vis_data(i,3) = abs(baseline)/1D+3
         vis_data(i,4) = 0D0
@@ -265,8 +267,8 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
      if (dummy == 'vis') then
 
         i1 = i1 + 1
-        read (12,*,err=95) (dummy, dummy, dummy, vis_data(i1,1:2), &
-             dummy, dummy, dummy, vis_data(i1,3:4), vis, vis_err)
+        read (12,*,err=95) dummy, dummy, dummy, vis_data(i1,1:2), &
+             dummy, dummy, dummy, vis_data(i1,3:4), vis, vis_err
 
         !reverse signs of u, v, to correct for inconsistent sign in FT
         !doesn't actually matter for V^2 data
@@ -288,9 +290,9 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
      else if (dummy == 'triple') then
 
         i2 = i2 + 1
-        read (12,*,err=95) (dummy, dummy, dummy, dummy, triple_data(i2,1:2), &
+        read (12,*,err=95) dummy, dummy, dummy, dummy, triple_data(i2,1:2), &
              dummy, dummy, dummy, triple_data(i2,3:6), &
-             amp, amp_err, cp, cp_err)
+             amp, amp_err, cp, cp_err
 
         !reverse signs of u1, v1, u2, v2 to correct for inconsistent sign in FT
         triple_data(i2,3:6) = -triple_data(i2,3:6)
@@ -418,7 +420,7 @@ subroutine read_oi_fits(info, file_name, source, &
   integer, dimension(maxhdu) :: vis2_rows, t3_rows, vis2_nwave, t3_nwave
   character(len=80), dimension(maxhdu) :: vis2_insname, t3_insname, wl_insname
   integer :: status, unit, blocksize, hdutype, nhdu, maxwave
-  integer :: nvis2, nt3, nwl, iwl, nrow, irow, nwave, iwave, itab, j
+  integer :: nvis2, nt3, nwl, iwl, irow, nwave, iwave, itab, j
   integer :: vis_rows, triple_rows, colnum, naxis, count, num_wb
   integer, dimension(3) :: naxes
   character(len=80) :: keyval, comment

@@ -1,47 +1,62 @@
+USING MFIT
 
-Rough draft of essential documentation...
-
-Compiling mfit
-==============
-
-The following commands assume that 'f90' invokes the Sun Workshop f90/f95
-compiler, that the 'pgplotlink' command is somewhere in the path, and that all
-the required libraries will be found by the compiler.
-
-[On the Cavendish Astrophysics Sun systems, the pgplotlink
-shell script sends the following to standard output:
-
- -L/usr/local/lib -lpgplot -L/usr/openwin/lib -lX11
-]
-
-f90 -c -dalign maths.f90
-f90 -c -dalign visibility.f90
-f90 -c -dalign fit.f90
-f90 -c -dalign inout.f90
-f90 -c -dalign plot.f90
-f90 -c -dalign model.f90
-f90 -c -dalign gamma.f
-f90 -c -dalign rjbesl.f
-f90 -o mfit main.f90 maths.o visibility.o fit.o inout.o plot.o model.o gamma.o
-rjbesl.o -dalign `pgplotlink` -lpda -lemsf -lems -lcnf -lfitsio -lf77compat
-
-The '-lpda -lemsf -lems -lcnf' arguments are needed to link all the components
-of the Starlink PDA library. The resulting executable will be called 'mfit'.
+This documentation is fairly brief at the moment. We hope to include further
+information, including real- and Fourier-space mathematical descriptions of the
+model components, in a future release.
 
 
-Running mfit
-============
+Running mfit/clfit/fitgui
+=========================
 
-Assuming the executable is somewhere in the path, type 'mfit' at the shell
-prompt. The program is interactive, and will prompt for input. Hopefully the
-prompts are self-explanatory.
+There are three interfaces to the model-fitting code. 'mfit' should be run in a
+terminal window, and prompts for input as it goes along. 'clfit' (for
+command-line fit) gets all required parameters from the command line and does
+not prompt for further input. Both can make plots to any specified PGPLOT
+device. 'fitgui' is a graphical front-end to clfit.
+
+The command-line arguments accepted by clfit can be listed by typing 'clfit'
+without any arguments. The prompts in mfit and the labelling of GUI elements in
+fitgui should be self-explanatory. If not, a little trial and error may help!
+
+
+Plotting
+========
+
+mfit plots the uv coverage immediately after reading the data. It also plots
+squared visibility, triple product amplitude, and triple product phase against
+the (longest) projected basline, first for the initial model, then for the
+best-fit model.  Flagged points are shown in red. If all points of a particular
+data type are flagged, or there is no data of that type, the plot is skipped.
+
+After each plot, the program asks 'enter x-axis range for replot ([return] to
+skip)'. Enter two numbers followed by RETURN to plot the same data over a
+narrower x-axis range, or just RETURN to continue.
+
+clfit will generate at most one plot for each invocation. Use the '-p'
+argument to specify the plot type, or the '-z' argument to specify the plot
+type and x-axis range. Valid plot types are:
+
+uv     uv coverage for squared-visibility data
+vis2   squared visibility against projected baseline
+t3amp  triple product amplitude against longest projected baseline in triangle
+t3phi  triple product phase against longest projected baseline in triangle
+
+fitgui will similarly make up to one plot each time 'Go' is clicked. The plot
+types are as listed above.
 
 
 Data files
 ==========
 
-The program will read the following types of data file (refer to COAST data
-reduction documentation):
+mfit and clfit (and hence fitgui) will read the following types of data file:
+
+.fits	    OI Exchange format - see
+	    http://www.mrao.cam.ac.uk/~jsy1001/exchange/
+	    Only the squared visibility and triple product data types are
+	    used. The file must have extension .fits
+
+[The file formats below have been used for COAST data, but won't be of much
+ interest to the community. Details are in the COAST Data Reduction Manual]
 
 .vis	    Old analyse format (no errors on data points), visibility
             amplitudes only
@@ -49,8 +64,8 @@ reduction documentation):
 .nvis	    New analyse format (errors on data points), visibility
             amplitudes only
 
-.mapdat	    Can contain (squared) visibility amplitudes and/or triple products
-
+.mapdat	    Mapping data format. Can contain (squared) visibility amplitudes
+	    and/or triple products
 
 Both .vis and .nvis files contain *signed* visibility amplitudes. The models
 fit by analyse are all centro-symmetric, hence have purely real visibilities,
@@ -59,11 +74,7 @@ closure phase data) to sqrt(V^2) values when constructing a vis or nvis file.
 
 mfit ignores these signs and works with squared visibilities. You should put
 any closure phase measurements in explicitly (you will need to create a mapdat
-file for this).
-
-The capability to read the OI Exchange format
-(see http://www.mrao.cam.ac.uk/~jsy1001/exchange/) has been added in mfit
-v1.2. Only the squared visibility and triple product data types are used.
+or OI-FITS file for this).
 
 
 Model file format
@@ -91,7 +102,7 @@ Keyword            Parameter information
 name     	   A one word name for the component itself, e.g. 'main' or 
 		   'hot_spot' or something.
 
-shape_type         One word specifying the shape of the component can have 
+shape_type         One word specifying the shape of the component. Can use 
 		   either 'ellipse' 'disc' or 'point' obviously corresponding
 		   to elliptical, circular or unresolved point objects.
 
@@ -101,31 +112,28 @@ ld_type            One word specifying limb darkening type of the component,
 		   all as defined in the maths work. if 'point' is specified 
 	           as the shape_type then nothing should be put here.
 
-ld_order           A single integer (1-10) specifying the order the limb 
-		   darkening in the 'taylor' and 'gauss-hermite' LD cases.
-                   nothing should be put in other cases.
+ld_order           A single integer (1-10) specifying the order of the
+		   expansion in the 'taylor' and 'gauss-hermite' LD cases.
+                   No value should be put here in other cases.
 
-position           Two double precision numbers follow describing the position
-                   of the component with respect to the chosen phase reference
-                   point. This is only important for multiple component models
-		   since for a single component position corresponds to simple 
-		   phase factor.
-	           First number is the polar radius r of the component in mas
-                   second num is the polar angle theta in deg (measured N>E as
-                   in citvlb stuff)
+position           Two values follow describing the position of the component
+		   with respect to the chosen phase reference point.
+	           First number is the polar radius r of the component in mas.
+                   Second number is the polar angle theta in degrees (measured
+                   N>E)
 
-position_prior     Two double precision numbers giving the prior widths for 
-                   the position data above (prior assumed gaussian of standard
-                   deviation = prior width)
+position_prior     Two values giving the prior widths for the position data
+		   above (prior assumed gaussian of standard deviation = prior
+		   width)
 
-flux               One double precision number giving the flux B of the source.
-                   visibilties are always normalised so that unit visibility is
-                   obtained on zero baselines therfore flux is a relative 
+flux               One value giving the flux B of the source.
+                   Visibilties are always normalised so that unit visibility is
+                   obtained on zero baselines therefore flux is a relative 
                    quantitity and has no meaning for a single component model.
 
-flux_prior         One double precision number giving prior width on the flux
+flux_prior         One value giving prior width on the flux
 
-shape_param        Up to three double precision numbers giving shape info.
+shape_param        Up to three values giving shape info.
                    if 'point' is the shape type nothing should be put here.
                    if 'disc' is the shape type only one number should be put,
                    the diameter, a, of the disc in mas. ("diameter" is defined 
@@ -133,22 +141,22 @@ shape_param        Up to three double precision numbers giving shape info.
                    e.g. it is FWHM for gaussian - see the maths stuff).
                    if 'ellipse' is the shape type all three numbers are needed
                    giving the major axis, a, in mas, the orientation, phi, of 
-		   the major axis (measured N>E as in citvlb stuff) in degrees 
-		   and the eccentricity factor epsilon
+		   the major axis (measured N>E) in degrees 
+		   and the eccentricity factor epsilon.
 
 shape_param_prior  A prior for each of the numbers given above
 
-ld_param           Up to twenty limb darkening parameters should be put here.
-                   For 'uniform' 'prior' and 'gaussian' LD types nothing should
+ld_param           Up to twenty limb darkening parameters may be put here.
+                   For 'uniform' and 'gaussian' LD types nothing should
                    be here. 
 		   For 'hestroffer' only one paramter, the hestroffer 
 		   parameter "alpha" should be put. 
-		   For 'square-root' only parameters - the "alpha" and "beta"
-                   coefficients of (1-mu) and (1-root(mu)) should be put.
+		   For 'square-root' two parameters, the "alpha" and "beta"
+		   coefficients of (1-mu) and (1-root(mu)) should be put.
                    'gauss-hermite' and 'taylor' cases require the same number
                    of parameters as specified in the ld_order field above.
 
-ld_param_prior     Prior widths associated with each number supplied above.
+ld_param_prior     Prior widths associated with each number supplied above
 
 
 Illegal minimisations
@@ -178,7 +186,7 @@ The program attempts to minimise the unnormalised negative log posterior
 probability (equal to the sum of the negative log prior and negative log
 likelihood) of the model given the data. The data consist of any number of
 squared-visibilities, triple product amplitudes, and triple product phases,
-plus their Gaussian one-sigma errors.
+with their (assumed Gaussian) one-sigma errors.
 
 The minimiser used is the routine PDA_UNCMND from the Starlink PDA library
 (http://star-www.rl.ac.uk/star/docs/sun194.htx/sun194.html). This works better
@@ -238,10 +246,10 @@ differentiation method:
    H[ij] = {P(x+dx,y+dy)+P(x-dx,y-dy)-P(x+dx,y-dy)-P(x-dx,y+dy)}/{4.dx.dy}
    where x=x[i] y=x[j]
 
-The covariance matrix Cov[ij] is the inverted Hes matrix. Some problems appear
-to arise where diagonal elements of the matrix, corresponding to the variances
-in the parameters, are negative. This could possibly point to poorly chosen
-priors or a poor fit/irregularities in the negative log posterior
+The covariance matrix Cov[ij] is the inverse of the Hes matrix. Some problems
+appear to arise where diagonal elements of the matrix, corresponding to the
+variances in the parameters, are negative. This could possibly point to poorly
+chosen priors or a poor fit/irregularities in the negative log posterior
 surface. Where such negative values occur the program warns the user.
 
 The correlation matrix Cor[ij] = Cov[ij] / sqrt { Var[i].Var[j] } is also
@@ -266,23 +274,18 @@ if the posterior pdf is unimodal, and the peak in the posterior can be
 approximated by a Gaussian.
 
 
-Plotting
-========
-
-After each fit, the V^2 data points and the best-fit model values are plotted
-against projected baseline length. The triple product amplitudes and phases are
-plotted against the longest projected baseline in the triangle. Flagged points
-are shown in red. If all points of a particular data type are flagged, or there
-is no data of that type, the plot is skipped.
-
-
 Known deficiencies
 ==================
 
-Other plot choices should be added.
+Other plot choices (e.g. versus hour angle - need to read OI_TARGET for this)
+should be added.
+
+Ignores complex visibilities from OI-FITS file.
+
+Assumes single target in OI-FITS file.
 
 
-$Id: documentation,v 1.7 2003/06/11 09:38:30 jsy1001 Exp $
+$Id: documentation,v 1.8 2003/07/18 17:50:23 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
