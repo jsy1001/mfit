@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.14 2005/02/22 18:52:43 jsy1001 Exp $
+!$Id: clfit.f90,v 1.15 2005/02/23 12:08:06 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.14 $'
+  cvs_rev = '$Revision: 1.15 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -233,8 +233,7 @@ program Main
         sel_wavebands(1, :) = wb
         print *, ' '
         print '(1x, a, 1x, 2f8.2)', 'Using specified waveband:', wb
-     end if
-     if (wl(1) /= -1.0D0) then
+     else if (wl(1) /= -1.0D0) then
         call filt_by_wl(vis_data, wl(1), wl(2))
         call filt_by_wl(triple_data, wl(1), wl(2))
         allocate(sel_wavebands(size(wavebands, 1), 2))
