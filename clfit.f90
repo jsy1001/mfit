@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.13 2005/02/22 18:17:41 jsy1001 Exp $
+!$Id: clfit.f90,v 1.14 2005/02/22 18:52:43 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.13 $'
+  cvs_rev = '$Revision: 1.14 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -242,6 +242,10 @@ program Main
         call filt_by_wl(sel_wavebands, wl(1), wl(2))
         print *, ' '
         print '(1x, a, 1x, 2f8.2)', 'Using specified wavelength range:', wl
+     else
+        !use all wavebands present
+        allocate(sel_wavebands(size(wavebands, 1), 2))
+        sel_wavebands = wavebands
      end if
 
   else
@@ -604,6 +608,7 @@ program Main
   if (allocated(vis_data)) deallocate(vis_data)
   if (allocated(triple_data)) deallocate(triple_data)
   if (allocated(wavebands)) deallocate(wavebands)
+  if (allocated(sel_wavebands)) deallocate(sel_wavebands)
 
 contains
 
