@@ -5,14 +5,12 @@ Compiling mfit
 ==============
 
 The following commands assume that 'f90' invokes the Sun Workshop f90/f95
-compiler, and that the 'pgplotlink' and 'pda_link' commands are somewhere in
-the path.
+compiler, and that the 'pgplotlink' command is somewhere in the path.
 
-[On the Cavendish Astrophysics Sun systems, the pgplotlink and pda_link
-shell scripts send the following to standard output:
+[On the Cavendish Astrophysics Sun systems, the pgplotlink
+shell script sends the following to standard output:
 
-pgplotlink: -L/usr/local/lib -lpgplot -L/usr/openwin/lib -lX11
-pda_link: -lpda -lemsf -lems -lcnf
+ -L/usr/local/lib -lpgplot -L/usr/openwin/lib -lX11
 ]
 
 f90 -c -dalign maths.f90
@@ -24,9 +22,10 @@ f90 -c -dalign model.f90
 f90 -c -dalign gamma.f
 f90 -c -dalign rjbesl.f
 f90 -o mfit main.f90 maths.o visibility.o fit.o inout.o plot.o model.o gamma.o
-rjbesl.o -dalign `pgplotlink` `pda_link` -lf77compat
+rjbesl.o -dalign `pgplotlink` -lpda -lemsf -lems -lcnf -lf77compat
 
-The executable will be called 'mfit'.
+The '-lpda -lemsf -lems -lcnf' arguments are needed to link all the components
+of the Starlink PDA library. The resulting executable will be called 'mfit'.
 
 
 Running mfit
@@ -274,7 +273,7 @@ Wavebands with the same lambda but different delta(lambda) are not
 distinguished in mapdat files.
 
 
-$Id: documentation,v 1.3 2002/10/22 13:56:40 jsy1001 Exp $
+$Id: documentation,v 1.4 2002/11/18 10:28:58 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.3 2002/10/09 11:17:07 jsy1001 Exp $
+!$Id: inout.f90,v 1.4 2002/11/18 10:28:58 jsy1001 Exp $
 
 module Inout
 
@@ -78,7 +78,7 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, lambda, &
        vis_data(i,3) = 0D0
        vis_data(i,4) = vis**2D0
        !calculate fractional error on mod V
-       frac_error = sqrt( calib_error**2D0 + (default_error/vis_data(i,4))**2D0 )
+       frac_error = sqrt( calib_error**2D0 + (default_error/vis)**2D0 )
        !hence calculate abs error on squared visibility
        vis_data(i,5) = 2D0*frac_error*vis_data(i,4)
   end do
@@ -132,7 +132,7 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, lambda, &
   open (unit=11, action='read', file=file_name)
   do i = 1, max_lines+1
      read (11, '(a)', err=94, end=1) line
-     if (line(1:1) /= '#') then
+     if (line(1:1) /= '#' .and. len_trim(line) > 0) then
         data_items = data_items + 1
      else if (i == 1) then
         source = trim(line(2:)) !by convention, 1st comment is source name
@@ -155,14 +155,14 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, lambda, &
   open (unit=11, action='read', file=file_name)
   do
      read (11, '(a)', err=92, end=2) line
-     if (line(1:1) /= '#') then
+     if (line(1:1) /= '#' .and. len_trim(line) > 0) then
         read (line, *, err=94) (vis, err, baseline)
         vis_data(i,1) = lambda
         vis_data(i,2) = abs(baseline)/1D+3
         vis_data(i,3) = 0D0
         vis_data(i,4) = vis**2D0
         !calculate fractional error on mod V
-        frac_error = sqrt( calib_error**2D0 + (err/vis_data(i,4))**2D0 )
+        frac_error = sqrt( calib_error**2D0 + (err/vis)**2D0 )
         !hence calculate abs error on squared visibility
         vis_data(i,5) = 2D0*frac_error*vis_data(i,4)
         i = i + 1

@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.4 2002/10/09 11:17:07 jsy1001 Exp $
+!$Id: main.f90,v 1.5 2002/11/18 10:28:58 jsy1001 Exp $
 
 program Main
 
@@ -55,7 +55,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  version = 1.0D0
+  version = 1.01D0
   print *,' '
   print *,spacer_line
   print *,' '

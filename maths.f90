@@ -276,8 +276,13 @@ function modulus(z)
   !local variables
   double precision :: re, imag, a, b
 
-  re = dble(z)
-  imag = dimag(z)
+  re = abs(dble(z))
+  imag = abs(dimag(z))
+
+  if (re .eq. 0D0 .and. imag .eq. 0D0) then
+     modulus = 0D0
+     return
+  end if
 
   if (re .gt. imag) then
      a = re
