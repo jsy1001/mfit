@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.4 2002/10/09 11:17:07 jsy1001 Exp $
+!$Id: fit.f90,v 1.5 2002/10/22 13:56:40 jsy1001 Exp $
 
 module Fit
 
@@ -316,7 +316,7 @@ contains
 
     !calculate covariance matrix is (inverse of the hessian)
     cov = hes
-    call inv_rsis(cov) !inversion of real symmetric indeterminate square matrix
+    call inv_mat(cov) !inversion
 
     !calculate correlation matrix
     !correlation defined as: corr(x,y) = cov(x,y) / sqroot(var(x)*var(y))

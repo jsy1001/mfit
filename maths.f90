@@ -2,29 +2,27 @@ module Maths
 
 !subroutines contained
 !
-!bessel(nu,x,y,n,output) - returns complex array output of bessel function
-!                          values for bessel function with complex argument
-!                          x + iy and orders nu, nu+1 ... nu+(n-1)
-!inv_rsis(A) - returns the inverse of real symmetric indefinite square matrix A
-!laguerre(n,x) - returns real array of laguerre polynomial values for argument
-!                x. returns polynomials of order 0 up to n. array is dble
-!                precision with elemens 0:n
-!rnd_initialise() - initialise random number generator 
+!bessel(nu,x,n,output) - returns array output of values for bessel function
+!                         with real argument x and
+!                         orders nu, nu+1 ... nu+(n-1)
+!                         NB 0 <= nu < 1
+!inv_mat(A) - returns the inverse of matrix A
+!laguerre(n,x, output) - returns real array of laguerre polynomial values for
+!                        argument x. Returns polynomials of order 0 up to n.
+!                        Returned array is double precision with elements 0:n
 !
 !functions contained
 !
-!argument(z) - returns the argument of double complex z
-!bess1(x) - returns 1st order bessel function of double precision x
-!comb(n,p) - returns combinatorial nCp for integers n, p
-!fact(x) - returns factorial of integer x
-!gamma(x) - returns gamma function of double precision x
+!argument(z) -   returns the argument of double complex z
+!bess1(x) -      returns 1st order bessel function of double precision x
+!comb(n,p) -     returns combinatorial nCp for integers n, p
+!fact(x) -       returns factorial of integer x
+!gamma(x) -      returns gamma function of double precision x
 !machine_max() - returns maximum machine number
 !machine_min() - returns minimum machine number
 !machine_precision() - returns the machine precsion
-!modulus(z) - returns the modulus of complex z
-!modx(a,b) - difference mod 360 of a and b
-!rnd_gauss(mu,sigma) - returns random value selected from N(mu,sigma)
-!rnd_unit - returns random value selected in range 0<rnd_unit<1
+!modulus(z) -    returns the modulus of complex z
+!modx(a,b) -     difference mod 360 of a and b
 
 implicit none
 
@@ -38,77 +36,59 @@ double precision, parameter :: rad2deg = 180D0/pi
 contains
 
 !==============================================================================
-subroutine bessel(nu, x, y, num, output)
+
+subroutine bessel(nu, x, num, output)
 
   !function arguments
-  double precision :: nu, x, y
+  double precision :: nu, x
   integer :: num
-  double complex :: z
-  double complex, dimension(:), allocatable :: output
+  double precision, dimension(:), allocatable :: output
   
   !local variables
-  integer :: ifail, nz, i
-  character(len=1) :: scale
+  integer :: ncalc
 
-  !fatal errors - leave to NAG
-  
-  !allocate final output
   allocate(output(num))
-
-  !find complex input
-  z = dcmplx(x, y)
-
-  !call NAG bessel function subroutine
-  ifail = 0
-  scale = 'u'
-  call S17DEF(nu, z, num, scale, output, nz, ifail)
-  if (nz /= 0) stop 'maths error: bessel: underflow in output elements' 
   
+  call RJBESL(x, nu, num, output, ncalc)
+  if (ncalc .lt. 0) then
+     stop 'maths error: bessel: an argument to RJBESL is out of range'
+  else if (ncalc .lt. num) then
+     stop 'maths error: bessel: not all requested function values could be calculated accurately'
+  end if
+
 end subroutine bessel
 
 !==============================================================================
 
-subroutine inv_rsis(A)
+subroutine inv_mat(A)
+
+  !inverts matrix A in situ
 
   !subroutine arguments
   double precision, dimension(:,:) :: A
 
   !local variables
-  integer :: n, info, nmax, ifail, i, j
-  integer, dimension(:), allocatable :: ipiv, work
+  integer :: ifail
+  integer, dimension(:), allocatable :: ipvt
+  double precision, dimension(:), allocatable :: work
+  double precision, dimension(2) :: dummy !not referenced
 
-  !maximum matrix size nmax x nmax
-  nmax = 10
+  ifail = 0
+  allocate(ipvt(size(A, 2)))
+  allocate(work(size(A, 2)))
 
-  !check size of A and fix dimensionality stuff
-  if (size(A,1)/=size(A,2)) stop 'maths error: inv_rsis: non-square matrix'
-  n = size(A,1)
-  if (n>nmax) stop 'maths error: inv_rsis: matrix too large'
-  allocate(ipiv(n))
-  allocate(work(n**3))
-
-  !factorise A
-  call F07MDF('L', n, A, n, ipiv, work, n**3, info)
-
-  !compute inverse
-  if (info==0) then
-     call F07MJF('L', n, A, n, ipiv, work, info)
+  call PDA_DGEFA(A, size(A, 1), size(A, 2), ipvt, ifail)
+  if ( ifail .ne. 0 ) then
+     stop 'maths error: inv_mat: zero-valued element in factorisation; cannot invert matrix'
   else
-     stop 'maths error: inv_rsis: singular D, matrix inversion impossible'
+     call PDA_DGEDI(A, size(A, 1), size(A, 2), ipvt, dummy, work, 1)
   end if
 
-  !write upper right triangle back
-  do i = 2, n
-     do j = 1, i-1
-        A(j,i) = A(i,j)
-     end do
-  end do
-
   !clean up
-  deallocate(ipiv)
+  deallocate(ipvt)
   deallocate(work)
-
-end subroutine inv_rsis
+      
+end subroutine inv_mat
 
 !==============================================================================
 
@@ -148,17 +128,6 @@ end subroutine laguerre
 
 !==============================================================================
 
-subroutine rnd_initialise()
-
-  !initialises random number generation
-  !this must be done prior to any looping over random value generation
-
-  call G05CCF
-
-end subroutine rnd_initialise
-
-!==============================================================================
-
 function argument(z)
 
   !returns argument of complex number z in the range -pi<arg<=pi
@@ -177,16 +146,17 @@ end function argument
 function bess1(x)
 
   !function arguments
-  double precision :: bess1, S17AFF, x
+  double precision :: bess1, PDA_DBESJ1, x
 
   !local variables
   integer :: ifail
 
-  !fatal errors - leave to NAG
-
-  !call NAG gamma function routine
+  !call PDA bessel function routine
   ifail = 0
-  bess1 = S17AFF(x, ifail)
+  bess1 = PDA_DBESJ1(x, ifail)
+  if (ifail .ne. 0) then
+     stop 'maths error: bess1: error flag set by PDA_DBESJ1'
+  end if
 
 end function bess1
 
@@ -235,16 +205,9 @@ end function fact
 function gamma(x)
 
   !function arguments
-  double precision :: gamma, S14AAF, x
+  double precision :: gamma, DGAMMA, x
 
-  !local variables
-  integer :: ifail
-
-  !fatal errors - leave to NAG
-
-  !call NAG gamma function routine
-  ifail = 0
-  gamma = S14AAF(x, ifail)
+  gamma = DGAMMA(x)
 
 end function gamma
 
@@ -252,15 +215,15 @@ end function gamma
 
 function machine_max()
 
-  !returns the machine max number using NAG
+  !returns the machine max number (largest magnitude)
 
   !function arguments
   double precision :: machine_max
 
   !local variables 
-  double precision :: X02ALF
+  double precision :: PDA_D1MACH
 
-  machine_max = X02ALF()
+  machine_max = PDA_D1MACH(2)
 
 end function machine_max
 
@@ -268,15 +231,15 @@ end function machine_max
 
 function machine_min()
 
-  !returns the machine min number using NAG
+  !returns the machine min number (smallest magnitude)
 
   !function arguments
   double precision :: machine_min
 
   !local variables 
-  double precision :: X02AKF
+  double precision :: PDA_D1MACH
 
-  machine_min = X02AKF()
+  machine_min = PDA_D1MACH(1)
 
 end function machine_min
 
@@ -284,15 +247,15 @@ end function machine_min
 
 function machine_precision()
 
-  !returns the machine precision using NAG machine constants routine
+  !returns the machine precision
 
   !function arguments
   double precision :: machine_precision
 
   !local variables
-  double precision :: X02AJF
+  double precision :: PDA_D1MACH
 
-  machine_precision = X02AJF()
+  machine_precision = PDA_D1MACH(3)
 
 end function machine_precision
 
@@ -300,7 +263,10 @@ end function machine_precision
 
 function modulus(z)
 
-  !returns modulus of complex z, uses NAG for highest precision and to
+  !returns modulus of complex z, uses method from
+  !  Wilkinson J H and Reinsch C (1971) "Handbook for Automatic Computation II,
+  !  Linear Algebra", Springer-Verlag
+  !for highest precision and to
   !avoid underflow errors if im(z)<<re(z) or im(z)>>re(z)
 
   !function arguments
@@ -308,14 +274,20 @@ function modulus(z)
   double precision :: modulus
 
   !local variables
-  integer :: ifail
-  double precision :: A02ABF
+  double precision :: re, imag, a, b
 
-  !fatal errors - leave to NAG
+  re = dble(z)
+  imag = dimag(z)
 
-  !call NAG modulus routine
-  ifail = 0
-  modulus = A02ABF(dble(z), dimag(z))
+  if (re .gt. imag) then
+     a = re
+     b = imag
+  else
+     a = imag
+     b = re
+  end if
+
+  modulus = a*sqrt(1D0 + (b/a)**2D0)
 
 end function modulus
 
@@ -337,76 +309,4 @@ end function modx
 
 !==============================================================================
 
-function rnd_gauss(mu,sigma)
-
-  !returns random number selected from gaussian distribution with
-  !mean mu and standard deviation sigma
-
-  !function arguments
-  double precision :: rnd_gauss, mu, sigma
-
-  !local variables
-  double precision :: G05DDF
-
-  !call NAG normal dist random generator routine
-  rnd_gauss = G05DDF(mu, sigma)
-
-end function rnd_gauss
-
-!==============================================================================
-
-function rnd_unit()
-
-  !returns random value selected from range 0 - 1
-  !dummy is dummy argument to NAG
-
-  !function arguments
-  double precision :: rnd_unit
-
-  !local variables
-  double precision :: G05CAF, dummy
-
-  !call NAG unit dist random number generator routine
-  dummy = 1D0
-  rnd_unit = G05CAF(dummy)
-
-end function rnd_unit
-
-!==============================================================================
-
 end module Maths
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

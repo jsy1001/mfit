@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.4 2002/10/09 11:17:07 jsy1001 Exp $
+# $Id: makefile,v 1.5 2002/10/22 13:56:40 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -11,7 +11,8 @@ FFLAGC = -C -dalign
 package = mfit
 prefix = /coast/depot-sparc/$(package)
 
-OBJECTS = main.o maths.o fit.o visibility.o inout.o plot.o model.o
+OBJECTS = main.o maths.o fit.o visibility.o inout.o plot.o model.o \
+	gamma.o rjbesl.o
 MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
 
 EXES = mfit
@@ -23,10 +24,10 @@ pda_link = /star/bin/pda_link
 
 
 mfit: $(OBJECTS)
-	$(F90) $^ -o $@ `pgplotlink` `$(pda_link)` -dalign -lnag -lf77compat
+	$(F90) $^ -o $@ `pgplotlink` `$(pda_link)` -dalign -lf77compat
 
-calc: calc.o maths.o
-	$(F90) $^ -o $@ -dalign -lnag -lf77compat
+calc: calc.o maths.o gamma.o rjbesl.o
+	$(F90) $^ -o $@ `$(pda_link)` -dalign -lf77compat
 
 # source files containing module definitions must be compiled before source
 # files that USE those modules
@@ -53,6 +54,12 @@ model.mod: model.f90
 
 calc.o: calc.f90 maths.mod
 	$(F90) -c $(FFLAGC) calc.f90
+
+gamma.o: gamma.f
+	$(F90) -c $(FFLAGC) gamma.f
+
+rjbesl.o: rjbesl.f
+	$(F90) -c $(FFLAGC) rjbesl.f
 
 
 include ../build/defaults.mk

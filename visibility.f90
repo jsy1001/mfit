@@ -161,28 +161,28 @@ function taylor(a, rho, nmax, alpha)
   !local variables
   double complex :: x1, x2, y1, y2, z1, z2, z3, z4, z5, z6
   integer :: i, p, n
-  double complex, dimension(:), allocatable :: even_output
-  double complex, dimension(:), allocatable :: odd_output
-  double complex, dimension(:), allocatable :: bessel_data
+  double precision, dimension(:), allocatable :: even_output
+  double precision, dimension(:), allocatable :: odd_output
+  double precision, dimension(:), allocatable :: bessel_data
 
   !set up bessel array space
   allocate(bessel_data(0:nmax))
   
-  !do get seperate odd/even bessel data arrays
-  !bessel call is done in bulk for highest NAG efficiency
-  !no need for odd output call if in nmax=0 case
-  call bessel(1D0, pi*a*rho, 0D0, floor((dble(nmax)/2D0)+1D0), &
+  !bessel() can only give separate odd/even bessel data arrays
+  !bessel call is done in bulk for highest efficiency
+  !no need for odd output call if nmax=0 case
+  call bessel(0D0, pi*a*rho, 2+floor(dble(nmax)/2D0), &
               even_output)
-  if (nmax > 0) call bessel(1.5D0, pi*a*rho, 0D0, ceiling(dble(nmax)/2D0), &
+  if (nmax > 0) call bessel(0.5D0, pi*a*rho, 1+ceiling(dble(nmax)/2D0), &
                             odd_output)
 
   !interlace odd/even arrays to get array of J[(p/2)+1](pi*a*rho)
   !values that are referenced by p value
-  do i = 1, size(even_output)
-     bessel_data((2*i)-2) = even_output(i)
+  do i = 2, size(even_output)
+     bessel_data((2*i)-4) = even_output(i)
   end do
-  do i = 1, size(odd_output)
-     bessel_data((2*i)-1) = odd_output(i)
+  do i = 2, size(odd_output)
+     bessel_data((2*i)-3) = odd_output(i)
   end do
 
   !sigma over n
@@ -198,7 +198,7 @@ function taylor(a, rho, nmax, alpha)
         z2 = (2D0)**(dble(p)/2D0)
         z3 = comb(n,p)
         z4 = gamma((dble(p)/2D0)+1D0)
-        z5 = bessel_data(p)
+        z5 = bessel_data(p) !J[p/2+1](pi*a*rho)
         z6 = (pi*a*rho)**((dble(p)/2D0)+1D0)
         y1 = y1 + (z1*z2*z3*z4*(z5/z6))
         y2 = y2 + ((z1*z3)/(dble(p)+2D0))
@@ -228,17 +228,17 @@ function square_root(a, rho, alpha, beta)
 
   !local variables
   double precision :: x1, x2, x3, x4
-  double complex, dimension(:), allocatable :: bs1, bs2, bs3
+  double precision, dimension(:), allocatable :: bs1, bs2, bs3
 
   !get bessel function values
-  call bessel(1D0, pi*a*rho, 0D0, 1, bs1)
-  call bessel(1.5D0, pi*a*rho, 0D0, 1, bs2)
-  call bessel(1.25D0, pi*a*rho, 0D0, 1, bs3)
+  call bessel(0D0, pi*a*rho, 1, bs1)
+  call bessel(0.5D0, pi*a*rho, 1, bs2)
+  call bessel(0.25D0, pi*a*rho, 1, bs3)
 
   !calculate visibility
-  x1 = ((1D0-alpha-beta)*(bs1(1)))/(pi*a*rho)
-  x2 = (alpha*(sqrt(pi/2D0))*bs2(1))/((pi*a*rho)**(1.5D0))
-  x3 = (beta*((2D0)**(0.25D0))*(gamma(1.25D0))*bs3(1))/((pi*a*rho)**(1.25D0))
+  x1 = ((1D0-alpha-beta)*(bs1(2)))/(pi*a*rho)
+  x2 = (alpha*(sqrt(pi/2D0))*bs2(2))/((pi*a*rho)**(1.5D0))
+  x3 = (beta*((2D0)**(0.25D0))*(gamma(1.25D0))*bs3(2))/((pi*a*rho)**(1.25D0))
   x4 = (0.5D0)-((1D0/6D0)*alpha)-((1D0/10D0)*beta)
 
   square_root = (x1+x2+x3)/x4
@@ -269,17 +269,21 @@ function hestroffer(a, rho, alpha)
   double precision :: hestroffer, a, rho, alpha
   
   !local variables
-  double precision :: x1, x2, x3
-  double complex, dimension(:), allocatable :: bessel_data
+  integer :: num
+  double precision :: order, frac, x1, x2, x3
+  double precision, dimension(:), allocatable :: bessel_data
   
-  call bessel((alpha/2D0)+1D0, pi*a*rho, 0D0, 1, bessel_data)
+  order = (alpha/2D0)+1D0
+  frac = order - floor(order)
+  num = floor(order) + 1
+  call bessel(frac, pi*a*rho, num, bessel_data)
   
-  x1 = dble(gamma((alpha/2D0)+2D0))
-  x2 = dble(bessel_data(1))
+  x1 = gamma((alpha/2D0)+2D0)
+  x2 = bessel_data(num)
   x3 = ((pi*a*rho)/2D0)**((alpha/2D0)+1D0)
   
   !deallocate bessel array
-  deallocate (bessel_data)
+  deallocate(bessel_data)
 
   hestroffer = x1*(x2/x3)
 
