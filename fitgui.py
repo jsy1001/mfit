@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.2 2003/09/09 15:45:19 jsy1001 Exp $
+# $Id: fitgui.py,v 1.3 2003/09/11 13:53:34 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.2 $")[1]
+_revision = string.split("$Revision: 1.3 $")[1]
 
 
 class GUI:
@@ -221,19 +221,22 @@ class GUI:
             optText += ' --waveband %.2f %.2f' % (cwl, bw)
         p = self.selPlot.get()
         if p != self.plots[0]: # not 'No plot'
-            try:
-                if p == 'post':
+            if p == 'post':
+                try:
                     index = int(self.plotIndex.get())
+                except ValueError:
+                    index = 1
+            try:
                 xmin = float(self.plotFrom.get())
                 xmax = float(self.plotTo.get())
             except ValueError:
                 if p == 'post':
-                    optText += ' --plot post 1'
+                    optText += ' --plot post %d' % index
                 else:
                     optText += ' --plot %s' % p
             else:
                 if p == 'post':
-                    optText += ' --zoomplot %s %d %.3f %.3f' % (p, index, xmin, xmax)
+                    optText += ' --zoomplot post %d %.3f %.3f' % (index, xmin, xmax)
                 else:
                     optText += ' --zoomplot %s %.3f %.3f' % (p, xmin, xmax)
         if self.nofit.get(): optText += ' --nofit'
