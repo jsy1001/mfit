@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.7 2003/08/20 16:55:34 jsy1001 Exp $
+!$Id: plot.f90,v 1.8 2003/09/01 12:27:27 jsy1001 Exp $
 
 module Plot
   
@@ -36,7 +36,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
     real :: xmin, xmax, ymin, ymax
-    double precision :: lambda, u1, v1, u2, v2
+    double precision :: lambda, delta_lambda, u1, v1, u2, v2
     double complex :: vis1, vis2, vis3
     real :: phase, phase_err, model_phase
     real, dimension(3) :: bas
@@ -55,6 +55,7 @@ contains
     num_flagged = 0
     do i = 1, size(triple_data, 1)
        lambda = triple_data(i, 1)
+       delta_lambda = triple_data(i, 2)
        u1 = triple_data(i, 3)
        v1 = triple_data(i, 4)
        u2 = triple_data(i, 5)
@@ -67,9 +68,9 @@ contains
        phase = modulo(triple_data(i, 9), 360D0)
        if (phase > 180.) phase = phase - 360.
        phase_err = triple_data(i, 10)
-       vis1 = cmplx_vis(spec, param, lambda, u1, v1)
-       vis2 = cmplx_vis(spec, param, lambda, u2, v2)
-       vis3 = cmplx_vis(spec, param, lambda, -(u1+u2), -(v1+v2))
+       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
+       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
+       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
        num_model = num_model + 1
        model_points(num_model, 1) = maxval(bas)
        model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
@@ -156,7 +157,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
     real :: xmin, xmax, ymin, ymax
-    double precision :: lambda, u1, v1, u2, v2
+    double precision :: lambda, delta_lambda, u1, v1, u2, v2
     double complex :: vis1, vis2, vis3
     real :: amp, amp_err
     real, dimension(3) :: bas
@@ -175,6 +176,7 @@ contains
     num_flagged = 0
     do i = 1, size(triple_data, 1)
        lambda = triple_data(i, 1)
+       delta_lambda = triple_data(i, 2)
        u1 = triple_data(i, 3)
        v1 = triple_data(i, 4)
        u2 = triple_data(i, 5)
@@ -186,9 +188,9 @@ contains
        if (present(uxmax) .and. maxval(bas) .gt. uxmax) cycle!out of plot range
        amp = triple_data(i, 7)
        amp_err = triple_data(i, 8)
-       vis1 = cmplx_vis(spec, param, lambda, u1, v1)
-       vis2 = cmplx_vis(spec, param, lambda, u2, v2)
-       vis3 = cmplx_vis(spec, param, lambda, -(u1+u2), -(v1+v2))
+       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
+       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
+       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
        num_model = num_model + 1
        model_points(num_model, 1) = maxval(bas)
        model_points(num_model, 2) = modulus(vis1*vis2*vis3)
@@ -276,7 +278,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
-    double precision :: u, v, lambda
+    double precision :: u, v, lambda, delta_lambda
     integer :: num_data, num_flagged, num_model, i, istat
     real :: bas, vsq, err, xmin, xmax, ymin, ymax
     integer, parameter :: grid_size = 200
@@ -292,6 +294,7 @@ contains
     num_flagged = 0
     do i = 1, size(vis_data, 1)
        lambda = vis_data(i, 1)
+       delta_lambda = vis_data(i, 2)
        u = vis_data(i, 3)
        v = vis_data(i, 4)
        bas = 1000.*sqrt(u**2. + v**2.)/lambda
@@ -331,10 +334,11 @@ contains
        num_model = grid_size
        allocate(model_points(num_model, 2))
        lambda = vis_data(1, 1)
+       delta_lambda = vis_data(1, 2)
        do i = 1, num_model
           u = xmin*lambda/1000. + ((i-1.)/(num_model-1.))*(xmax-xmin)*lambda/1000.
           model_points(i, 1) = 1000.*u/lambda
-          model_points(i, 2) = modulus(cmplx_vis(spec, param, lambda, u, 0D0))**2.
+          model_points(i, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, 0D0))**2.
        end do
     else
        !calculate model points corresponding to plotted data points
@@ -342,13 +346,14 @@ contains
        num_model = 0
        do i = 1, size(vis_data, 1)
           lambda = vis_data(i, 1)
+          delta_lambda = vis_data(i, 2)
           u = vis_data(i, 3)
           v = vis_data(i, 4)
           bas = 1000.*sqrt(u**2. + v**2.)/lambda
           if (bas .ge. xmin .and. bas .le. xmax) then
              num_model = num_model + 1
              model_points(num_model, 1) = bas
-             model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, u, v))**2.
+             model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v))**2.
           end if
        end do
     end if
@@ -412,7 +417,7 @@ contains
 
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points
-    real :: u, v, lambda, bas, max
+    real :: u, v, lambda, delta_lambda, bas, max
     integer :: num_data, num_flagged, i, istat
 
     !functions
@@ -427,6 +432,7 @@ contains
     max = 0.
     do i = 1, size(vis_data, 1)
        lambda = vis_data(i, 1)
+       delta_lambda = vis_data(i, 2)
        u = 1000.*vis_data(i, 3)/lambda
        v = 1000.*vis_data(i, 4)/lambda
        bas = sqrt(u**2. + v**2.)

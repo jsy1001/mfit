@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.11 2003/07/18 17:50:23 jsy1001 Exp $
+!$Id: fit.f90,v 1.12 2003/09/01 12:27:27 jsy1001 Exp $
 
 module Fit
 
@@ -382,9 +382,9 @@ contains
 
     !local variables
     integer :: i
-    double precision :: lambda, u, v, data_vis, data_vis_err, model_vis
+    double precision :: lambda, delta_lambda, u, v, data_vis, data_vis_err
     double precision :: u1, v1, u2, v2, data_amp, data_amp_err, data_phase
-    double precision :: data_phase_err, model_amp, model_phase
+    double precision :: data_phase_err, model_vis, model_amp, model_phase
     double complex :: vis, vis1, vis2, vis3
 
     chisqrd = 0D0
@@ -394,6 +394,7 @@ contains
        
        !extract points
        lambda = vis_data(i,1)
+       delta_lambda = vis_data(i,2)
        u = vis_data(i,3)
        v = vis_data(i,4)
        data_vis = vis_data(i,5)
@@ -403,7 +404,7 @@ contains
        if (data_vis_err>0D0) then
 
           !compute model-predicted visibility amplitude squared
-          vis = cmplx_vis(spec, param, lambda, u, v)
+          vis = cmplx_vis(spec, param, lambda, delta_lambda, u, v)
           model_vis = (modulus(vis))**2D0
 
           !compute contribution to chisqrd
@@ -419,6 +420,7 @@ contains
 
        !extract points
        lambda = triple_data(i,1)
+       delta_lambda = triple_data(i,2)
        u1 = triple_data(i,3)
        v1 = triple_data(i,4)
        u2 = triple_data(i,5)
@@ -430,9 +432,9 @@ contains
 
        if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
           !compute model-predicted triple amplitude
-          vis1 = cmplx_vis(spec, param, lambda, u1, v1)
-          vis2 = cmplx_vis(spec, param, lambda, u2, v2)
-          vis3 = cmplx_vis(spec, param, lambda, -(u1+u2), -(v1+v2))
+          vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
+          vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
+          vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
           vis = vis1*vis2*vis3
           model_amp = modulus(vis)
           model_phase = rad2deg*argument(vis)
@@ -509,9 +511,9 @@ double precision, dimension(:,:) :: param
 
 !local variables
 integer :: i
-double precision :: lambda, u, v, data_vis, data_vis_err, model_vis
+double precision :: lambda, delta_lambda, u, v, data_vis, data_vis_err
 double precision :: u1, v1, u2, v2, data_amp, data_amp_err, data_phase
-double precision :: data_phase_err, model_amp, model_phase
+double precision :: data_phase_err, model_vis, model_amp, model_phase
 double complex :: vis, vis1, vis2, vis3
 
 likelihood = 0D0
@@ -521,6 +523,7 @@ do i = 1, size(vis_data,1)
    
    !extract points
    lambda = vis_data(i,1)
+   delta_lambda = vis_data(i,2)
    u = vis_data(i,3)
    v = vis_data(i,4)
    data_vis = vis_data(i,5)
@@ -529,7 +532,7 @@ do i = 1, size(vis_data,1)
    if (data_vis_err>0D0) then
       
       !compute model-predicted visibility amplitude squared
-      vis = cmplx_vis(model_spec, param, lambda, u, v)
+      vis = cmplx_vis(model_spec, param, lambda, delta_lambda, u, v)
       model_vis = (modulus(vis)**2D0)
       
       !compute contribution to likelihood
@@ -545,6 +548,7 @@ do i = 1, size(triple_data,1)
 
    !extract points
    lambda = triple_data(i,1)
+   delta_lambda = triple_data(i,2)
    u1 = triple_data(i,3)
    v1 = triple_data(i,4)
    u2 = triple_data(i,5)
@@ -556,9 +560,9 @@ do i = 1, size(triple_data,1)
 
    if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
       !compute model-predicted triple product
-      vis1 = cmplx_vis(model_spec, param, lambda, u1, v1)
-      vis2 = cmplx_vis(model_spec, param, lambda, u2, v2)
-      vis3 = cmplx_vis(model_spec, param, lambda, -(u1+u2), -(v1+v2))
+      vis1 = cmplx_vis(model_spec, param, lambda, delta_lambda, u1, v1)
+      vis2 = cmplx_vis(model_spec, param, lambda, delta_lambda, u2, v2)
+      vis3 = cmplx_vis(model_spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
       vis = vis1*vis2*vis3
       model_amp = modulus(vis)
       model_phase = rad2deg*argument(vis)

@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.5 2003/08/20 16:56:24 jsy1001 Exp $
+!$Id: visibility.f90,v 1.6 2003/09/01 12:27:27 jsy1001 Exp $
 
 module Visibility
 
@@ -28,7 +28,7 @@ implicit none
 contains
 !==============================================================================
 
-function cmplx_vis(spec, param, lambda, u, v)
+function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
 
   !returns complex visibility real and imaginary parts for
   !multiple component model. model component details stored in 
@@ -38,25 +38,18 @@ function cmplx_vis(spec, param, lambda, u, v)
   !subroutine arguments
   character(len=128), dimension(:,:), intent(in) :: spec
   double precision, dimension(:,:), intent(in) :: param
-  double precision, intent(in) :: lambda, u, v
+  double precision, intent(in) :: lambda, delta_lambda, u, v
   double complex :: cmplx_vis
   
   !local variables
-  integer :: i, num_comps, nmax
-  double precision :: r, theta, B, a, phi, B_total
+  integer :: i, iwave, nwave, num_comps, nmax
+  double precision :: r, theta, B, a, phi, B_total, lambda1
   double precision :: epsilon, rho, F, x1, x2, x3
   double precision, dimension(0:10) :: alpha
-  
+  double complex :: sumvis
+
   !set number of components
   num_comps = size(spec,1)
-
-  !print *,'cmplx_vis call...'
-  !print *,param
-  !print *,lambda,u,v
-  
-  !clear real and imag vis
-  cmplx_vis = 0D0
-  b_total = 0D0
   
   !trap zero baseline case
   if ((u == 0D0) .and. (v == 0D0)) then 
@@ -64,6 +57,14 @@ function cmplx_vis(spec, param, lambda, u, v)
      B_total = 1D0
 
   else
+  
+     !clear real and imag vis
+     cmplx_vis = 0D0
+     B_total = 0D0
+  
+     !choose number of wavelengths to average over
+     nwave = 1D3*delta_lambda/lambda
+     if (nwave < 2) nwave = 2
      
      !sum over components
      do i = 1, num_comps
@@ -83,53 +84,63 @@ function cmplx_vis(spec, param, lambda, u, v)
         !sum up brightnesses (need later to normalise whole model)
         B_total = B_total + B
 
-        !confiure array of ld parameters
+        !configure array of ld parameters
         !nb alpha(0) set differently for different models
         alpha(1:10) = param(i,8:nmax+7)
         
-        !calculate parameter rho
-        x1 = (epsilon**2)*(((u*cos(phi))-(v*sin(phi)))**2)
-        x2 = (((v*cos(phi))+(u*sin(phi)))**2)
-        rho = (sqrt(x1 + x2))/(lambda*(1D-9))
-   
-        !deal with point shape, everything else is elliptical
-        !(disc case already set to have ellipticity 1.0)
-        if ((trim(spec(i,2)) == 'point') .or. (a==0)) then
-           F = 1D0
-        else
-           select case (trim(spec(i,3)))
-           case ('uniform')
-              F = uniform(a, rho)
-           case ('taylor')
-              !alpha is array of taylor coeffs 0-20 (0th defined as -1)
-              alpha(0) = -1D0
-              F = taylor(a, rho, nmax, alpha)
-           case ('square-root')
-              !alpha(1) and alpha(2) are sqroot coeffs alpha and beta
-              F = square_root(a, rho, alpha(1), alpha(2))
-           case ('gaussian')
-              F = gaussian(a, rho)
-           case ('hestroffer')
-              !alpha(1) is hestroffer power law parameter
-              F = hestroffer(a, rho, alpha(1))
-           case ('gauss-hermite')
-              !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
-              alpha(0) = 1D0
-              F = gauss_hermite(a, rho, nmax, alpha)
-           case default
-              !must be numerical CLV
-              F = clvvis(a, rho)
-           end select
-        end if
-        
-        !calculate real and imaginary parts (incorporate off-centre
-        !position of component r, theta and brightness B)
-        x1 = (2D0*pi*r*((u*sin(theta))+(v*cos(theta))))/(lambda*(1D-9))
-        x2 = B*F*cos(x1)
-        x3 = B*F*sin(x1)
+        !loop over wavelengths within bandpass (will normalise later)
+        sumvis = 0D0
+        do iwave = 1, nwave
+           lambda1 = lambda - delta_lambda/2D0 + (iwave-1)*delta_lambda/(nwave-1)
+           
+           !calculate parameter rho
+           x1 = (epsilon**2)*(((u*cos(phi))-(v*sin(phi)))**2)
+           x2 = (((v*cos(phi))+(u*sin(phi)))**2)
+           rho = (sqrt(x1 + x2))/(lambda1*(1D-9))
 
-        !add this component visibility to sum
-        cmplx_vis = cmplx_vis + cmplx(x2,x3)
+           !deal with point shape, everything else is elliptical
+           !(disc case already set to have ellipticity 1.0)
+           if ((trim(spec(i,2)) == 'point') .or. (a==0)) then
+              F = 1D0
+           else
+              select case (trim(spec(i,3)))
+              case ('uniform')
+                 F = uniform(a, rho)
+              case ('taylor')
+                 !alpha is array of taylor coeffs 0-20 (0th defined as -1)
+                 alpha(0) = -1D0
+                 F = taylor(a, rho, nmax, alpha)
+              case ('square-root')
+                 !alpha(1) and alpha(2) are sqroot coeffs alpha and beta
+                 F = square_root(a, rho, alpha(1), alpha(2))
+              case ('gaussian')
+                 F = gaussian(a, rho)
+              case ('hestroffer')
+                 !alpha(1) is hestroffer power law parameter
+                 F = hestroffer(a, rho, alpha(1))
+              case ('gauss-hermite')
+                 !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
+                 alpha(0) = 1D0
+                 F = gauss_hermite(a, rho, nmax, alpha)
+              case default
+                 !must be numerical CLV
+                 F = clvvis(a, rho)
+              end select
+           end if
+
+           !calculate real and imaginary parts (incorporate off-centre
+           !position of component r, theta and brightness B)
+           x1 = (2D0*pi*r*((u*sin(theta))+(v*cos(theta))))/(lambda1*(1D-9))
+           x2 = B*F*cos(x1)
+           x3 = B*F*sin(x1)
+
+           !add this component visibility to sum
+           sumvis = sumvis + cmplx(x2,x3)
+
+        end do
+
+        !add normalised sum over wavelengths to sum over components
+        cmplx_vis = cmplx_vis + sumvis/nwave
 
      end do
    
@@ -137,8 +148,6 @@ function cmplx_vis(spec, param, lambda, u, v)
 
   !normalise whole model visiblity
   if (B_total /= 0D0) cmplx_vis = cmplx_vis/B_total
-
-  !print *,'... cmplx_vis return'
 
   return
 
