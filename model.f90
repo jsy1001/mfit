@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.4 2003/08/20 16:56:24 jsy1001 Exp $
+!$Id: model.f90,v 1.5 2003/09/01 14:24:28 jsy1001 Exp $
 
 module Model
 
@@ -119,8 +119,9 @@ subroutine read_model(info, file_name)
      if (dummy == 'source') then
         read (12, *, err=94) dummy, source1, source2
         model_name = trim(source1) // ' ' // trim(source2)
+        exit
      else
-        read (12, *, err=94)
+        read (12, *, err=94) dummy
      end if
   end do
   close (11)
