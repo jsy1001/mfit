@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.5 2002/10/22 13:56:40 jsy1001 Exp $
+!$Id: fit.f90,v 1.6 2002/11/29 10:40:05 jsy1001 Exp $
 
 module Fit
 
@@ -45,7 +45,7 @@ contains
 
 !==============================================================================
   
-  subroutine minimiser(info, symm, sol, flag, desc, &
+  subroutine minimiser(info, force_symm, sol, flag, desc, &
        hes, cov, cor, chisqrd, nlposterior)
 
     !On exit, flag holds success state of the minimisation:
@@ -63,7 +63,7 @@ contains
     !Corresponding message text will be in info,
     !parameter values will be in fit_param
     !
-    !symm is a logical that forces centrosymmetric only models
+    !force_symm is a logical that forces centrosymmetric only models
 
     !subroutine arguments
     character(len=128), intent(out) :: info
@@ -71,7 +71,7 @@ contains
     double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
     double precision, intent(out) :: nlposterior, chisqrd
     integer, intent(out) :: flag
-    logical, intent(in) :: symm
+    logical, intent(in) :: force_symm
 
     !local variables
     integer :: i, j, k, n, lwork
@@ -171,16 +171,9 @@ contains
     end do
     if (illegal) goto 90
 
-    !if centrosymmetric model is forced then maust have 
+    !if centrosymmetric model is forced then must have 
     !eccentricity epsilon fixed to be unity and position radius fixed at zero
-    if (symm) then
-       do i = 1, size(model_param,1)
-          if (.not.((model_param(i,7)==1D0).and.(model_prior(i,7)==0D0))) &
-               goto 92
-          if (.not.((model_param(i,2)==0D0).and.(model_prior(i,2)==0D0))) &
-               goto 92
-       end do
-    end if
+    if (force_symm .and. .not. symm) goto 92
 
     !allocate fit_param array
     !fit_param is identical to model_param, it holds the definition of the model

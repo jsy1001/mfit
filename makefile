@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.7 2002/11/18 10:30:50 jsy1001 Exp $
+# $Id: makefile,v 1.8 2002/11/29 10:40:05 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -20,7 +20,7 @@ TEST_EXES = calc
 PACKAGE_DOCS = documentation
 REMOVE_TARGETS += $(MODULES)
 
-pda_libs = -lpda -lemsf -lems -lcnf
+pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
 
 
 mfit: $(OBJECTS)

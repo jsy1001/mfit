@@ -29,6 +29,9 @@ double precision, dimension(17,2) :: model_limits
 !name from model file (2 words max)
 character(len=128) :: model_name
 
+!centrosymmetric model?
+logical symm
+
 contains
 
 !==============================================================================
@@ -225,8 +228,18 @@ subroutine read_model(info, file_name)
   end do
   
 2 continue 
-
   close (11)
+
+  !is this a centrosymmetric model?
+  symm = .true.
+  do i = 1, size(model_param, 1)
+     !need all epsilon fixed at unity
+     if (.not.((model_param(i,7)==1D0).and.(model_prior(i,7)==0D0))) &
+          symm = .false.
+     !and all r fixed at zero
+     if (.not.((model_param(i,2)==0D0).and.(model_prior(i,2)==0D0))) &
+          symm = .false.
+  end do
   return
   
   !error trapping 

@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.5 2002/11/18 10:28:58 jsy1001 Exp $
+!$Id: main.f90,v 1.6 2002/11/29 10:40:05 jsy1001 Exp $
 
 program Main
 
@@ -30,15 +30,15 @@ program Main
   double precision, dimension(:,:), allocatable :: model_vis_data
 
   !variables
-  integer, parameter :: char=80 !for spacer lines
-  character(len=char) :: spacer_line
-  character(len=128) :: info, file_name, ext, source, x_title, y_title
+  integer, parameter :: width=80 !for spacer lines
+  character(len=width) :: spacer_line
+  character(len=128) :: info, file_name, ext, source, top_title
   integer :: i, j, length, flag, degfreedom
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, chisqrd, normchisqrd
   double precision :: version, lambda, u1, v1, u2, v2, step, calib_error, cp
   double complex :: W1, W2, W3, T
-  logical :: symm
+  logical :: force_symm
 
   external myhandler
   integer :: ieeer, ieee_handler, myhandler
@@ -50,12 +50,12 @@ program Main
   !----------------------------------------------------------------------------
   !Formatting stuff
 
-  spacer_line = repeat('-',char)
+  spacer_line = repeat('-',width)
 
   !----------------------------------------------------------------------------
   !Introduction
 
-  version = 1.01D0
+  version = 1.10D0
   print *,' '
   print *,spacer_line
   print *,' '
@@ -118,7 +118,7 @@ program Main
         !read_mapdat allocates vis_data, triple_data, and wavebands
         call read_mapdat(info, file_name, source, max_lines, &
              vis_data, triple_data, wavebands, calib_error)
-        symm = .false.
+        force_symm = .false.
 
         !Filter here to reduce vis and triple data to single waveband, selected
         !by user, this will not be necessary if multi-waveband fitting is
@@ -196,7 +196,7 @@ program Main
         call read_vis(info, file_name, source, max_lines, vis_data, lambda, &
              calib_error)
         allocate(triple_data(0,0))
-        symm = .true.
+        force_symm = .true.
 
      else if (ext == 'nvis') then
         !Model is forced to be centrosymmetric (real visibilities)
@@ -207,7 +207,7 @@ program Main
         call read_nvis(info, file_name, source, max_lines, vis_data, lambda, &
              calib_error)
         allocate(triple_data(0,0))
-        symm = .true.
+        force_symm = .true.
 
      else
         info = 'file type not handled'
@@ -269,6 +269,7 @@ program Main
        'unflagged data points out of',size(vis_data,1)+(2*size(triple_data,1))
   print *,' '
   print *,spacer_line
+  call plot_uv('u /M\gl', 'v /M\gl', trim(source), '?')
 
   ! allow repeated model fits to same data
   model_loop: do
@@ -305,6 +306,16 @@ program Main
      call print_model()
      print *,' '
      print *,spacer_line
+
+     !-------------------------------------------------------------------------
+     ! plot initial model
+     top_title = trim(source)//' - initial model: '//trim(model_name)
+     if (useful_vis > 0) &
+          call plot_vis(model_spec, model_param, symm, &
+          'Baseline /M\gl', 'Squared visibility', top_title)
+     if (useful_cp > 0) &
+          call plot_triple(model_spec, model_param, 'Longest baseline /M\gl',&
+          'Closure phase /'//char(176), top_title)
 
      !-------------------------------------------------------------------------
      !fit model to the data by minimising negative log posterior
@@ -374,28 +385,14 @@ program Main
         !----------------------------------------------------------------------
         !plot
 
-        print *,' '
-        print *,'plotting...'
-
-        allocate(model_vis_data(1000, 5))
-
-        v1 = 0D0
-        u1 = -0.01D0
-        step = 0.01D0
-        do i = 1, 1000
-           u1 = u1 + step
-           W1 = (cmplx_vis(model_spec, fit_param, lambda, u1, v1))**2D0
-           model_vis_data(i,1:5) = (/lambda,u1,v1,modulus(W1),0D0/)
-        end do
-
-        x_title = 'baseline / megalambda'
-        y_title = 'normalised visibility squared'
-
-        info = ''
-        call plot_vis_data(info, vis_data, model_vis_data, &
-             lambda, x_title, y_title, (trim(source)//': '//trim(model_name)))
-        deallocate(model_vis_data)
-        if (info /= '') print *,info
+        top_title = trim(source)//' - final model: '//trim(model_name)
+        if (useful_vis > 0) &
+             call plot_vis(model_spec, fit_param, symm, 'Baseline /M\gl', &
+             'Squared Visibility', top_title)
+        if (useful_cp > 0) &
+             call plot_triple(model_spec, fit_param, 'Longest baseline /M\gl',&
+             'Closure phase /'//char(176), top_title)
+        call pgend
      end if
 
      !-------------------------------------------------------------------------
