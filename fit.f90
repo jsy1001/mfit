@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.9 2003/06/10 16:11:43 jsy1001 Exp $
+!$Id: fit.f90,v 1.10 2003/06/12 14:53:11 jsy1001 Exp $
 
 module Fit
 
@@ -211,7 +211,7 @@ contains
 
     print *, 'calculating initial goodness-of-fit...'
     !calculate goodness-of-fit statistic chi squared
-    call gof(chisqrd)
+    call gof(model_spec, fit_param, chisqrd)
     print *,' '
     print *,'initial chi squared =',real(chisqrd) 
 
@@ -332,7 +332,7 @@ contains
     end do
 
     !calculate goodness-of-fit statistic chi squared
-    call gof(chisqrd)
+    call gof(model_spec, fit_param, chisqrd)
 
     !estimate -log(evidence)
     !if det -ve returns zero
@@ -353,104 +353,106 @@ contains
 
     !error trapping 
 90  info = 'illegal freedom(s) in model'
-    goto 200
-91  info = 'minimisation routine error: ' // info
+    flag = -2
     goto 200
 92  info = 'for vis/nvis data must have guaranteed symmetric model'
+    flag = -3
     goto 200
 
   end subroutine minimiser
 
 !==============================================================================
 
-subroutine gof(chisqrd)
+  subroutine gof(spec, param, chisqrd)
 
-!Goodness of fit information calculation
-!
-!Computes the chisqrd value of a model fit and data set
-!chisqrd = sum[i] { (data[i]-theory[i])^2/data_error[i]^2 }
-!chisqrd is thus almost identical to likelihood
-!could save code here and significantly combine this function
-!with the likeihood one but maybe less risky to keep them separated...
-!Could in future add code here to look up critical chi sqaured values
-!for num of data points and num of free parameters
+    !Goodness of fit information calculation
+    !
+    !Computes the chisqrd value of a model fit and data set
+    !chisqrd = sum[i] { (data[i]-theory[i])^2/data_error[i]^2 }
+    !chisqrd is thus almost identical to likelihood
+    !could save code here and significantly combine this function
+    !with the likelihood one but maybe less risky to keep them separated...
+    !Could in future add code here to look up critical chi squared values
+    !for num of data points and num of free parameters
 
-!subroutine arguments
-double precision, intent(out) :: chisqrd
+    !subroutine arguments
+    character(len=128), dimension(:,:), intent(in) :: spec
+    double precision, dimension(:,:), intent(in) :: param
+    double precision, intent(out) :: chisqrd
 
-!local variables
-integer :: i
-double precision :: lambda, u, v, data_vis, data_vis_err, model_vis
-double precision :: u1, v1, u2, v2, data_amp, data_amp_err, data_phase
-double precision :: data_phase_err, model_amp, model_phase
-double complex :: vis, vis1, vis2, vis3
+    !local variables
+    integer :: i
+    double precision :: lambda, u, v, data_vis, data_vis_err, model_vis
+    double precision :: u1, v1, u2, v2, data_amp, data_amp_err, data_phase
+    double precision :: data_phase_err, model_amp, model_phase
+    double complex :: vis, vis1, vis2, vis3
 
-chisqrd = 0D0
+    chisqrd = 0D0
 
-!sum over the visibility data points
-do i = 1, size(vis_data,1)
-   
-   !extract points
-   lambda = vis_data(i,1)
-   u = vis_data(i,3)
-   v = vis_data(i,4)
-   data_vis = vis_data(i,5)
-   data_vis_err = vis_data(i,6)
+    !sum over the visibility data points
+    do i = 1, size(vis_data,1)
+       
+       !extract points
+       lambda = vis_data(i,1)
+       u = vis_data(i,3)
+       v = vis_data(i,4)
+       data_vis = vis_data(i,5)
+       data_vis_err = vis_data(i,6)
 
-   !ignore if -ve or zero error:
-   if (data_vis_err>0D0) then
-      
-      !compute model-predicted visibility amplitude squared
-      vis = cmplx_vis(model_spec, fit_param, lambda, u, v)
-      model_vis = (modulus(vis))**2D0
-      
-      !compute contribution to chisqrd
-      chisqrd = chisqrd + &
-                (((data_vis-model_vis)/data_vis_err)**2D0)
+       !ignore if -ve or zero error:
+       if (data_vis_err>0D0) then
 
-   end if      
+          !compute model-predicted visibility amplitude squared
+          vis = cmplx_vis(spec, param, lambda, u, v)
+          model_vis = (modulus(vis))**2D0
 
-end do
+          !compute contribution to chisqrd
+          chisqrd = chisqrd + &
+               (((data_vis-model_vis)/data_vis_err)**2D0)
 
-!sum over triple product amplitude and phase data points
-do i = 1, size(triple_data,1)
+       end if
 
-   !extract points
-   lambda = triple_data(i,1)
-   u1 = triple_data(i,3)
-   v1 = triple_data(i,4)
-   u2 = triple_data(i,5)
-   v2 = triple_data(i,6)
-   data_amp = triple_data(i,7)
-   data_amp_err = triple_data(i,8)
-   data_phase = triple_data(i,9)
-   data_phase_err = triple_data(i,10)
+    end do
 
-   if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
-      !compute model-predicted triple amplitude
-      vis1 = cmplx_vis(model_spec, fit_param, lambda, u1, v1)
-      vis2 = cmplx_vis(model_spec, fit_param, lambda, u2, v2)
-      vis3 = cmplx_vis(model_spec, fit_param, lambda, -(u1+u2), -(v1+v2))
-      vis = vis1*vis2*vis3
-      model_amp = modulus(vis)
-      model_phase = rad2deg*argument(vis)
-   end if
+    !sum over triple product amplitude and phase data points
+    do i = 1, size(triple_data,1)
 
-   !compute rmsdev and chisqrd contributions
-   !nb phase calculations modulo 360 degrees
-   if (data_amp_err>0D0) then
-      chisqrd = chisqrd + &
-                (((data_amp-model_amp)/(data_amp_err))**2D0)
-   end if
-   if (data_phase_err>0D0) then
-      chisqrd = chisqrd + &
-           (modx(data_phase,model_phase)/(data_phase_err))**2D0
+       !extract points
+       lambda = triple_data(i,1)
+       u1 = triple_data(i,3)
+       v1 = triple_data(i,4)
+       u2 = triple_data(i,5)
+       v2 = triple_data(i,6)
+       data_amp = triple_data(i,7)
+       data_amp_err = triple_data(i,8)
+       data_phase = triple_data(i,9)
+       data_phase_err = triple_data(i,10)
 
-   end if 
+       if ((data_amp_err>0D0).or.(data_phase_err>0D0)) then
+          !compute model-predicted triple amplitude
+          vis1 = cmplx_vis(spec, param, lambda, u1, v1)
+          vis2 = cmplx_vis(spec, param, lambda, u2, v2)
+          vis3 = cmplx_vis(spec, param, lambda, -(u1+u2), -(v1+v2))
+          vis = vis1*vis2*vis3
+          model_amp = modulus(vis)
+          model_phase = rad2deg*argument(vis)
+       end if
 
-end do
+       !compute rmsdev and chisqrd contributions
+       !nb phase calculations modulo 360 degrees
+       if (data_amp_err>0D0) then
+          chisqrd = chisqrd + &
+               (((data_amp-model_amp)/(data_amp_err))**2D0)
+       end if
+       if (data_phase_err>0D0) then
+          chisqrd = chisqrd + &
+               (modx(data_phase,model_phase)/(data_phase_err))**2D0
 
-end subroutine gof
+       end if
+
+    end do
+
+  end subroutine gof
 
 !==============================================================================
 

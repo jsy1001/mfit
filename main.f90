@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.10 2003/06/11 09:37:28 jsy1001 Exp $
+!$Id: main.f90,v 1.11 2003/06/12 14:53:11 jsy1001 Exp $
 
 program Main
 
@@ -302,7 +302,7 @@ program Main
         print *, '*****'
      end if
 
-     if (flag < 4) then
+     if (flag > -1 .and. flag < 4) then
         degfreedom = useful_vis + useful_amp + useful_cp - size(sol,1)
         normchisqrd = chisqrd/degfreedom
 
