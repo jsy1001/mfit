@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.3 2002/10/04 13:52:34 jsy1001 Exp $
+# $Id: makefile,v 1.4 2002/10/09 11:17:07 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -6,7 +6,7 @@ SHELL = /bin/sh
 
 F90 = /opt/SUNWspro/bin/f90
 
-FFLAGC = -Xlist -C -g -dalign
+FFLAGC = -C -dalign
 
 package = mfit
 prefix = /coast/depot-sparc/$(package)
@@ -19,8 +19,11 @@ TEST_EXES = calc
 PACKAGE_DOCS = documentation
 REMOVE_TARGETS += $(MODULES)
 
+pda_link = /star/bin/pda_link
+
+
 mfit: $(OBJECTS)
-	$(F90) $^ -o $@ `pgplotlink` `/star/bin/pda_link` -dalign -lnag -lf77compat
+	$(F90) $^ -o $@ `pgplotlink` `$(pda_link)` -dalign -lnag -lf77compat
 
 calc: calc.o maths.o
 	$(F90) $^ -o $@ -dalign -lnag -lf77compat

@@ -1,3 +1,5 @@
+!$Id: fit.f90,v 1.4 2002/10/09 11:17:07 jsy1001 Exp $
+
 module Fit
 
 !callable subroutines contained
@@ -44,7 +46,7 @@ contains
 !==============================================================================
   
   subroutine minimiser(info, symm, sol, flag, desc, &
-       hes, cov, cor, chisqrd, sumsqr, nlposterior)
+       hes, cov, cor, chisqrd, nlposterior)
 
     !On exit, flag holds success state of the minimisation:
     ! flag =  0:  Optimal solution found
@@ -67,7 +69,7 @@ contains
     character(len=128), intent(out) :: info
     character(len=35), dimension(:), allocatable, intent(out) :: desc
     double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
-    double precision, intent(out) :: nlposterior, chisqrd, sumsqr
+    double precision, intent(out) :: nlposterior, chisqrd
     integer, intent(out) :: flag
     logical, intent(in) :: symm
 
@@ -220,13 +222,9 @@ contains
 
     print *, 'calculating initial goodness-of-fit...'
     !calculate goodness-of-fit statistic chi squared
-    call gof(chisqrd, sumsqr)
+    call gof(chisqrd)
     print *,' '
-    print *,'initial sum of sqrd deviations =',real(sumsqr)
-    print *,' '
-    print *,'           initial chi squared =',real(chisqrd) 
-    call posterior(n, x, nlposterior) ! uses fit_param (=model_param at this stage)
-    print *,'initial negative log posterior =',real(nlposterior)
+    print *,'initial chi squared =',real(chisqrd) 
 
     !call minimising algorithm
     info = ''
@@ -345,7 +343,7 @@ contains
     end do
 
     !calculate goodness-of-fit statistic chi squared
-    call gof(chisqrd, sumsqr)
+    call gof(chisqrd)
 
     !clean-up and return
 200 continue
@@ -368,19 +366,20 @@ contains
 
 !==============================================================================
 
-subroutine gof(chisqrd, sumsqr)
+subroutine gof(chisqrd)
 
-!goodness of fit information calculation
-!computes the chisqrd value of a model fit and data set
+!Goodness of fit information calculation
+!
+!Computes the chisqrd value of a model fit and data set
 !chisqrd = sum[i] { (data[i]-theory[i])^2/data_error[i]^2 }
 !chisqrd is thus almost identical to likelihood
 !could save code here and significantly combine this function
 !with the likeihood one but maybe less risky to keep them separated...
-!could in future add code here to look up critical chi sqaured values
+!Could in future add code here to look up critical chi sqaured values
 !for num of data points and num of free parameters
 
 !subroutine arguments
-double precision, intent(out) :: chisqrd, sumsqr
+double precision, intent(out) :: chisqrd
 
 !local variables
 integer :: i
@@ -390,7 +389,6 @@ double precision :: data_phase_err, model_amp, model_phase
 double complex :: vis, vis1, vis2, vis3
 
 chisqrd = 0D0
-sumsqr = 0D0
 
 !sum over the visibility data points
 do i = 1, size(vis_data,1)
@@ -409,13 +407,9 @@ do i = 1, size(vis_data,1)
       vis = cmplx_vis(model_spec, fit_param, lambda, u, v)
       model_vis = (modulus(vis))**2D0
       
-      !compute contribution to rmsdev and chisqrd
-      sumsqr = sumsqr + ((data_vis-model_vis)**2D0)
+      !compute contribution to chisqrd
       chisqrd = chisqrd + &
                 (((data_vis-model_vis)/data_vis_err)**2D0)
-
-      !print '(a, 3f7.4, 2f9.2)','vis',data_vis,model_vis,data_vis_err, &
-      !     ((data_vis-model_vis)/data_vis_err)**2D0, chisqrd
 
    end if      
 
@@ -448,17 +442,13 @@ do i = 1, size(triple_data,1)
    !compute rmsdev and chisqrd contributions
    !nb phase calculations modulo 360 degrees
    if (data_amp_err>0D0) then
-      sumsqr = sumsqr + ((data_amp-model_amp)**2D0)
       chisqrd = chisqrd + &
                 (((data_amp-model_amp)/(data_amp_err))**2D0)
    end if
    if (data_phase_err>0D0) then
-      sumsqr = sumsqr + ((modx(data_phase,model_phase))**2D0)
       chisqrd = chisqrd + &
-           (modx(data_phase,model_phase)/data_phase_err)**2D0
+           (modx(data_phase,model_phase)/(data_phase_err))**2D0
 
-      !print '(a, 3f8.2, 2f9.2)','t_phase',data_phase,model_phase,data_phase_err, &
-      !     (modx(data_phase,model_phase)/data_phase_err)**2D0, chisqrd
    end if 
 
 end do
@@ -510,7 +500,7 @@ end subroutine posterior
 
 function likelihood(vis_data, triple_data, model_spec, param)
 
-!computes the negative log likelihood of data given model
+!Computes the negative log likelihood of data given model
 
 !subroutine arguments
 double precision :: likelihood

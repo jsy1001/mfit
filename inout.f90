@@ -1,3 +1,5 @@
+!$Id: inout.f90,v 1.3 2002/10/09 11:17:07 jsy1001 Exp $
+
 module Inout
 
 !subroutines contained
@@ -19,6 +21,7 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, lambda, &
   !(Re)Allocates and fills in vis_data array. Note projected
   !baseline sqrt(u**2 + v**2) gets
   !put in u column, with zero in v column
+  !Adds calib_error, assumed to be constant fractional error in mod V
  
   !subroutine arguments
   character(len=128), intent(out) :: info, source
@@ -31,13 +34,17 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, lambda, &
   !local variables
   character(len=32) :: dummy
   integer :: i, data_items
-  double precision :: vis, baseline, default_error
+  double precision :: vis, baseline, default_error, frac_error
 
-  !default absolute error on the visibility^2 data points
+  !default absolute error on the visibility data points
+  !(for consistency with analyse)
   default_error = 0.001D0
   
   !check for zero length filename
-  if (file_name == '') goto 90    
+  if (file_name == '') then
+     info = 'blank filename'
+     return
+  end if
   
   !read file header
   open (unit=11, err=91, status='old', action='read', file=file_name)
@@ -50,7 +57,9 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, lambda, &
   do i = 1, max_lines+1
      read (11, *, err=94, end=1) dummy
   end do
-  goto 93
+  info = 'file exceeds maximum permitted length'
+  close (11)
+  return
 1 close (11)
   
   !allocate array size
@@ -68,29 +77,24 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, lambda, &
        vis_data(i,2) = abs(baseline)/1D+3
        vis_data(i,3) = 0D0
        vis_data(i,4) = vis**2D0
-       vis_data(i,5) = vis_data(i,4) * sqrt( calib_error**2D0 + &
-            (default_error/vis_data(i,4))**2D0 )
+       !calculate fractional error on mod V
+       frac_error = sqrt( calib_error**2D0 + (default_error/vis_data(i,4))**2D0 )
+       !hence calculate abs error on squared visibility
+       vis_data(i,5) = 2D0*frac_error*vis_data(i,4)
   end do
 
-  !clean-up and return
-200 continue
-    
+  close(11)
   return
 
   !error trapping 
-90 info = 'blank filename'
-  goto 200
 91 info = 'cannot open file'
-  goto 200
+  return
 92 info = 'cannot read from file'
   close (11)
-  goto 200
-93 info = 'file exceeds maximum permitted length'
-  close (11)
-  goto 200
+  return
 94 info = 'unknown read problem - possible invalid file format'
   close (11)
-  goto 200
+  return
   
   end subroutine read_vis
 
@@ -103,6 +107,7 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, lambda, &
   !(Re)Allocates and fills in vis_data array. Note projected
   !baseline sqrt(u**2 + v**2) gets
   !put in u column, with zero in v column
+  !Adds calib_error, assumed to be constant fractional error in mod V
  
   !subroutine arguments
   character(len=*), intent(in) :: file_name
@@ -114,7 +119,7 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, lambda, &
   !local variables
   character(len=256) :: line
   integer :: i, data_items
-  double precision :: vis, err, baseline
+  double precision :: vis, err, baseline, frac_error
   
   !check for zero length filename
   if (file_name == '') then
@@ -156,10 +161,10 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, lambda, &
         vis_data(i,2) = abs(baseline)/1D+3
         vis_data(i,3) = 0D0
         vis_data(i,4) = vis**2D0
-        !calculate abs error on squared visibility; err is abs error
-        !on (assumed real) visibility
-        vis_data(i,5) = vis_data(i,4) * sqrt( calib_error**2D0 + &
-             (2D0*err/vis_data(i,4))**2D0 )
+        !calculate fractional error on mod V
+        frac_error = sqrt( calib_error**2D0 + (err/vis_data(i,4))**2D0 )
+        !hence calculate abs error on squared visibility
+        vis_data(i,5) = 2D0*frac_error*vis_data(i,4)
         i = i + 1
         if (i > max_lines) then
            info = 'file exceeds maximum permitted length'
@@ -194,6 +199,8 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
   !vis_data: lambda, u, v, vis, err
   !          vis is squared visibility amplitude (may be -ve for data points)
   !triple_data: lambda, u1, v1, u2, v2, amp, err, cp, err
+  !
+  !Adds calib_error, assumed to be constant fractional error in mod V
   !
   !wavebands array (allocated here) is list of different wavelength values
   !encountered
@@ -260,9 +267,9 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
         if (vis<0D0) vis_data(i1,4) = -vis_data(i1,4)
 
         !"vis" error in file is the modulus of the fractional error
-        !(in the squared visibility) divided by 2. Need to convert to
-        !absolute error
-        vis_data(i1,5) = vis_data(i1,4) * sqrt(calib_error**2D0 + &
+        !(in the squared visibility) divided by 2. Need to add calibration error
+        !and convert to absolute error
+        vis_data(i1,5) = vis_data(i1,4) * sqrt((2D0*calib_error)**2D0 + &
                          (2D0*vis_err)**2D0 )
 
         if (vis_err<0D0) vis_data(i1,5) = -vis_data(i1,5)
@@ -273,6 +280,10 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
         read (12,*,err=95) (dummy, dummy, dummy, dummy, triple_data(i2,1), &
              dummy, dummy, dummy, dummy, triple_data(i2,2:5), &
              amp, amp_err, cp, cp_err)
+
+        !reverse signs of u1, v1, u2, v2 as Caltech baseline convention is
+        !opposite to the one used here
+        triple_data(i2,2:5) = -triple_data(i2,2:5)
 
         !amplitude in file is cube root of amplitude
         triple_data(i2,6) = amp**3D0

@@ -1,3 +1,5 @@
+!$Id: main.f90,v 1.4 2002/10/09 11:17:07 jsy1001 Exp $
+
 program Main
 
   use Inout
@@ -33,7 +35,7 @@ program Main
   character(len=128) :: info, file_name, ext, source, x_title, y_title
   integer :: i, j, length, flag, degfreedom
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
-  double precision :: nlposterior, chisqrd, sumsqr, normchisqrd
+  double precision :: nlposterior, chisqrd, normchisqrd
   double precision :: version, lambda, u1, v1, u2, v2, step, calib_error, cp
   double complex :: W1, W2, W3, T
   logical :: symm
@@ -90,10 +92,10 @@ program Main
 
      do
         print *,' '
-        print *,'enter frac calibration error to be applied to squared visibilities'
+        print *,'enter calibration error (fractional error in system visibility)'
         read *,calib_error
         if (calib_error>=0D0) exit
-        print *,'must specify a positive frac calibration error'
+        print *,'must specify a positive calibration error'
      end do
 
      if (ext == 'vis' .or. ext == 'nvis') then
@@ -147,7 +149,7 @@ program Main
               do i = 1, length
                  if (vis_data(i,1)==lambda) keep(i) = .true.
               end do
-              allocate(swap(count(keep,1),5))
+              allocate(swap(count(keep,1),size(vis_data, 2)))
               j = 0
               do i = 1, length
                  if (keep(i)) then
@@ -156,7 +158,7 @@ program Main
                  end if
               end do
               deallocate(vis_data)
-              allocate(vis_data(count(keep,1),5))
+              allocate(vis_data(count(keep,1),size(vis_data, 2)))
               vis_data = swap
               deallocate(swap)
               deallocate(keep)
@@ -316,11 +318,11 @@ program Main
      info = ''
      ! minimiser allocates fit_param, x, x_pos, sol, desc, hes, cov, cor
      call minimiser(info, symm, sol, flag, desc, &
-          hes, cov, cor, chisqrd, sumsqr, nlposterior)
+          hes, cov, cor, chisqrd, nlposterior)
      if (info /= '') then
-        print *,' *****'
-        print *,info
-        print *,' *****'
+        print *,'*****'
+        print *,trim(info)
+        print *, '*****'
      end if
 
      if (flag < 4) then
@@ -329,8 +331,6 @@ program Main
 
         print *,' '
         print *,'negative log posterior =',real(nlposterior)
-        print *,' '
-        print *,'sum of sqrd deviations =',real(sumsqr)
         print *,' '
         print *,'           chi squared =',real(chisqrd) 
         print *,'    degrees of freedom =',degfreedom
@@ -376,19 +376,6 @@ program Main
 
         print *,' '
         print *,'plotting...'
-
-        do i = 1, size(triple_data,1)
-           lambda = triple_data(i,1)
-           u1 = triple_data(i,2)
-           v1 = triple_data(i,3)
-           u2 = triple_data(i,4)
-           v2 = triple_data(i,5)
-           W1 = cmplx_vis(model_spec, model_param, lambda, u1, v1)
-           W2 = cmplx_vis(model_spec, model_param, lambda, u2, v2)
-           W3 = cmplx_vis(model_spec, model_param, lambda, -(u1+u2), -(v1+v2))
-           T = W1*w2*w3
-           cp = rad2deg*argument(T)
-        end do
 
         allocate(model_vis_data(1000, 5))
 
