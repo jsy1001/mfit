@@ -1,0 +1,345 @@
+module Visibility
+
+!callable function contained
+!cmplx_vis - returns complex visibility for the model
+!            by summing over model components present it
+!            calls the functions below in the summation.  
+!
+!local functions contained
+!
+!return transform function (on origin i.e. real) as
+!function of rho and d_lambda
+!all arguments to double precision where possible
+!
+!uniform           happy - thesis ok
+!taylor            happy - thesis ok
+!square_root       not happy - db thesis seems incorrect
+!gaussian          happy - thesis ok
+!hestroffer        happy - agrees with paper
+!gauss_hermite     not happy - db thesis seems incorrect
+
+use Maths !picks up pi parameter from here
+
+implicit none
+
+contains
+!==============================================================================
+
+function cmplx_vis(spec, param, lambda, u, v)
+
+  !returns complex visibility real and imaginary parts for
+  !multiple component model. model component details stored in 
+  !the model_spec and model_param arrays.
+  
+  !subroutine arguments
+  character(len=128) :: info, source
+  character(len=128), dimension(:,:), allocatable :: spec
+  double precision, dimension(:,:), allocatable :: param
+  double precision :: lambda, u, v
+  double complex :: cmplx_vis
+  
+  !local variables
+  integer :: i, num_comps, nmax, j
+  double precision :: r, theta, B, a, phi, B_total
+  double precision :: epsilon, rho, F, x1, x2, x3
+  double precision, dimension(0:10) :: alpha
+  
+  !set number of components
+  num_comps = size(spec,1)
+
+  !print *,'cmplx_vis call...'
+  !print *,param
+  !print *,lambda,u,v
+  
+  !clear real and imag vis
+  cmplx_vis = 0D0
+  b_total = 0D0
+  
+  !trap zero baseline case
+  if ((u == 0D0) .and. (v == 0D0)) then 
+     cmplx_vis = dcmplx(1D0,0D0)
+     B_total = 1D0
+
+  else
+     
+     !sum over components
+     do i = 1, num_comps
+        
+        !get position r and theta, brightness I
+        !major axis a, orientation phi, ellipticity epsilon
+        !ld order nmax, ld parameters alpha
+        r = mas2rad*param(i,2)
+        theta = deg2rad*param(i,3)
+        B = param(i,4)
+
+        a = mas2rad*param(i,5)
+        phi = deg2rad*param(i,6)
+        epsilon = param(i,7)
+        nmax = int(param(i,1))
+        
+        !sum up brightnesses (need later to normalise whole model)
+        B_total = B_total + B
+
+        !confiure array of ld parameters
+        !nb alpha(0) set differently for different models
+        alpha(1:10) = param(i,8:nmax+7)
+        
+        !calculate parameter rho
+        x1 = (epsilon**2)*(((u*cos(phi))-(v*sin(phi)))**2)
+        x2 = (((v*cos(phi))+(u*sin(phi)))**2)
+        rho = (sqrt(x1 + x2))/(lambda*(1D-9))
+   
+        !deal with point shape, everything else is elliptical
+        !(disc case already set to have ellipticity 1.0)
+        if ((trim(spec(i,2)) == 'point') .or. (a==0)) then
+           F = 1D0
+        else
+           select case (trim(spec(i,3)))
+              case ('uniform')
+                 F = uniform(a, rho)
+              case ('taylor')
+                 !alpha is array of taylor coeffs 0-20 (0th defined as -1)
+                 alpha(0) = -1D0
+                 F = taylor(a, rho, nmax, alpha)
+              case ('square-root')
+                 !alpha(1) and alpha(2) are sqroot coeffs alpha and beta
+                 F = square_root(a, rho, alpha(1), alpha(2))
+              case ('gaussian')
+                 F = gaussian(a, rho)
+              case ('hestroffer')
+                 !alpha(1) is hestroffer power law parameter
+                 F = hestroffer(a, rho, alpha(1))
+              case ('gauss-hermite')
+                 !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
+                 alpha(0) = 1D0
+                 F = gauss_hermite(a, rho, nmax, alpha)
+           end select
+        end if
+        
+        !calculate real and imaginary parts (incorporate off-centre
+        !position of component r, theta and brightness B)
+        x1 = (2D0*pi*r*((u*sin(theta))+(v*cos(theta))))/(lambda*(1D-9))
+        x2 = B*F*cos(x1)
+        x3 = B*F*sin(x1)
+
+        !add this component visibility to sum
+        cmplx_vis = cmplx_vis + dcmplx(x2,x3)
+
+     end do
+   
+  end if 
+
+  !normalise whole model visiblity
+  if (B_total /= 0D0) cmplx_vis = cmplx_vis/B_total
+
+  !print *,'... cmplx_vis return'
+
+  return
+
+end function cmplx_vis
+
+!==============================================================================
+
+function uniform(a, rho)
+
+  !function arguments
+  double precision :: uniform, a, rho
+
+  !evaluate visibility
+  uniform = (2D0*bess1(pi*a*rho))/(pi*a*rho)
+  
+end function uniform
+
+!==============================================================================
+
+function taylor(a, rho, nmax, alpha)
+
+  !function arguments, note alpha is an array of coefficients
+  double precision :: taylor, a, rho
+  integer :: nmax
+  double precision, dimension(0:10) :: alpha
+  
+  !local variables
+  double complex :: x1, x2, y1, y2, z1, z2, z3, z4, z5, z6
+  integer :: i, p, n
+  double complex, dimension(:), allocatable :: even_output
+  double complex, dimension(:), allocatable :: odd_output
+  double complex, dimension(:), allocatable :: bessel_data
+
+  !set up bessel array space
+  allocate(bessel_data(0:nmax))
+  
+  !do get seperate odd/even bessel data arrays
+  !bessel call is done in bulk for highest NAG efficiency
+  !no need for odd output call if in nmax=0 case
+  call bessel(1D0, pi*a*rho, 0D0, floor((dble(nmax)/2D0)+1D0), &
+              even_output)
+  if (nmax > 0) call bessel(1.5D0, pi*a*rho, 0D0, ceiling(dble(nmax)/2D0), &
+                            odd_output)
+
+  !interlace odd/even arrays to get array of J[(p/2)+1](pi*a*rho)
+  !values that are referenced by p value
+  do i = 1, size(even_output)
+     bessel_data((2*i)-2) = even_output(i)
+  end do
+  do i = 1, size(odd_output)
+     bessel_data((2*i)-1) = odd_output(i)
+  end do
+
+  !sigma over n
+  x1 = 0
+  x2 = 0
+  do n = 0, nmax
+     
+     !sigma over p
+     y1 = 0
+     y2 = 0
+     do p = 0, n
+        z1 = dble((-1D0)**(p))
+        z2 = (2D0)**(dble(p)/2D0)
+        z3 = comb(n,p)
+        z4 = gamma((dble(p)/2D0)+1D0)
+        z5 = bessel_data(p)
+        z6 = (pi*a*rho)**((dble(p)/2D0)+1D0)
+        y1 = y1 + (z1*z2*z3*z4*(z5/z6))
+        y2 = y2 + ((z1*z3)/(dble(p)+2D0))
+     end do
+
+     x1 = x1 + ((alpha(n))*(y1))
+     x2 = x2 + ((alpha(n))*(y2))
+  
+  end do
+
+  !deallocate
+  deallocate(bessel_data)
+  deallocate(even_output)
+  if (allocated(odd_output)) deallocate(odd_output)
+
+  taylor = (x1/x2)
+
+end function taylor
+
+!==============================================================================
+
+function square_root(a, rho, alpha, beta)
+
+  !subroutine arguments, alpha and beta are single parameters
+  !alpha is (1-mu) coeff and beta is (1-root(mu)) coeff
+  double precision :: square_root, a, rho, alpha, beta
+
+  !local variables
+  double precision :: x1, x2, x3, x4
+  double complex, dimension(:), allocatable :: bs1, bs2, bs3
+
+  !get bessel function values
+  call bessel(1D0, pi*a*rho, 0D0, 1, bs1)
+  call bessel(1.5D0, pi*a*rho, 0D0, 1, bs2)
+  call bessel(1.25D0, pi*a*rho, 0D0, 1, bs3)
+
+  !calculate visibility
+  x1 = ((1D0-alpha-beta)*(bs1(1)))/(pi*a*rho)
+  x2 = (alpha*(sqrt(pi/2D0))*bs2(1))/((pi*a*rho)**(1.5D0))
+  x3 = (beta*((2D0)**(0.25D0))*(gamma(1.25D0))*bs3(1))/((pi*a*rho)**(1.25D0))
+  x4 = (0.5D0)-((1D0/6D0)*alpha)-((1D0/10D0)*beta)
+
+  square_root = (x1+x2+x3)/x4
+
+  !deallocate bessel data arrays
+  deallocate(bs1)
+  deallocate(bs2)
+  deallocate(bs3)
+
+end function square_root
+
+!==============================================================================
+
+function gaussian(a, rho)
+
+  !subroutine arguments
+  double precision :: gaussian, a, rho
+
+  gaussian = exp(-((pi*a*rho)**2D0)/(4D0*log(2D0)))
+
+end function gaussian
+
+!==============================================================================
+
+function hestroffer(a, rho, alpha)
+
+  !subroutine arguments, note alpha is a single parameter
+  double precision :: hestroffer, a, rho, alpha
+  
+  !local variables
+  double precision :: x1, x2, x3
+  double complex, dimension(:), allocatable :: bessel_data
+  
+  call bessel((alpha/2D0)+1D0, pi*a*rho, 0D0, 1, bessel_data)
+  
+  x1 = dble(gamma((alpha/2D0)+2D0))
+  x2 = dble(bessel_data(1))
+  x3 = ((pi*a*rho)/2D0)**((alpha/2D0)+1D0)
+  
+  !deallocate bessel array
+  deallocate (bessel_data)
+
+  hestroffer = x1*(x2/x3)
+
+end function hestroffer
+
+!==============================================================================
+
+function gauss_hermite(a, rho, nmax, alpha)
+
+  !subroutine arguments, note alpha is an array of coefficients
+  double precision :: gauss_hermite, a, rho
+  integer :: nmax
+  double precision, dimension(0:10) :: alpha
+
+  !local variables
+  double precision, dimension(:), allocatable :: laguerre_data
+  double precision :: x1, x2, y1, y2, z1, z2, z3, z4, z5, z6, z7
+  integer :: n, t
+  
+  !get laguerre coefficients
+  call laguerre(nmax, ((pi*rho*a)**2D0)/(4D0*log(2D0)), laguerre_data)
+  
+  !sigma over n
+  x1 = 0
+  x2 = 0
+  do n = 0, nmax  
+     
+     !sigma over t
+     y1 = 0
+     y2 = 0
+     do t = 0, n        
+        z1 = dble((-1D0)**t)
+        z2 = gamma(dble(t)+1D0)
+        z3 = (2D0)**(3D0*dble(t))
+        z4 = fact(2*t)
+        z5 = fact(n-t)
+        z6 = exp(-((pi*rho*a)**2D0)/(4D0*log(2D0)))
+        z7 = laguerre_data(t)
+        y1 = y1 + ((z1*z2*z3*z6*z7)/(z4*z5))
+        y2 = y2 + ((z1*z2*z3)/(z4*z5))
+     end do
+
+     x1 = x1 + (alpha(n)*y1*(dble((-1D0)**n))*(fact(2*n)))
+     x2 = x2 + (alpha(n)*y2*(dble((-1D0)**n))*(fact(2*n)))
+
+  end do
+
+  deallocate(laguerre_data)
+
+  gauss_hermite = (x1/x2)
+
+end function gauss_hermite
+
+!==============================================================================
+
+end module Visibility
+
+
+
+
+
+
