@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.7 2003/02/17 13:20:02 jsy1001 Exp $
+!$Id: main.f90,v 1.8 2003/05/28 14:42:53 jsy1001 Exp $
 
 program Main
 
@@ -27,11 +27,11 @@ program Main
   double precision, dimension(:, :), allocatable :: wavebands
   double precision, dimension(2) :: wb
   character(len=width) :: spacer_line
-  character(len=128) :: info, file_name, ext, source, top_title
+  character(len=128) :: info, file_name, ext, source, top_title, xrange
   integer :: i, j, length, flag, degfreedom
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
   double precision :: nlposterior, chisqrd, normchisqrd
-  double precision :: version, calib_error
+  double precision :: version, calib_error, uxmin, uxmax
   logical :: force_symm
 
   external myhandler
@@ -81,7 +81,7 @@ program Main
   read_data: do
      print *,' '
      print *,'enter data filename in current directory'
-     read '(a)',file_name
+     read (*, '(a)') file_name
      ext = trim(file_name(index(file_name,'.')+1:len(file_name)))
 
      if (ext /= 'fits') then
@@ -253,7 +253,7 @@ program Main
      do
         print *, ' '
         print *, 'enter model filename in current directory (or [return] to exit)'
-        read (*,'(a)') file_name
+        read (*, '(a)') file_name
         if (file_name == '') exit model_loop
         print *, ' '
         print *, 'reading model...'
@@ -276,8 +276,12 @@ program Main
      if (useful_vis > 0) &
           call plot_vis(model_spec, model_param, symm, &
           'Baseline /M\gl', 'Squared visibility', top_title)
+     if (useful_amp > 0) &
+          call plot_triple_amp(model_spec, model_param, &
+          'Longest baseline /M\gl', 'Triple amplitude', top_title)
      if (useful_cp > 0) &
-          call plot_triple(model_spec, model_param, 'Longest baseline /M\gl',&
+          call plot_triple_phase(model_spec, model_param, &
+          'Longest baseline /M\gl', &
           'Closure phase /'//char(176), top_title)
 
      !-------------------------------------------------------------------------
@@ -349,12 +353,42 @@ program Main
         !plot
 
         top_title = trim(source)//' - final model: '//trim(model_name)
-        if (useful_vis > 0) &
-             call plot_vis(model_spec, fit_param, symm, 'Baseline /M\gl', &
-             'Squared Visibility', top_title)
-        if (useful_cp > 0) &
-             call plot_triple(model_spec, fit_param, 'Longest baseline /M\gl',&
-             'Closure phase /'//char(176), top_title)
+        if (useful_vis > 0) then
+           call plot_vis(model_spec, fit_param, symm, 'Baseline /M\gl', &
+                'Squared Visibility', top_title)
+           print *, 'enter x-axis range for replot ([return] to skip)'
+           read (*, '(a)') xrange
+           if (len_trim(xrange) .gt. 0) then
+              read (xrange, *) uxmin, uxmax
+              call plot_vis(model_spec, fit_param, symm, 'Baseline /M\gl', &
+                   'Squared Visibility', top_title, uxmin, uxmax)
+           end if
+        end if
+        if (useful_amp > 0) then 
+           call plot_triple_amp(model_spec, fit_param, &
+                'Longest baseline /M\gl', 'Triple amplitude', top_title)
+           print *, 'enter x-axis range for replot ([return] to skip)'
+           read (*, '(a)') xrange
+           if (len_trim(xrange) .gt. 0) then
+              read (xrange, *) uxmin, uxmax
+              call plot_triple_amp(model_spec, fit_param, &
+                   'Longest baseline /M\gl', 'Triple amplitude', top_title, &
+                   uxmin, uxmax)
+             end if
+        end if
+        if (useful_cp > 0) then
+           call plot_triple_phase(model_spec, fit_param, &
+                'Longest baseline /M\gl', 'Closure phase /'//char(176), &
+                top_title)
+           print *, 'enter x-axis range for replot ([return] to skip)'
+           read (*, '(a)') xrange
+           if (len_trim(xrange) .gt. 0) then
+              read (xrange, *) uxmin, uxmax
+              call plot_triple_phase(model_spec, fit_param, &
+                   'Longest baseline /M\gl', 'Closure phase /'//char(176), &
+                   top_title, uxmin, uxmax)
+             end if
+        end if
      end if
 
      !-------------------------------------------------------------------------
