@@ -21,7 +21,7 @@ program Main
   logical, dimension(:), allocatable :: keep
 
   !arrays for fit results
-  character(len=35), dimension(:), allocatable :: var
+  character(len=35), dimension(:), allocatable :: desc
   double precision, dimension(:,:), allocatable :: sol, hes, cov, cor
 
   !arrays for plotting
@@ -314,33 +314,16 @@ program Main
      print *,'fitting model by minimising negative log posterior...'
 
      info = ''
-     ! minimiser allocates fit_param, x, x_pos, sol, var, hes, cov, cor
-     call minimiser(info, symm, sol, flag, var, &
+     ! minimiser allocates fit_param, x, x_pos, sol, desc, hes, cov, cor
+     call minimiser(info, symm, sol, flag, desc, &
           hes, cov, cor, chisqrd, sumsqr, nlposterior)
      if (info /= '') then
+        print *,' *****'
         print *,info
-     else
+        print *,' *****'
+     end if
 
-        select case(flag)
-        case(0)
-           print *,'...failed'
-           print *,' '
-           print *,'maximum number of iterations were exceeded without convergence'
-           print *,'therefore only solution bounds can be provided'
-        case(1)
-           print *,'...done'
-           print *,' '
-           print *,'minimisation suceeded but have obtained invalid negative values'
-           print *,'for some/all diagonal elements of covariance matrix,'
-           print *,'some/all correlation matrix elements are invalid,'
-           print *,'some/all hessian-based error estimates are not possible'
-        case(2)
-           print *,'...done'
-           print *,' '
-           print *,'minimisation suceeded with valid hessian, covariance and '
-           print *,'correlation matrices available at solution'
-        end select
-
+     if (flag < 4) then
         degfreedom = useful_vis + useful_amp + useful_cp - size(sol,1)
         normchisqrd = chisqrd/degfreedom
 
@@ -356,24 +339,13 @@ program Main
         print *,' '
         print *,'solution details:'
         print *,'                                                ', &
-             'fitted      hessian        total'
+             'fitted      hessian'
         print *,'num  parameter name                             ', &
-             ' value        error        error'
+             ' value        error'
         do i = 1, size(sol,1)
-           write(*,62) (i, var(i), sol(i,1), sol(i,5:6))
+           write(*,62) (i, desc(i), sol(i,:))
         end do
-62      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6, 1x, f12.6) 
-
-        print *,' '
-        print *,'fitting details:'
-        print *,'                                                ', &
-             ' lower        upper      rms dev'
-        print *,'num  parameter name                             ', &
-             ' bound        bound        error'
-        do i = 1, size(sol,1)
-           write(*,63) (i, var(i), sol(i,2:4))
-        end do
-63      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6, 1x, f12.6) 
+62      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6) 
 
         length = size(hes,1)
         print *,' '
@@ -443,7 +415,7 @@ program Main
      !Deallocate model/fitting storage
      call free_model() !model_*
      call free_fit() !fit_param, x_pos, x_info
-     if (allocated(var)) deallocate(var)
+     if (allocated(desc)) deallocate(desc)
      if (allocated(sol)) deallocate(sol)
      if (allocated(hes)) deallocate(hes)
      if (allocated(cov)) deallocate(cov)

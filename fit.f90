@@ -42,497 +42,329 @@ double precision, dimension(:,:), allocatable :: x_info
 contains
 
 !==============================================================================
+  
+  subroutine minimiser(info, symm, sol, flag, desc, &
+       hes, cov, cor, chisqrd, sumsqr, nlposterior)
 
-subroutine minimiser(info, symm, sol, flag, var, &
-                     hes, cov, cor, chisqrd, sumsqr, nlposterior)
+    !On exit, flag holds success state of the minimisation:
+    ! flag =  0:  Optimal solution found
+    ! flag =  1:  Terminated with gradient small,
+    !             parameter values probably optimal
+    ! flag =  2:  Terminated with step size small,
+    !             parameter values probably optimal
+    ! flag =  3:  Lower point cannot be found,
+    !             parameter values probably optimal
+    ! flag =  4:  Iteration limit (150) exceeded
+    ! flag =  5:  Too many large steps,
+    !             function may be unbounded
+    !
+    !Corresponding message text will be in info,
+    !parameter values will be in fit_param
+    !
+    !symm is a logical that forces centrosymmetric only models
 
-!returns the fit_param array of best fitting model parameters to the data
-!flag holds sucess state of the minimisation:
-!=0 minimisation exceeded number of iterations - bounds provided only
-!=1 minimsation suceeded but with -ve on covariance diagonals
-!=2 minimisation suceeded with fully valid covariance and correlation matrices
+    !subroutine arguments
+    character(len=128), intent(out) :: info
+    character(len=35), dimension(:), allocatable, intent(out) :: desc
+    double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
+    double precision, intent(out) :: nlposterior, chisqrd, sumsqr
+    integer, intent(out) :: flag
+    logical, intent(in) :: symm
 
-!symm is a logical that forces centrosymmetric only models
+    !local variables
+    integer :: i, j, k, n, lwork
+    character(len=128) :: name, comp
+    character(len=2), dimension(10) :: numbers
+    double precision :: P, Pl, Pu, Pi, Pj, deltai, deltaj, eta, diff
+    double precision, dimension(:), allocatable ::  x, temp_x, work
+    logical :: illegal
 
-!subroutine arguments
-character(len=128), intent(out) :: info
-character(len=35), dimension(:), allocatable, intent(out) :: var
-double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
-double precision, intent(out) :: nlposterior, chisqrd, sumsqr
-integer, intent(out) :: flag
-logical, intent(in) :: symm
+    interface
+       subroutine PDA_UNCMND(n, x0, fcn, x, f, info, w, lw)
+         integer, intent(in) :: n, lw
+         double precision, dimension(n) :: x0, x
+         external fcn
+         double precision, intent(out) :: f
+         integer, intent(out) :: info
+         double precision, dimension(lw), intent(out) :: w
+       end subroutine PDA_UNCMND
+    end interface
 
-!local variables
-integer :: i, j, k, n
-character(len=128) :: name, comp
-character(len=2), dimension(10) :: numbers
-double precision :: P, Pl, Pu, Pi, Pj, deltai, deltaj, eta, diff
-double precision, dimension(:), allocatable ::  x, temp_x
-logical :: illegal, ok
+    !go through model arrays and count number of variable parameters
+    n = 0
+    do i = 1, size(model_param,1)
+       do j = 1, 17
+          if (model_prior(i,j) /= 0D0) n=n+1
+       end do
+    end do
 
-!go through model arrays and count number of variable parameters
-n = 0
-do i = 1, size(model_param,1)
-   do j = 1, 17
-      if (model_prior(i,j) /= 0D0) n=n+1
-   end do
-end do
+    !allocate variable array and read in the variables
+    !x is a vector holding the values of the model parameters that are allowed
+    !to vary, x_pos holds the positions of the values in the model_param array
+    !that defines the model.
+    allocate(x(n))
+    allocate(temp_x(n))
+    allocate(x_pos(n,2))
+    k = 0
+    do i = 1, size(model_param,1)
+       do j = 1, 17
+          if (model_prior(i,j) /= 0D0) then
+             k = k+1
+             x_pos(k,1) = i
+             x_pos(k,2) = j
+             x(k) = model_param(i,j)
+          end if
+       end do
+    end do
 
-!allocate variable array and read in the variables
-!x is a vector holding the values of the model parameters that are allowed
-!to vary, x_pos holds the positions of the values in the model_param array
-!that defines the model.
-allocate(x(n))
-allocate(temp_x(n))
-allocate(x_pos(n,2))
-k = 0
-do i = 1, size(model_param,1)
-   do j = 1, 17
-      if (model_prior(i,j) /= 0D0) then
-         k = k+1
-         x_pos(k,1) = i
-         x_pos(k,2) = j
-         x(k) = model_param(i,j)
-      end if
-   end do
-end do
+    !assign names to the variables listed in the sol solution array
+    allocate(desc(n))
+    name = ''
+    numbers = (/' 1',' 2',' 3',' 4',' 5',' 6',' 7',' 8',' 9','10'/)
+    do i = 1, n
+       comp = adjustl(numbers(x_pos(i,1)))
+       select case(x_pos(i,2))
+       case (2)
+          name = 'position radius (mas)'
+       case (3)
+          name = 'position angle (deg)'
+       case (4)
+          name = 'flux (arb units)'
+       case (5)
+          name = 'major axis (mas)'
+       case (6)
+          name = 'orientation (deg)'
+       case (7)
+          name = 'ellipticity'
+       case default
+          name = 'LD parameter ' // adjustl(numbers(x_pos(i,2)-7))
+       end select
+       desc(i) = 'component ' // trim(comp) // ', ' // trim(name)
+    end do
 
-!assign names to the variables listed in the sol solution array
-allocate(var(n))
-var = ''
-numbers = (/' 1',' 2',' 3',' 4',' 5',' 6',' 7',' 8',' 9','10'/)
-do i = 1, n
-   comp = adjustl(numbers(x_pos(i,1)))
-   select case(x_pos(i,2))
-      case (2)
-         name = 'position radius (mas)'
-      case (3)
-         name = 'position angle (deg)'
-      case (4)
-         name = 'flux (arb units)'
-      case (5)
-         name = 'major axis (mas)'
-      case (6)
-         name = 'orientation (deg)'
-      case (7)
-         name = 'ellipticity'
-      case default
-         name = 'LD parameter ' // adjustl(numbers(x_pos(i,2)-7))
-   end select
-   var(i) = 'component ' // trim(comp) // ', ' // trim(name)
-end do
+    !check for illegal types of minimisation:
+    illegal = .false.
+    !must have at least 1 freedom to minimise with
+    if (n==0) illegal = .true.
+    !for single component model cannot vary r/theta (change in position
+    !only contstant phase offset) or B (flux is normalised anyway) 
+    if (size(model_param,1)==1) then
+       do i = 1, size(x_pos,1)
+          if (x_pos(i,2)==2) illegal = .true.
+          if (x_pos(i,2)==3) illegal = .true.
+          if (x_pos(i,2)==4) illegal = .true.
+       end do
+    end if
+    !for any component cannot vary theta if r is zero and not free to vary
+    !(position angle has no effect if position radius fixed at zero)
+    do i = 1, size(model_param,1)
+       if ((model_param(i,2)==0D0) .and. (model_prior(i,2)==0D0) &
+            .and. (model_prior(i,3)/=0D0)) illegal = .true.
+    end do
+    !for any component cannot vary phi if epsilon is unity and not free to vary
+    !(orientation is meaningless is ellipse reduced to circular disc)
+    do i = 1, size(model_param,1)
+       if ((model_param(i,7)==1D0) .and. (model_prior(i,7)==0D0) &
+            .and. (model_prior(i,6)/=0D0)) illegal = .true.
+    end do
+    if (illegal) goto 90
 
-!check for illegal types of minimisation:
-illegal = .false.
-!must have at least 1 freedom to minimise with
-if (n==0) illegal = .true.
-!for single component model cannot vary r/theta (change in position
-!only contstant phase offset) or B (flux is normalised anyway) 
-if (size(model_param,1)==1) then
-   do i = 1, size(x_pos,1)
-      if (x_pos(i,2)==2) illegal = .true.
-      if (x_pos(i,2)==3) illegal = .true.
-      if (x_pos(i,2)==4) illegal = .true.
-   end do
-end if
-!for any component cannot vary theta if r is zero and not free to vary
-!(position angle has no effect if position radius fixed at zero)
-do i = 1, size(model_param,1)
-   if ((model_param(i,2)==0D0) .and. (model_prior(i,2)==0D0) &
-      .and. (model_prior(i,3)/=0D0)) illegal = .true.
-end do
-!for any component cannot vary phi if epsilon is unity and not free to vary
-!(orientation is meaningless is ellipse reduced to circular disc)
-do i = 1, size(model_param,1)
-   if ((model_param(i,7)==1D0) .and. (model_prior(i,7)==0D0) &
-        .and. (model_prior(i,6)/=0D0)) illegal = .true.
-end do
-if (illegal) goto 90
+    !if centrosymmetric model is forced then maust have 
+    !eccentricity epsilon fixed to be unity and position radius fixed at zero
+    if (symm) then
+       do i = 1, size(model_param,1)
+          if (.not.((model_param(i,7)==1D0).and.(model_prior(i,7)==0D0))) &
+               goto 92
+          if (.not.((model_param(i,2)==0D0).and.(model_prior(i,2)==0D0))) &
+               goto 92
+       end do
+    end if
 
-!if centrosymmetric model is forced then maust have 
-!eccentricity epsilon fixed to be unity and position radius fixed at zero
-if (symm) then
-   do i = 1, size(model_param,1)
-      if (.not.((model_param(i,7)==1D0).and.(model_prior(i,7)==0D0))) &
-           goto 92
-      if (.not.((model_param(i,2)==0D0).and.(model_prior(i,2)==0D0))) &
-           goto 92
-   end do
-end if
+    !allocate fit_param array
+    !fit_param is identical to model_param, it holds the definition of the model
+    !with the difference that fit_param is designed to vary as the model is
+    !adjusted to fit. x_pos is used to update the variable parameters in 
+    !the array with their values from x
+    if (allocated(fit_param)) deallocate(fit_param)
+    allocate(fit_param(size(model_param,1),size(model_param,2)))
+    fit_param = model_param
 
-!allocate fit_param array
-!fit_param is identical to model_param, it holds the definition of the model
-!with the difference that fit_param is designed to vary as the model is
-!adjusted to fit. x_pos is used to update the variable parameters in 
-!the array with their values from x
-if (allocated(fit_param)) deallocate(fit_param)
-allocate(fit_param(size(model_param,1),size(model_param,2)))
-fit_param = model_param
+    !compile x_info array
+    !1st column is of typical length scales for variables and set equal to the
+    !prior width. 2nd and 3rd columns hold lower and upper bounds on the
+    !value of the parameter in question - used to prevent negative/other illegal
+    !values causing problems (esp in visibility calculations)
+    allocate(x_info(n,3))
+    do i = 1, n
+       x_info(i,1) = model_prior(x_pos(i,1),x_pos(i,2))
+    end do
+    !preset limits to values from the limits array used in model input
+    do i = 1, n
+       x_info(i,2) = model_limits(x_pos(i,2),1)
+       x_info(i,3) = model_limits(x_pos(i,2),2)
+       !alpha(1) in hestroffer model must be > 0
+       if (x_pos(i,2)==8) then
+          if (trim(model_spec(x_pos(i,1),3))=='hestroffer') x_info(i,2) = 0D0
+       end if
+    end do
 
-!compile x_info array
-!1st column is of typical length scales for variables and set equal to the
-!prior width. 2nd and 3rd columns hold lower and upper bounds on the
-!value of the parameter in question - used to prevent negative/other illegal
-!values causing problems (esp in visibility calculations)
-allocate(x_info(n,3))
-do i = 1, n
-   x_info(i,1) = model_prior(x_pos(i,1),x_pos(i,2))
-end do
-!preset limits to values from the limits array used in model input
-do i = 1, n
-   x_info(i,2) = model_limits(x_pos(i,2),1)
-   x_info(i,3) = model_limits(x_pos(i,2),2)
-   !alpha(1) in hestroffer model must be > 0
-   if (x_pos(i,2)==8) then
-      if (trim(model_spec(x_pos(i,1),3))=='hestroffer') x_info(i,2) = 0D0
-   end if
-end do
+    !allocate sol, hes, cov, cor arrays
+    allocate(sol(n,2))
+    allocate(hes(n,n))
+    allocate(cov(n,n))
+    allocate(cor(n,n))
+    sol = 0D0
+    hes = 0D0
+    cov = 0D0
+    cor = 0D0
 
-!allocate sol, hes, cov, cor arrays
-allocate(sol(n,6))
-allocate(hes(n,n))
-allocate(cov(n,n))
-allocate(cor(n,n))
-sol = 0D0
-hes = 0D0
-cov = 0D0
-cor = 0D0
+    print *, 'calculating initial goodness-of-fit...'
+    !calculate goodness-of-fit statistic chi squared
+    call gof(chisqrd, sumsqr)
+    print *,' '
+    print *,'initial sum of sqrd deviations =',real(sumsqr)
+    print *,' '
+    print *,'           initial chi squared =',real(chisqrd) 
+    call posterior(n, x, nlposterior) ! uses fit_param (=model_param at this stage)
+    print *,'initial negative log posterior =',real(nlposterior)
 
-print *, 'calculating initial goodness-of-fit...'
-!calculate goodness-of-fit statistic chi squared
-call gof(chisqrd, sumsqr)
-print *,' '
-print *,'initial sum of sqrd deviations =',real(sumsqr)
-print *,' '
-print *,'           initial chi squared =',real(chisqrd) 
-call posterior(n, x, nlposterior) ! uses fit_param (=model_param at this stage)
-print *,'negative log posterior =',real(nlposterior)
+    !call minimising algorithm
+    info = ''
+    lwork = n*(n+10)
+    allocate(work(lwork))
+    temp_x = x !starting point
+    call PDA_UNCMND(n, temp_x, posterior, x, nlposterior, flag, work, lwork)
+    deallocate(work)
+    ! solution is in x
 
-!call minimising algorithm
-info = ''
-print *,'running minimiser...'
-call simplex(info, x, sol, ok, n)
-if (info/='') goto 91
-!now have solution x and x_info which provides minimiser est err, and
-!min/max bounds on solution
+    !put best-fit values in fit_param & sol
+    do i = 1, n
+       fit_param(x_pos(i,1),x_pos(i,2)) = x(i)
+       sol(i,1) = x(i)
+    end do
 
-!update fit_param
-do i = 1, n
-   fit_param(x_pos(i,1),x_pos(i,2)) = sol(i,1)
-end do
+    !set return message
+    select case(flag)
+    case(-1)
+       stop 'Insufficient workspace for PDA_UNCMND'
+    case(0)
+       info = 'Optimal solution found'
+    case(1)
+       info = 'Terminated with gradient small, parameter values probably optimal'
+    case(2)
+       info = 'Terminated with step size small, parameter values probably optimal'
+    case(3)
+       info = 'Lower point cannot be found, parameter values probably optimal'
+    case(4)
+       info = 'Iteration limit exceeded'
+    case(5)
+       info = 'Too many large steps, likelihood function may be unbounded'
+    case default
+       stop 'Unexpected status value from PDA_UNCMND'
+    end select
 
-!negative logarithm of posterior probability at solution
-x = sol(:,1)
-call posterior(n, x, nlposterior)
+    if (flag < 0 .or. flag > 3) return ! not a minimum, so skip hessian calc.
+    
+    !find error in x position more rigourously by considering hessian
+    !hessian matrix Aij has components (d2/(dyi*dyj))P({y}) where yi and yj
+    !are parameters i and j, P({y}) is the neg log posterior for model with
+    !parameters {y} = y1, y2, ... yi, ... yj, ... yN
+    !estimate each element Aij via taylor 2nd order symmetric numeric 
+    !differentiation method, for off-diagonals this is
+    ![P(i+di,j+dj)+P(i-di,j-dj)-P(i+di,j-dj)-P(i-di,j+dj)]/[4di*dj], for diagonals
+    ![P(i+di)+P(i-di)-2P(i)]/[di^2]
+    !eta is scaling factor in selecting increment in numeric differentiation,
+    !increment is eta * upper limit on parameter
+    eta = 1D-4
+    !find hessian elements (nb Aij=Aji symmetric)
+    do i = 1, n
+       deltai = eta * x_info(i,3)
+       do j = 1, i
+          deltaj = eta * x_info(j,3)
+          temp_x = sol(:,1)
+          if (j == i) then
+             !P(i)
+             call posterior(n, temp_x, P)
+             !P(i-di)
+             temp_x(i) = sol(i,1)-deltai
+             call posterior(n, temp_x, Pl)
+             !P(i+di)
+             temp_x(i) = sol(i,1)+deltai
+             call posterior(n, temp_x, Pu) 
+             !hessian by numeric method
+             diff = Pu + Pl - (2D0*P)
+             if (diff/=0D0) hes(i,i) = diff/(deltai**2)
+          else
+             !P(i+di,j+dj)
+             temp_x(i) = sol(i,1)+deltai
+             temp_x(j) = sol(j,1)+deltaj
+             call posterior(n, temp_x, Pu)
+             !P(i+di,j-dj)
+             temp_x(j) = sol(j,1)-deltaj
+             call posterior(n, temp_x, Pi)   
+             !P(i-di,j-dj)
+             temp_x(i) = sol(i,1)-deltai
+             call posterior(n, temp_x, Pl)
+             !P(i-di,j+dj)
+             temp_x(j) = sol(j,1)+deltaj
+             call posterior(n, temp_x, Pj)  
+             !hessian by numeric method
+             diff = Pu + Pl - Pi - Pj
+             if (diff/=0D0) hes(i,j) = diff/(4D0*deltai*deltaj)
+             hes(j,i) = hes(i,j) !since hessian is symmetric
+          end if
+       end do
+    end do
 
-flag = 2
-if (.not.(ok)) flag = 0
+    !calculate covariance matrix is (inverse of the hessian)
+    cov = hes
+    call inv_rsis(cov) !inversion of real symmetric indeterminate square matrix
 
-print *,'calculating hessian...'
-!find error in x position more rigourously by considering hessian
-!hessian matrix Aij has components (d2/(dyi*dyj))P({y}) where yi and yj
-!are parameters i and j, P({y}) is the neg log posterior for model with
-!parameters {y} = y1, y2, ... yi, ... yj, ... yN
-!estimate each element Aij via taylor 2nd order symmetric numeric 
-!differentiation method, for off-diagonals this is
-![P(i+di,j+dj)+P(i-di,j-dj)-P(i+di,j-dj)-P(i-di,j+dj)]/[4di*dj], for diagonals
-![P(i+di)+P(i-di)-2P(i)]/[di^2]
-!eta is scaling factor in selecting increment in numeric differentiation,
-!increment is eta * upper limit on parameter
-eta = 1D-4
-!find hessian elements (nb Aij=Aji symmetric)
-do i = 1, n
-   deltai = eta * x_info(i,3)
-   do j = 1, i
-      deltaj = eta * x_info(j,3)
-      temp_x = sol(:,1)
-      if (j == i) then
-         !P(i)
-         call posterior(n, temp_x, P)
-         !P(i-di)
-         temp_x(i) = sol(i,1)-deltai
-         call posterior(n, temp_x, Pl)
-         !P(i+di)
-         temp_x(i) = sol(i,1)+deltai
-         call posterior(n, temp_x, Pu) 
-         !hessian by numeric method
-         diff = Pu + Pl - (2D0*P)
-         if (diff/=0D0) hes(i,i) = diff/(deltai**2)
-      else
-         !P(i+di,j+dj)
-         temp_x(i) = sol(i,1)+deltai
-         temp_x(j) = sol(j,1)+deltaj
-         call posterior(n, temp_x, Pu)
-         !P(i+di,j-dj)
-         temp_x(j) = sol(j,1)-deltaj
-         call posterior(n, temp_x, Pi)   
-         !P(i-di,j-dj)
-         temp_x(i) = sol(i,1)-deltai
-         call posterior(n, temp_x, Pl)
-         !P(i-di,j+dj)
-         temp_x(j) = sol(j,1)+deltaj
-         call posterior(n, temp_x, Pj)  
-         !hessian by numeric method
-         diff = Pu + Pl - Pi - Pj
-         if (diff/=0D0) hes(i,j) = diff/(4D0*deltai*deltaj)
-         hes(j,i) = hes(i,j) !since hessian is symmetric
-      end if
-   end do
-end do
+    !calculate correlation matrix
+    !correlation defined as: corr(x,y) = cov(x,y) / sqroot(var(x)*var(y))
+    !noting that var(x) = cov(x,x)
+    do i = 1, n
+       do j = 1, i
+          if (cov(i,i)*cov(j,j)>0D0) then
+             cor(i,j) = cov(i,j)/sqrt(cov(i,i)*cov(j,j))
+          else
+             flag = 1
+          end if
+          cor(j,i) = cor(i,j)
+       end do
+    end do
 
-print *,'calculating covariance...'
-!calculate covariance matrix is (inverse of the hessian)
-cov = hes
-call inv_rsis(cov) !inversion of real symmetric indeterminate sqaure matrix
+    !calculate estimated error on solution
+    !ideal case: error on a single parameter x is taken as the sqroot(cov(x,x))
+    !negative cov(x,x) case: estimated error reported as zero (as occurs for
+    !minimisation failure too)
+    do i = 1, n
+       if (cov(i,i)>0) then
+          sol(i,2) = sqrt(cov(i,i))
+       end if
+    end do
 
-print *,'calculating correlation...'
-!calculate correlation matrix
-!correlation defined as: corr(x,y) = cov(x,y) / sqroot(var(x)*var(y))
-!noting that var(x) = cov(x,x)
-do i = 1, n
-   do j = 1, i
-      if (cov(i,i)*cov(j,j)>0D0) then
-         cor(i,j) = cov(i,j)/sqrt(cov(i,i)*cov(j,j))
-      else
-         flag = 1
-      end if
-      cor(j,i) = cor(i,j)
-   end do
-end do
+    !calculate goodness-of-fit statistic chi squared
+    call gof(chisqrd, sumsqr)
 
-print *, 'estimating errors on parameters...'
-!calculate estimated error on solution
-!ideal case:
-!error on a single parameter x is taken as the sqroot(cov(x,x)) plus the
-!minima location error (rms deviation of amoeba vertices) - the error on
-!the parameter cannot be lower than this value
-!negative cov(x,x) case: estimated error reported as zero (as occurs for
-!minimsation failure case too)
-do i = 1, n
-   if (cov(i,i)>0) then
-      sol(i,5) = sqrt(cov(i,i))
-      sol(i,6) = sol(i,5) + sol(i,4)
-   end if
-end do
-
-print *, 'calculating final goodness-of-fit...'
-!calculate goodness-of-fit statistic chi squared
-call gof(chisqrd, sumsqr)
-
-!clean-up and return
+    !clean-up and return
 200 continue
 
-!deallocate local storage
-if (allocated(x)) deallocate(x)
-if (allocated(temp_x)) deallocate(temp_x)
+    !deallocate local storage
+    if (allocated(x)) deallocate(x)
+    if (allocated(temp_x)) deallocate(temp_x)
 
-return
+    return
 
-!error trapping 
-90 info = 'illegal freedom(s) in model'
-goto 200
-91 info = 'minimisation routine error: ' // info
-goto 200
-92 info = 'for vis/nvis data must have guaranteed symmetric model'
-goto 200
+    !error trapping 
+90  info = 'illegal freedom(s) in model'
+    goto 200
+91  info = 'minimisation routine error: ' // info
+    goto 200
+92  info = 'for vis/nvis data must have guaranteed symmetric model'
+    goto 200
 
-end subroutine minimiser
-
-!==============================================================================
-
-subroutine simplex(info, x, sol, ok, ndim)
-
-!based on amoeba code (numerical recipies) for downhill simplex algorithm
-!in multidimensions (uses amotry code also in numerical recipies)
-
-!subroutine arguments
-character(len=128) :: info
-double precision, dimension(:,:), intent(out) :: sol
-double precision, dimension(:), intent(inout) :: x
-logical, intent(out) :: ok
-integer, intent(in) :: ndim
-
-!local variables
-integer :: s
-integer :: iter, nmax, itmax
-double precision :: zeta, eta, ftol
-double precision, dimension(:,:), allocatable :: p
-double precision, dimension(:), allocatable :: y
-integer i, ihi, ilo, inhi, j, m, n
-double precision :: rtol, sum, swap, ysave, ytry, min, max
-double precision, dimension(:), allocatable :: psum
-
-!routine parameter setting
-!nmax limit on dimensions is a carryover from original code
-!setting equal to ndim effectively puts onus of ndim into minimiser hands
-!??
-nmax = ndim
-!set fractional tolerance to machine precision, zeta scale factor is
-!to prevent rounding errors causing problems (refer to numerical recipies)
-zeta = 1D6
-ftol = zeta*machine_precision()
-!initial bounding of minimum accomplished by bounding moving to lower
-!and upper limits on each variable. the limit is chosen by moving a distance
-!of prior * eta away from the model value. 
-!normal set to 5D0 for 5 standard deviation initial bounding
-eta = 5D0
-!itmax limit of maximum number of function evaluations
-itmax = 200000
-
-!allocations
-allocate(p(1:ndim+1,1:ndim))
-allocate(y(1:ndim+1))
-allocate(psum(nmax))
-
-!form initial simplex
-!rows of p are the vertices of the starting simplex
-!1st vertex is the model point
-p(1, :) = x
-
-!check and correct for range violations
-do s = 1, ndim
-   if (p(1,s) < x_info(s,2)) p(1,s) = x_info(s,2)
-   if (p(1,s) > x_info(s,3)) p(1,s) = x_info(s,3)
-end do
-!remaining vertices are model points offset by eta*prior in each 
-!variable direction in parameter space
-do s = 2, ndim+1
-   p(s,:) = x
-   p(s,s-1) = p(s,s-1) + eta*x_info(s-1,1)
-   !check and correct for range violations
-   if (p(s,s-1) < x_info(s-1,2)) p(s,s-1) = x_info(s-1,2)
-   if (p(s,s-1) > x_info(s-1,3)) p(s,s-1) = x_info(s-1,3)
-end do
-
-!form initial vector with elements equal to function value at
-!each of the simplex vertices
-do s = 1, ndim+1
-   x = p(s,:)
-   call posterior(ndim, x, y(s))
-end do
-
-!amoeba code
-!enter here when starting or have just overall contracted
-1 continue
-do n = 1, ndim
-   sum=0D0 !recompute psum
-   do m = 1, ndim+1
-      sum = sum + p(m,n)
-   end do
-   psum(n) = sum
-end do
-
-!enter here when have just changed a single point
-2 continue
-ilo=1
-if (y(1) > y(2)) then !determine which point is the highest (worst),
-   ihi=1              !next-highest and lowest (best) 
-   inhi=2
-else
-   ihi=2
-   inhi=1
-end if
-
-do i=1, ndim+1 !by looping over points in the simplex
-   if (y(i) < y(ilo)) ilo=i
-   if (y(i) > y(ihi)) then
-      inhi=ihi
-      ihi=i
-   else if (y(i) > y(inhi)) then
-      if (i /= ihi) inhi=i
-   end if
-end do
-
-!compute the fractional range from highest to lowest and return if satisfactory
-rtol = 2D0*abs(y(ihi)-y(ilo))/(abs(y(ihi))+abs(y(ilo)))
-
-if (rtol < ftol) then !if returning, put best point and value in slot 1
-   swap = y(1)
-   y(1) = y(ilo)
-   y(ilo) = swap
-   do n=1, ndim
-      swap = p(1,n)
-      p(1,n) = p(ilo,n)
-      p(ilo,n) = swap
-   end do
-   ok = .true.
-   goto 3 !termination
-end if
-
-if (iter > itmax) then
-   ok = .false.
-   goto 3 !termination
-end if   
-
-iter = iter + 2
-
-!begin new iteration, first extrapolate by a factor -1 through the face of
-!the simplex across from the high point, i.e. reflect the simplex from the
-!high point
-ytry = extrap(p, y, psum, ndim, ihi, -1D0, nmax)
-if (ytry <= y(ilo)) then !gives better result than the best point so
-                        !try additonal extrapolation by a factor 2
-   ytry = extrap(p, y, psum, ndim, ihi, 2D0, nmax)
-else if (ytry >= y(inhi)) then !the reflected point is worse than the second
-                             !highest so look for intermediate lower point
-                             !i.e. do one dimensional contraction
-   ysave = y(ihi)
-   ytry = extrap(p, y, psum, ndim, ihi, 0.5D0, nmax)
-   if (ytry >= ysave) then !cant seem to get rid of that high point, better
-                          !contract around the lowest (best) point
-      do i=1, ndim+1
-         if (i /= ilo) then
-            do j=1, ndim
-               psum(j) = 0.5D0*(p(i,j)+p(ilo,j))
-               p(i,j) = psum(j)
-            end do
-            call posterior(ndim, psum, y(i))
-         end if
-      end do
-      iter = iter + ndim !keep track of function evaluations
-      goto 1 !go back for the test of doneness and the next iteration
-   end if
-else
-   iter = iter - 1 !correct the evaluation count
-end if
-goto 2
-
-3 continue
-
-!write position to solution matrix (row 1 of p has best point)
-sol(:,1) = p(1,:)
-
-!return x_info with info on final solution, - and + tolerances
-!all obtained by looking over simplex vertices
-do n = 1, ndim !loop over variables
-   sum = 0D0
-   min = p(1,n)
-   max = p(1,n)
-   do m = 1, ndim+1 !loop over vertices
-      if (p(m,n)<min) min=p(m,n)
-      if (p(m,n)>max) max=p(m,n)
-      sum = sum + ((p(m,n)-p(1,n))**2D0)
-   end do
-   sol(n,2) = min
-   sol(n,3) = max
-   sol(n,4) = sqrt(sum/(dble(ndim))) !mean sqrd deviation 
-end do
-
-!clean-up and return
-200 continue
-
-!deallocations
-if (allocated(p)) deallocate(p)
-if (allocated(y)) deallocate(y)
-if (allocated(psum)) deallocate(psum)
-
-return
-
-!error trapping
-90 info = ''
-goto 200
-
-end subroutine simplex
+  end subroutine minimiser
 
 !==============================================================================
 
@@ -629,62 +461,9 @@ do i = 1, size(triple_data,1)
       !     (modx(data_phase,model_phase)/data_phase_err)**2D0, chisqrd
    end if 
 
-
 end do
 
 end subroutine gof
-
-!==============================================================================
-
-function extrap(p, y, psum, ndim, ihi, fac, nmax)
-
-!called from amoeba code in subroutine simplex
-!identical to amotry code given in numerical recipies
-!function extrapolates by a factor fac through the face of the simplex across
-!from the high point, tries it, and replaces the high point if the new point
-!is better
-
-!function arguments
-integer, intent(in) :: ihi, ndim, nmax
-double precision :: extrap
-double precision, intent(in) :: fac
-double precision, dimension(:,:), intent(inout) :: p
-double precision, dimension(:), intent(out) :: psum, y
-
-!local variables
-integer :: j
-double precision :: fac1, fac2, ytry
-double precision, dimension(:), allocatable :: ptry
-
-!allocations
-allocate(ptry(nmax))
-
-!amotry start
-fac1 = (1D0-fac)/ndim
-fac2 = fac1-fac
-do j = 1, ndim
-   ptry(j) = (psum(j)*fac1) - (p(ihi,j)*fac2)
-end do
-
-!evaluate the function at the highest point, it its better than the highest
-!then replace the highest
-call posterior(ndim, ptry, ytry)
-if (ytry < y(ihi)) then
-   y(ihi) = ytry
-   do j = 1, ndim
-      psum(j) = psum(j) - p(ihi,j) + ptry(j)
-      p(ihi,j) = ptry(j)
-   end do
-end if
-
-extrap = ytry
-
-!deallocate
-deallocate(ptry)
-
-return
-
-end function extrap
 
 !==============================================================================
 
@@ -694,7 +473,7 @@ subroutine posterior(n, x, post)
 ! Everything else needed comes from module variables
 
 !subroutine arguments
-double precision, dimension(:), intent(in) :: x
+double precision, dimension(n), intent(in) :: x
 integer, intent(in) :: n
 double precision, intent(out) :: post
 
@@ -707,17 +486,11 @@ logical :: violation
 !if position is out of range then return very large energy 
 violation = .false.
 do i = 1, n !over variable parameters
-   if (x(i) < x_info(i,2)) then
-      violation = .true.
-      print *,'out of bounds in posterior()',x(i),x_info(i,2),x_info(i,3)
-   end if
-   if (x(i) > x_info(i,3)) then
-      violation = .true.
-      print *,'out of bounds in posterior()',x(i),x_info(i,2),x_info(i,3)
-   end if
+   if (x(i) < x_info(i,2)) violation = .true.
+   if (x(i) > x_info(i,3)) violation = .true.
 end do
 if (violation) then
-   post = machine_max()
+   post = 1.0d10
    return
 end if 
 

@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.2 2002/10/03 17:44:39 jsy1001 Exp $
+# $Id: makefile,v 1.3 2002/10/04 13:52:34 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -16,10 +16,11 @@ MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
 
 EXES = mfit
 TEST_EXES = calc
+PACKAGE_DOCS = documentation
 REMOVE_TARGETS += $(MODULES)
 
 mfit: $(OBJECTS)
-	$(F90) $^ -o $@ `pgplotlink` -dalign -lnag -lf77compat
+	$(F90) $^ -o $@ `pgplotlink` `/star/bin/pda_link` -dalign -lnag -lf77compat
 
 calc: calc.o maths.o
 	$(F90) $^ -o $@ -dalign -lnag -lf77compat
