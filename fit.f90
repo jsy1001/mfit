@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.8 2003/05/29 12:40:52 jsy1001 Exp $
+!$Id: fit.f90,v 1.9 2003/06/10 16:11:43 jsy1001 Exp $
 
 module Fit
 
@@ -73,7 +73,7 @@ contains
     integer :: i, j, k, n, lwork
     character(len=128) :: name, comp
     character(len=2), dimension(10) :: numbers
-    double precision :: P, Pl, Pu, Pi, Pj, deltai, deltaj, eta, diff, det
+    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, eta, diff, det
     double precision, dimension(:), allocatable ::  x, temp_x, work
     logical :: illegal
 
@@ -274,29 +274,29 @@ contains
              call posterior(n, temp_x, P)
              !P(i-di)
              temp_x(i) = sol(i,1)-deltai
-             call posterior(n, temp_x, Pl)
+             call posterior(n, temp_x, P_l)
              !P(i+di)
              temp_x(i) = sol(i,1)+deltai
-             call posterior(n, temp_x, Pu) 
+             call posterior(n, temp_x, P_u) 
              !hessian by numeric method
-             diff = Pu + Pl - (2D0*P)
+             diff = P_u + P_l - (2D0*P)
              if (diff/=0D0) hes(i,i) = diff/(deltai**2)
           else
              !P(i+di,j+dj)
              temp_x(i) = sol(i,1)+deltai
              temp_x(j) = sol(j,1)+deltaj
-             call posterior(n, temp_x, Pu)
+             call posterior(n, temp_x, P_u)
              !P(i+di,j-dj)
              temp_x(j) = sol(j,1)-deltaj
-             call posterior(n, temp_x, Pi)   
+             call posterior(n, temp_x, P_i)   
              !P(i-di,j-dj)
              temp_x(i) = sol(i,1)-deltai
-             call posterior(n, temp_x, Pl)
+             call posterior(n, temp_x, P_l)
              !P(i-di,j+dj)
              temp_x(j) = sol(j,1)+deltaj
-             call posterior(n, temp_x, Pj)  
+             call posterior(n, temp_x, P_j)  
              !hessian by numeric method
-             diff = Pu + Pl - Pi - Pj
+             diff = P_u + P_l - P_i - P_j
              if (diff/=0D0) hes(i,j) = diff/(4D0*deltai*deltaj)
              hes(j,i) = hes(i,j) !since hessian is symmetric
           end if
