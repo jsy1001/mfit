@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.9 2003/05/29 12:40:52 jsy1001 Exp $
+!$Id: main.f90,v 1.10 2003/06/11 09:37:28 jsy1001 Exp $
 
 program Main
 
@@ -16,7 +16,7 @@ program Main
   !parameters
   !pi, deg/rad conversions all picked up from Maths module
   integer, parameter :: max_lines = 1000      !max. lines in data file
-  integer, parameter :: width = 80            !for spacer lines
+  integer, parameter :: width = 78            !for spacer lines
   double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
 
   !arrays for fit results
@@ -82,7 +82,7 @@ program Main
      print *,' '
      print *,'enter data filename in current directory'
      read (*, '(a)') file_name
-     ext = trim(file_name(index(file_name,'.')+1:len(file_name)))
+     ext = trim(file_name(scan(file_name,'.',.true.)+1:len(file_name)))
 
      if (ext /= 'fits') then
         do
@@ -190,7 +190,6 @@ program Main
   end do
   if ((useful_vis + useful_amp + useful_cp) == 0) stop 'No unflagged data'
 
-  print *,'...done'
   print *,' '
   print *, trim(ext), ' file visibility data for ', trim(source),':'
 
@@ -228,7 +227,7 @@ program Main
        'unflagged data points out of', size(vis_data,1)+(2*size(triple_data,1))
   print *, ' '
   print *, spacer_line
-  if (ext /= 'vis' .and. ext /= 'nvis') then
+  if (ext /= 'vis' .and. ext /= 'nvis' .and. useful_vis > 0) then
      call plot_uv('u /M\gl', 'v /M\gl', trim(source), '?')
   else
      istat = pgopen('?')
