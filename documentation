@@ -281,11 +281,8 @@ Known deficiencies
 
 Other plot choices should be added.
 
-Mfit doesn't cope with pathnames containing more than a single dot (assumed to
-separate the extension from the rest of the pathname).
 
-
-$Id: documentation,v 1.6 2003/05/29 12:40:52 jsy1001 Exp $
+$Id: documentation,v 1.7 2003/06/11 09:38:30 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
