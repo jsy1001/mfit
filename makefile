@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.10 2003/05/29 12:40:52 jsy1001 Exp $
+# $Id: makefile,v 1.11 2003/06/13 17:25:43 jsy1001 Exp $
 #
 # Makefile for mfit on sparc
 
@@ -11,19 +11,26 @@ FFLAGC = -g -C -dalign
 package = mfit
 prefix = /coast/depot-sparc/$(package)
 
-OBJECTS = main.o maths.o fit.o visibility.o inout.o plot.o model.o \
+OBJECTS = maths.o fit.o visibility.o inout.o plot.o model.o \
 	gamma.o rjbesl.o
 MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
 
-EXES = mfit
+EXES = mfit clfit
 TEST_EXES = calc
 PACKAGE_DOCS = documentation
 REMOVE_TARGETS += $(MODULES)
+SCRIPTS = fitgui
+PYTHONSCRIPTS = fitgui.py
 
 pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
 
 
-mfit: $(OBJECTS)
+default_target: $(EXES)
+
+mfit: main.o $(OBJECTS)
+	$(F90) $^ -o $@ `pgplotlink` $(pda_libs) -lfitsio -dalign -lf77compat
+
+clfit: clfit.o f2kcli.o $(OBJECTS)
 	$(F90) $^ -o $@ `pgplotlink` $(pda_libs) -lfitsio -dalign -lf77compat
 
 calc: calc.o maths.o gamma.o rjbesl.o
@@ -33,6 +40,12 @@ calc: calc.o maths.o gamma.o rjbesl.o
 # files that USE those modules
 main.o: main.f90 inout.mod plot.mod visibility.mod fit.mod model.mod
 	$(F90) -c $(FFLAGC) main.f90
+
+clfit.o: clfit.f90 f2kcli.mod inout.mod plot.mod visibility.mod fit.mod model.mod
+	$(F90) -c $(FFLAGC) clfit.f90
+
+f2kcli.mod: f2kcli.f90
+	$(F90) -c $(FFLAGC) f2kcli.f90
 
 maths.mod: maths.f90
 	$(F90) -c $(FFLAGC) maths.f90
