@@ -40,6 +40,8 @@ uv     uv coverage for squared-visibility data
 vis2   squared visibility against projected baseline
 t3amp  triple product amplitude against longest projected baseline in triangle
 t3phi  triple product phase against longest projected baseline in triangle
+post n one-dimensional cut through the minimum of the negative log posterior,
+       along the axis of variable parameter n
 
 fitgui will similarly make up to one plot each time 'Go' is clicked. The plot
 types are as listed above.
@@ -285,7 +287,7 @@ Ignores complex visibilities from OI-FITS file.
 Assumes single target in OI-FITS file.
 
 
-$Id: documentation,v 1.8 2003/07/18 17:50:23 jsy1001 Exp $
+$Id: documentation,v 1.9 2003/09/09 16:55:03 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

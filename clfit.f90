@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.5 2003/09/09 15:45:19 jsy1001 Exp $
+!$Id: clfit.f90,v 1.6 2003/09/09 16:55:03 jsy1001 Exp $
 
 program Main
 
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.5 $'
+  cvs_rev = '$Revision: 1.6 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -544,8 +544,8 @@ contains
     print *, "-n|--nofit            just report initial chi^2 and make plot (if specified) for initial model"
     print *, '-w|--waveband CWL BW  select this waveband; must specify wb this way for .(n)vis data'
     print *, '-c|--calerr FRAC      add calibration error (frac. error in system visibility)'
-    print *, '-p|--plot  uv|vis2|t3amp|t3phi  make specified plot'
-    print *, '-z|--zoomplot  uv|vis2|t3amp|t3phi XMIN XMAX  plot with specified x-axis range'
+    print *, '-p|--plot  uv|post N|vis2|t3amp|t3phi  make specified plot'
+    print *, '-z|--zoomplot  uv|post N|vis2|t3amp|t3phi| XMIN XMAX  plot with specified x-axis range'
     print *, '-d|--device DEV       PGPLOT device to use'
     print *, ' '
 
