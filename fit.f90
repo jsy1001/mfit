@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.14 2004/02/13 16:50:57 jsy1001 Exp $
+!$Id: fit.f90,v 1.15 2004/02/25 13:56:10 jsy1001 Exp $
 
 module Fit
 
@@ -260,7 +260,7 @@ contains
 
     !find hessian elements (nb Aij=Aji symmetric)
     deltai = 5D-3
-    deltai = 5D-3
+    deltaj = 5D-3
     do i = 1, n
        do j = 1, i
           temp_x = sol(:,1)
