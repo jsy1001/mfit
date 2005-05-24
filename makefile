@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.14 2005/01/06 18:45:12 jsy1001 Exp $
+# $Id: makefile,v 1.15 2005/05/24 12:53:06 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -6,6 +6,7 @@ SHELL = /bin/sh
 
 # Sun Workshop Fortran 95
 F90 = /opt/SUNWspro/bin/f90
+FLINK = /opt/SUNWspro/bin/f90
 FFLAGC = -C -g -dalign -I/opt/local/include
 FFLAGL = -dalign -lf77compat
 pgplot_libs = -lpgplot -lX11
@@ -15,6 +16,7 @@ fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Solaris
 #F90 = /opt/NAGWare/bin/f95
+#FLINK = /opt/NAGWare/bin/f95
 #FFLAGC = -g -mismatch -I/opt/local/include
 #FFLAGL = -lF77 -lM77
 #pgplot_libs = -lpgplot -lX11
@@ -24,13 +26,14 @@ fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Linux
 #F90 = /usr/local/bin/f95
-#FFLAGC = -g -mismatch
+#FLINK = f77
+#FFLAGC = -g -mismatch -I/usr/local/include
 # Not sure about next line
 #FFLAGL = -lg2c -lm
-#pgplot_libs = -lpgplot -lX11
+#pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
 #fitsio_libs = -lfitsio
 #pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
-#fftw_libs = -lrfftw -lfftw -lm
+#fftw_libs = -L/usr/local/lib -lrfftw -lfftw -lm
 
 # *** Modify above this line for your system ***
 
@@ -39,16 +42,19 @@ OBJECTS = maths.o fit.o visibility.o inout.o plot.o model.o \
 MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
 
 
-all: mfit clfit calc ;
+all: mfit clfit calc mplot ;
 
 mfit: main.o $(OBJECTS)
-	$(F90) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
 
 clfit: clfit.o f2kcli.o $(OBJECTS)
-	$(F90) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
 
 calc: calc.o maths.o gamma.o rjbesl.o
-	$(F90) $(FFLAGL) $^ -o $@ $(pda_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pda_libs)
+
+mplot: modelplot.f90 model.o maths.o fitsimage.o gamma.o rjbesl.o inout.o
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
 
 clean:
 	rm -f *.o *.mod *.lst
@@ -90,3 +96,9 @@ gamma.o: gamma.f
 
 rjbesl.o: rjbesl.f
 	$(F90) -c $(FFLAGC) rjbesl.f
+
+modelplot.o: modelplot.f90 model.mod maths.mod fitsimage.mod inout.mod 
+	$(F90) -c $(FFLAGC) modelplot.f90
+
+fitsimage.o: fitsimage.f90
+	$(F90) -c $(FFLAGC) fitsimage.f90

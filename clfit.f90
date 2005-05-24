@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.15 2005/02/23 12:08:06 jsy1001 Exp $
+!$Id: clfit.f90,v 1.16 2005/05/24 12:53:06 jsy1001 Exp $
 
 program Main
 
@@ -21,7 +21,7 @@ program Main
   double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
 
   !arrays for fit results
-  character(len=35), dimension(:), allocatable :: desc
+  character(len=55), dimension(:), allocatable :: desc
   double precision, dimension(:, :), allocatable :: sol, hes, cov, cor
 
   !other local variables
@@ -46,7 +46,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.15 $'
+  cvs_rev = '$Revision: 1.16 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -282,9 +282,9 @@ program Main
   print *, ' '
   print *, trim(ext),' file triple product data for ',trim(source),':'
   print *, ' '
-  print *, '  wave  band                baseline triangle coords', &
+  print '(1x, 2a)', '  wave  band                baseline triangle coords', &
        '                      triple product'
-  print *, 'length width        u1        v1        u2        v2', &
+  print '(1x, 2a)', 'length width        u1        v1        u2        v2', &
        '  amplitude     error   phase    err'
   print *, '  (nm)  (nm)       (m)       (m)       (m)       (m)'
   do i = 1, size(triple_data,1)
@@ -345,7 +345,7 @@ program Main
      !go through model arrays and count number of variable parameters
      n = 0
      do i = 1, size(model_param,1)
-        do j = 1, 17
+        do j = 1, size(model_param,2)
            if (model_prior(i,j) /= 0D0) n=n+1
         end do
      end do
@@ -458,26 +458,22 @@ program Main
 
         print *, ' '
         print *, 'solution details:'
-        print *, '                                                ', &
-             'fitted      hessian'
-        print *, 'num  parameter name                             ', &
-             ' value        error'
+        print '(1x, a, 49x, a)', '                   ', 'fitted      hessian'
+        print '(1x, a, 49x, a)', 'num  parameter name', ' value        error'
         do i = 1, size(sol,1)
            write(*,62) i, desc(i), sol(i,:)
         end do
-62      format(' (', i2, ') ', A35, 1x, f13.6, 1x, f12.6) 
+62      format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6) 
 
         ! Display alternative error bars for fitted parameters
         ! Estimates assuming data errors scaled so chi sqrd/deg freedom = unity
         print *, ' '
-        print *, 'SCALED DATA ERRORS ->                             ', &
-             'fitted      hessian'
-        print *, '  num  parameter name                             ', &
-             ' value        error'
+        print '(1x, a, 49x, a)', 'SCALED DATA ERRORS ->', 'fitted      hessian'
+        print '(1x, a, 49x, a)', '  num  parameter name', ' value        error'
         do i = 1, size(sol,1)
            write(*,63) i, desc(i), sol(i,1), sqrt(normchisqrd)*sol(i,2)
         end do
-63      format('  *(', i2, ') ', A35, 1x, f13.6, 1x, f12.6, '*') 
+63      format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*') 
 
         length = size(hes,1)
         print *, ' '

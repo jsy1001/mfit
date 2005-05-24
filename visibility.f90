@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.9 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: visibility.f90,v 1.10 2005/05/24 12:53:06 jsy1001 Exp $
 
 module Visibility
 
@@ -46,7 +46,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
   double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
 
   !local variables
-  integer :: i, iwave, nwave, num_comps, nmax, iwb
+  integer :: i, iwave, navg, iavg, num_comps, order, iwb, ipar
   double precision :: r, theta, B, a, phi, B_total, lambda1
   double precision :: epsilon, rho, F, x1, x2, x3
   double precision, dimension(0:10) :: alpha
@@ -61,61 +61,64 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
      B_total = 1D0
 
   else
+
+     !find index into model_wb
+     if (nwave > 1) then
+        if (.not. allocated(model_wb)) stop 'Wavebands not supplied to read_model'
+        iwb = -1
+        do iwave = 1, size(model_wb, 1)
+           if (lambda  >= model_wb(iwave, 1)-sig &
+                .and. lambda <= model_wb(iwave, 1)+sig &
+                .and. delta_lambda >= model_wb(iwave, 2)-sig &
+                .and. delta_lambda <= model_wb(iwave, 2)+sig) then
+              iwb = iwave
+              exit
+           end if
+        end do
+        if (iwb == -1) stop 'Datum has no matching waveband'
+     else
+        iwb = 1
+     end if
   
      !clear real and imag vis
      cmplx_vis = 0D0
      B_total = 0D0
   
-     !choose number of wavelengths to average over
-     nwave = 1D2*delta_lambda/lambda
-     if (nwave < 2) nwave = 2
+     !choose number of wavelengths (within band) to average over
+     navg = 1D2*delta_lambda/lambda
+     if (navg < 2) navg = 2
      
      !sum over components
      do i = 1, num_comps
         
         !get position r and theta, brightness I
         !major axis a, orientation phi, ellipticity epsilon
-        !ld order nmax, ld parameters alpha
-        r = mas2rad*param(i,2)
-        theta = deg2rad*param(i,3)
-        B = param(i,4)
+        !ld order order, ld parameters alpha
+        r = mas2rad*param(i, 2+4*model_wldep(1)*(iwb-1))
+        theta = deg2rad*param(i, 3+4*model_wldep(1)*(iwb-1))
+        !XXX handle rotation
+        B = param(i, 6+4*model_wldep(1)*(nwave-1)+model_wldep(2)*(iwb-1))
 
-        a = mas2rad*param(i,5)
-        phi = deg2rad*param(i,6)
-        epsilon = param(i,7)
-        nmax = int(param(i,1))
+        ipar = 7 + (4*model_wldep(1)+model_wldep(2))*(nwave-1) &
+             + 3*model_wldep(3)*(iwb-1)
+        a = mas2rad*param(i, ipar)
+        phi = deg2rad*param(i, ipar+1)
+        epsilon = param(i, ipar+2)
+        order = int(param(i, 1)) !ld order *for this cpt*
         
         !sum up brightnesses (need later to normalise whole model)
         B_total = B_total + B
 
         !configure array of ld parameters
         !nb alpha(0) set differently for different models
-        alpha(1:10) = param(i,8:nmax+7)
-
-        !find index into clv_wb
-        if (spec(i,3)(1:1) == '<') then
-           if (size(clv_inten, 2) > 1) then
-              !wavelength-dependent CLV
-              iwb = -1
-              do iwave = 1, size(clv_wb, 1)
-                 if (lambda  >= clv_wb(iwave, 1)-sig &
-                      .and. lambda <= clv_wb(iwave, 1)+sig &
-                      .and. delta_lambda >= clv_wb(iwave, 2)-sig &
-                      .and. delta_lambda <= clv_wb(iwave, 2)+sig) then
-                    iwb = iwave
-                    exit
-                 end if
-              end do
-              if (iwb == -1) stop 'Datum has no matching waveband'
-           else
-              iwb = 1
-           end if
-        end if
+        ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
+             + 3*model_wldep(3))*(nwave-1) + max_order*model_wldep(4)*(iwb-1)
+        alpha(1:order) = param(i, ipar:ipar+order-1)
         
         !loop over wavelengths within bandpass (will normalise later)
         sumvis = 0D0
-        do iwave = 1, nwave
-           lambda1 = lambda - delta_lambda/2D0 + (iwave-1)*delta_lambda/(nwave-1)
+        do iavg = 1, navg
+           lambda1 = lambda - delta_lambda/2D0 + (iavg-1)*delta_lambda/(navg-1)
            
            !calculate parameter rho
            x1 = (epsilon**2)*(((u*cos(phi))-(v*sin(phi)))**2)
@@ -133,7 +136,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
               case ('taylor')
                  !alpha is array of taylor coeffs 0-20 (0th defined as -1)
                  alpha(0) = -1D0
-                 F = taylor(a, rho, nmax, alpha)
+                 F = taylor(a, rho, order, alpha)
               case ('square-root')
                  !alpha(1) and alpha(2) are sqroot coeffs alpha and beta
                  F = square_root(a, rho, alpha(1), alpha(2))
@@ -145,7 +148,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
               case ('gauss-hermite')
                  !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
                  alpha(0) = 1D0
-                 F = gauss_hermite(a, rho, nmax, alpha)
+                 F = gauss_hermite(a, rho, order, alpha)
               case default
                  !must be numerical CLV
                  F = clvvis(a, rho, iwb)
@@ -164,7 +167,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
         end do
 
         !add normalised sum over wavelengths to sum over components
-        cmplx_vis = cmplx_vis + sumvis/nwave
+        cmplx_vis = cmplx_vis + sumvis/navg
 
      end do
    

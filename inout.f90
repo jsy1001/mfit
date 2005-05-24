@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.15 2005/01/07 14:02:02 jsy1001 Exp $
+!$Id: inout.f90,v 1.16 2005/05/24 12:53:06 jsy1001 Exp $
 
 module Inout
 
@@ -16,7 +16,7 @@ module Inout
 
 implicit none
 
-character(len=5), parameter :: release = '1.4.1'
+character(len=5), parameter :: release = '1.5.1'
 
 contains
 
@@ -168,10 +168,14 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, &
         vis_data(i,3) = abs(baseline)/1D+3
         vis_data(i,4) = 0D0
         vis_data(i,5) = vis**2D0
-        !calculate fractional error on mod V
-        frac_error = sqrt( calib_error**2D0 + (err/vis)**2D0 )
-        !hence calculate abs error on squared visibility
-        vis_data(i,6) = 2D0*frac_error*vis_data(i,5)
+        if (vis /= 0) then
+           !calculate fractional error on mod V
+           frac_error = sqrt( calib_error**2D0 + (err/vis)**2D0 )
+           !hence calculate abs error on squared visibility
+           vis_data(i,6) = 2D0*frac_error*vis_data(i,5)
+        else
+           vis_data(i,6) = 2D0*err
+        end if
         i = i + 1
         if (i > max_lines) then
            info = 'file exceeds maximum permitted length'
@@ -423,13 +427,14 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
   integer, dimension(maxhdu) :: vis2_rows, t3_rows, vis2_nwave, t3_nwave
   character(len=80), dimension(maxhdu) :: vis2_insname, t3_insname, wl_insname
   integer :: status, unit, blocksize, hdutype, nhdu, maxwave, ntarget
-  integer :: nvis2, nt3, nwl, iwl, irow, ntot, nwave, iwave, itab, j
+  integer :: nvis2, nt3, nwl, iwl, irow, ntot, nwave, iwave, itab, i, j
   integer :: vis_rows, triple_rows, colnum, naxis, count, num_wb
   integer :: target_id, sel_target_id
   integer, dimension(2) :: vis2sta
   integer, dimension(3) :: naxes, t3sta
   character(len=80) :: keyval, comment
   real, dimension(:, :), allocatable :: tab_wb, all_wb
+  double precision, dimension(2) :: swap
   double precision, dimension(:), allocatable :: vis2data, vis2err
   double precision, dimension(:), allocatable :: t3amp, t3amperr
   double precision, dimension(:), allocatable :: t3phi, t3phierr
@@ -630,11 +635,19 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
            vis_data(count, 3) = -ucoord
            vis_data(count, 4) = -vcoord
            vis_data(count, 5) = vis2data(iwave) !may be -ve
-           frac_error = abs(vis2err(iwave)/vis2data(iwave))
-           tot_error = abs(vis2data(iwave)) &
-                * sqrt((2D0*calib_error)**2D0 + frac_error**2D0 )
+           if (vis2data(iwave) /= 0D0) then
+              frac_error = abs(vis2err(iwave)/vis2data(iwave))
+              tot_error = abs(vis2data(iwave)) &
+                   * sqrt((2D0*calib_error)**2D0 + frac_error**2D0 )
+           else
+              tot_error = vis2err(iwave)
+           end if
            if (flag(iwave)) then
-              vis_data(count, 6) = -tot_error
+              if (tot_error == 0D0) then
+                 vis_data(count, 6) = -1.0D0
+              else
+                 vis_data(count, 6) = -tot_error
+              end if
            else
               vis_data(count, 6) = tot_error
            end if
@@ -698,8 +711,16 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
            !read_oi_t3 returns -ve t3amperr if NULL t3amp
            if (flag(iwave)) then
               !flag amplitude and phase
-              triple_data(count, 8) = -abs(t3amperr(iwave))
-              triple_data(count, 10)= -t3phierr(iwave)
+              if (t3amperr(iwave) /= 0) then
+                 triple_data(count, 8) = -abs(t3amperr(iwave))
+              else
+                 triple_data(count, 8) = -1.0D0
+              end if
+              if (t3phierr(iwave) /= 0) then
+                 triple_data(count, 10)= -t3phierr(iwave)
+              else
+                 triple_data(count, 10) = -99D0
+              end if
            else
               triple_data(count, 8) = t3amperr(iwave)
               triple_data(count, 10) = t3phierr(iwave)
@@ -725,6 +746,16 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
   allocate(wavebands(num_wb, 2))
   wavebands = all_wb(:num_wb, :)
   deallocate(all_wb)
+  !sort into ascending order of wavelengths (ignore bw)
+  do i = num_wb, 2, -1
+     do j = 1, i-1
+        if (wavebands(j, 1) > wavebands(j+1, 1)) then
+           swap = wavebands(j, :) 
+           wavebands(j, :) = wavebands(j+1, :)
+           wavebands(j+1, :) = swap
+        end if
+     end do
+  end do
   call ftclos(unit, status)
   call ftfiou(unit, status) !free unit number
 

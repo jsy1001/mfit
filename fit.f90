@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.16 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: fit.f90,v 1.17 2005/05/24 12:53:06 jsy1001 Exp $
 
 module Fit
 
@@ -66,16 +66,16 @@ contains
 
     !subroutine arguments
     character(len=128), intent(out) :: info
-    character(len=35), dimension(:), allocatable, intent(out) :: desc
-    double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, cov, cor
+    character(len=55), dimension(:), allocatable, intent(out) :: desc
+    double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, &
+         cov, cor
     double precision, intent(out) :: chisqrd, nlposterior, nlevidence
     integer, intent(out) :: flag
     logical, intent(in) :: force_symm
 
     !local variables
-    integer :: i, j, k, n, lwork
+    integer :: i, j, k, iwave, ipar, n, lwork
     character(len=128) :: name, comp
-    character(len=2), dimension(10) :: numbers
     double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det
     double precision, dimension(:), allocatable ::  x, temp_x, work
     logical :: illegal
@@ -94,7 +94,7 @@ contains
     !go through model arrays and count number of variable parameters
     n = 0
     do i = 1, size(model_param,1)
-       do j = 1, 17
+       do j = 1, size(model_param,2)
           if (model_prior(i,j) /= 0D0) n=n+1
        end do
     end do
@@ -106,41 +106,18 @@ contains
     allocate(x(n))
     allocate(temp_x(n))
     allocate(x_pos(n,2))
+    allocate(desc(n))
     k = 0
-    do i = 1, size(model_param,1)
-       do j = 1, 17
+    do i = 1, size(model_param,1) !loop over cpts
+       do j = 1, size(model_param,2)
           if (model_prior(i,j) /= 0D0) then
              k = k+1
              x_pos(k,1) = i
              x_pos(k,2) = j
              x(k) = model_param(i,j)
+             desc(k) = model_desc(i,j)
           end if
        end do
-    end do
-
-    !assign names to the variables listed in the sol solution array
-    allocate(desc(n))
-    name = ''
-    numbers = (/' 1',' 2',' 3',' 4',' 5',' 6',' 7',' 8',' 9','10'/)
-    do i = 1, n
-       comp = adjustl(numbers(x_pos(i,1)))
-       select case(x_pos(i,2))
-       case (2)
-          name = 'position radius (mas)'
-       case (3)
-          name = 'position angle (deg)'
-       case (4)
-          name = 'flux (arb units)'
-       case (5)
-          name = 'major axis (mas)'
-       case (6)
-          name = 'orientation (deg)'
-       case (7)
-          name = 'ellipticity'
-       case default
-          name = 'LD parameter ' // adjustl(numbers(x_pos(i,2)-7))
-       end select
-       desc(i) = 'component ' // trim(comp) // ', ' // trim(name)
     end do
 
     !check for illegal types of minimisation:
@@ -148,26 +125,40 @@ contains
     !must have at least 1 freedom to minimise with
     if (n==0) illegal = .true.
     !for single component model cannot vary r/theta (change in position
-    !only contstant phase offset) or B (flux is normalised anyway) 
+    !only constant phase offset) or B (flux is normalised anyway) 
     if (size(model_param,1)==1) then
-       do i = 1, size(x_pos,1)
-          if (x_pos(i,2)==2) illegal = .true.
-          if (x_pos(i,2)==3) illegal = .true.
-          if (x_pos(i,2)==4) illegal = .true.
+       do iwave = 1, nwave
+          if (model_prior(1, 2+4*model_wldep(1)*(iwave-1)) /= 0D0) &
+               illegal = .true.
+          if (model_prior(1, 3+4*model_wldep(1)*(iwave-1)) /= 0D0) &
+               illegal = .true.
+          if (model_prior(1, &
+               6+4*model_wldep(1)*(nwave-1)+model_wldep(2)*(iwave-1)) /= 0D0) &
+               illegal = .true.
        end do
     end if
     !for any component cannot vary theta if r is zero and not free to vary
     !(position angle has no effect if position radius fixed at zero)
     do i = 1, size(model_param,1)
-       if ((model_param(i,2)==0D0) .and. (model_prior(i,2)==0D0) &
-            .and. (model_prior(i,3)/=0D0)) illegal = .true.
+       do iwave = 1, nwave
+          ipar = 2+4*model_wldep(1)*(iwave-1)
+          if ((model_param(i,ipar)==0D0) .and. (model_prior(i,ipar)==0D0) &
+               .and. (model_prior(i,ipar+1)/=0D0)) illegal = .true.
+       end do
     end do
     !for any component cannot vary phi if epsilon is unity and not free to vary
-    !(orientation is meaningless is ellipse reduced to circular disc)
+    !(orientation is meaningless if ellipse reduced to circular disc)
     do i = 1, size(model_param,1)
-       if ((model_param(i,7)==1D0) .and. (model_prior(i,7)==0D0) &
-            .and. (model_prior(i,6)/=0D0)) illegal = .true.
+       do iwave = 1, nwave
+          ipar = 7 + (4*model_wldep(1)+model_wldep(2))*(nwave-1) &
+               + model_wldep(3)*(iwave-1)
+          if ((model_param(i,ipar+2)==1D0) .and. (model_prior(i,ipar+2)==0D0) &
+               .and. (model_prior(i,ipar+1)/=0D0)) illegal = .true.
+       end do
     end do
+    !doesn't make sense to have wavelength-dependent numerical CLV with
+    !wavelength-dependent diameter
+    if (size(clv_mvis, 2) > 1 .and. model_wldep(3) == 1) illegal = .true.
     if (illegal) goto 90
 
     !if centrosymmetric model is forced then must have 
@@ -175,7 +166,7 @@ contains
     if (force_symm .and. .not. symm) goto 92
 
     !allocate fit_param array
-    !fit_param is identical to model_param, it holds the definition of the model
+    !fit_param is identical to model_param, it holds the def'n of the model
     !with the difference that fit_param is designed to vary as the model is
     !adjusted to fit. x_pos is used to update the variable parameters in 
     !the array with their values from x
@@ -186,8 +177,8 @@ contains
     !compile x_info array
     !1st column is of typical length scales for variables and set equal to the
     !prior width. 2nd and 3rd columns hold lower and upper bounds on the
-    !value of the parameter in question - used to prevent negative/other illegal
-    !values causing problems (esp in visibility calculations)
+    !value of the parameter in question - used to prevent negative/other
+    !illegal values causing problems (esp in visibility calculations)
     allocate(x_info(n,3))
     do i = 1, n
        x_info(i,1) = model_prior(x_pos(i,1),x_pos(i,2))
@@ -197,8 +188,17 @@ contains
        x_info(i,2) = model_limits(x_pos(i,2),1)
        x_info(i,3) = model_limits(x_pos(i,2),2)
        !alpha(1) in hestroffer model must be > 0
-       if (x_pos(i,2)==8) then
-          if (trim(model_spec(x_pos(i,1),3))=='hestroffer') x_info(i,2) = 0D0
+       if (trim(model_spec(x_pos(i,1),3)) == 'hestroffer') then
+          if (model_wldep(4) == 1) then
+             do iwave = 1, nwave
+                if (x_pos(i,2) == (10+(4*model_wldep(1)+model_wldep(2) &
+                     +3*model_wldep(3))*(nwave-1) &
+                     + max_order*model_wldep(4)*(iwave-1))) x_info(i,2) = 0D0
+             end do
+          else
+             if (x_pos(i,2) == (10+(4*model_wldep(1)+model_wldep(2) &
+                  +3*model_wldep(3))*(nwave-1))) x_info(i,2) = 0D0
+          end if
        end if
     end do
 

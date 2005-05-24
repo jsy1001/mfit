@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.12 2005/01/07 16:02:44 jsy1001 Exp $
+!$Id: plot.f90,v 1.13 2005/05/24 12:53:06 jsy1001 Exp $
 
 module Plot
   
@@ -153,7 +153,8 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+    !!call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 13)
 
   end subroutine plot_triple_phase_bas
   !============================================================================
@@ -428,7 +429,8 @@ contains
     if (mod_line) then
        call pgline(num_model, model_points(:, 1), model_points(:, 2))
     else
-       call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+       !!call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+       call pgpt(num_model, model_points(:, 1), model_points(:, 2), 13)
     end if
 
   end subroutine plot_vis_bas
