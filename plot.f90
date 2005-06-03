@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.13 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: plot.f90,v 1.14 2005/06/03 09:47:58 jsy1001 Exp $
 
 module Plot
   
@@ -44,7 +44,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
     real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2
+    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
     real :: phase, phase_err, model_phase
     real, dimension(3) :: bas
@@ -68,6 +68,7 @@ contains
        v1 = triple_data(i, 4)
        u2 = triple_data(i, 5)
        v2 = triple_data(i, 6)
+       mjd = triple_data(i, 11)
        bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
        bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
        bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
@@ -76,9 +77,10 @@ contains
        phase = modulo(triple_data(i, 9), 360D0)
        if (phase > 180.) phase = phase - 360.
        phase_err = triple_data(i, 10)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
+       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
+       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
+       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
+            -(u1+u2), -(v1+v2), mjd)
        num_model = num_model + 1
        model_points(num_model, 1) = maxval(bas)
        model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
@@ -172,7 +174,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
     real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2
+    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
     real :: amp, amp_err
     real, dimension(3) :: bas
@@ -195,6 +197,7 @@ contains
        v1 = triple_data(i, 4)
        u2 = triple_data(i, 5)
        v2 = triple_data(i, 6)
+       mjd = triple_data(i, 11)
        bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
        bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
        bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
@@ -202,9 +205,10 @@ contains
        if (present(uxmax) .and. maxval(bas) .gt. uxmax) cycle!out of plot range
        amp = triple_data(i, 7)
        amp_err = triple_data(i, 8)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
+       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
+       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
+       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
+            -(u1+u2), -(v1+v2), mjd)
        num_model = num_model + 1
        model_points(num_model, 1) = maxval(bas)
        model_points(num_model, 2) = modulus(vis1*vis2*vis3)
@@ -298,7 +302,7 @@ contains
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
-    double precision :: u, v, lambda, delta_lambda
+    double precision :: u, v, lambda, delta_lambda, mjd
     integer :: num_data, num_flagged, num_model, i, istat
     real :: bas, vsq, err, xmin, xmax
     real :: ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
@@ -351,6 +355,7 @@ contains
     end if
 
     if (mod_line) then
+       !XXX can't have time-dependent model?
        !calculate grid of model points
        num_model = grid_size
        allocate(model_points(num_model, 2))
@@ -359,7 +364,7 @@ contains
        do i = 1, num_model
           u = xmin*lambda/1000. + ((i-1.)/(num_model-1.))*(xmax-xmin)*lambda/1000.
           model_points(i, 1) = 1000.*u/lambda
-          model_points(i, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, 0D0))**2.
+          model_points(i, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, 0D0, mjd))**2.
        end do
     else
        !calculate model points corresponding to plotted data points
@@ -370,11 +375,12 @@ contains
           delta_lambda = vis_data(i, 2)
           u = vis_data(i, 3)
           v = vis_data(i, 4)
+          mjd = vis_data(i, 7)
           bas = 1000.*sqrt(u**2. + v**2.)/lambda
           if (bas .ge. xmin .and. bas .le. xmax) then
              num_model = num_model + 1
              model_points(num_model, 1) = bas
-             model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v))**2.
+             model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd))**2.
           end if
        end do
     end if
@@ -581,7 +587,7 @@ contains
   !============================================================================
 
   subroutine plot_vis(xindex, spec, param, x_title, y_title, top_title, &
-       uxmin, uxmax, device)
+       xzero, uxmin, uxmax, device)
 
     !plot squared visibility against specified data column
     !xindex gives index into 2nd axis of vis_data for independent variable
@@ -591,13 +597,14 @@ contains
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
     character(len=*), intent(in) :: x_title, y_title, top_title
+    real, intent(in) :: xzero
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
     !local variables
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
-    double precision :: u, v, lambda, delta_lambda
+    double precision :: u, v, lambda, delta_lambda, mjd
     integer :: num_data, num_flagged, num_model, i, istat
     real :: vsq, err, xmin, xmax
     real :: ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
@@ -623,13 +630,13 @@ contains
        err = vis_data(i, 6)
        if (err <= 0D0) then
           num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = vis_data(i, xindex)
+          flagged_points(num_flagged, 1) = vis_data(i, xindex) - xzero
           flagged_points(num_flagged, 2) = vsq
           flagged_points(num_flagged, 3) = vsq - err
           flagged_points(num_flagged, 4) = vsq + err
        else
           num_data = num_data + 1
-          data_points(num_data, 1) = vis_data(i, xindex)
+          data_points(num_data, 1) = vis_data(i, xindex) - xzero
           data_points(num_data, 2) = vsq
           data_points(num_data, 3) = vsq + err
           data_points(num_data, 4) = vsq - err
@@ -656,10 +663,10 @@ contains
        delta_lambda = vis_data(i, 2)
        u = vis_data(i, 3)
        v = vis_data(i, 4)
-       if (vis_data(i, xindex) .ge. xmin .and. vis_data(i, xindex) .le. xmax) then
+       if ((vis_data(i, xindex)-xzero) .ge. xmin .and. (vis_data(i, xindex)-xzero) .le. xmax) then
           num_model = num_model + 1
-          model_points(num_model, 1) = vis_data(i, xindex)
-          model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v))**2.
+          model_points(num_model, 1) = vis_data(i, xindex) - xzero
+          model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd))**2.
        end if
     end do
 
@@ -713,7 +720,7 @@ contains
   !============================================================================
 
   subroutine plot_triple_phase(xindex, spec, param, x_title, y_title, &
-       top_title, uxmin, uxmax, device)
+       top_title, xzero, uxmin, uxmax, device)
 
     !plot triple product phase against specified data column
     !xindex gives index into 2nd axis of triple_data for independent variable
@@ -723,6 +730,7 @@ contains
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
     character(len=*), intent(in) :: x_title, y_title, top_title
+    real, intent(in) :: xzero
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
@@ -730,7 +738,7 @@ contains
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
     real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2
+    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
     real :: phase, phase_err, model_phase
     integer :: num_data, num_flagged, num_model, i, istat
@@ -759,23 +767,25 @@ contains
        v1 = triple_data(i, 4)
        u2 = triple_data(i, 5)
        v2 = triple_data(i, 6)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
+       mjd = triple_data(i, 11)
+       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
+       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
+       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
+            -(u1+u2), -(v1+v2), mjd)
        num_model = num_model + 1
-       model_points(num_model, 1) = triple_data(i, xindex)
+       model_points(num_model, 1) = triple_data(i, xindex) - xzero
        model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
        if (model_phase > 180.) model_phase = model_phase - 360.
        model_points(num_model, 2) = model_phase
        if (phase_err <= 0D0) then
           num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = triple_data(i, xindex)
+          flagged_points(num_flagged, 1) = triple_data(i, xindex) - xzero
           flagged_points(num_flagged, 2) = phase
           flagged_points(num_flagged, 3) = phase - phase_err
           flagged_points(num_flagged, 4) = phase + phase_err
        else
           num_data = num_data + 1
-          data_points(num_data, 1) = triple_data(i, xindex)
+          data_points(num_data, 1) = triple_data(i, xindex) - xzero
           data_points(num_data, 2) = phase
           data_points(num_data, 3) = phase + phase_err
           data_points(num_data, 4) = phase - phase_err
@@ -843,7 +853,7 @@ contains
   !============================================================================
 
   subroutine plot_triple_amp(xindex, spec, param, x_title, y_title, &
-       top_title, uxmin, uxmax, device)
+       top_title, xzero, uxmin, uxmax, device)
 
     !plot triple product phase against specified data column
     !xindex gives index into 2nd axis of triple_data for independent variable
@@ -853,6 +863,7 @@ contains
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
     character(len=*), intent(in) :: x_title, y_title, top_title
+    real, intent(in) :: xzero
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
@@ -860,7 +871,7 @@ contains
     real, dimension(:, :), allocatable :: data_points, flagged_points, &
          model_points
     real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2
+    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
     real :: amp, amp_err
     integer :: num_data, num_flagged, num_model, i, istat
@@ -888,21 +899,23 @@ contains
        v1 = triple_data(i, 4)
        u2 = triple_data(i, 5)
        v2 = triple_data(i, 6)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, -(u1+u2), -(v1+v2))
+       mjd = triple_data(i, 11)
+       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
+       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
+       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
+            -(u1+u2), -(v1+v2), mjd)
        num_model = num_model + 1
-       model_points(num_model, 1) = triple_data(i, xindex)
+       model_points(num_model, 1) = triple_data(i, xindex) - xzero
        model_points(num_model, 2) = modulus(vis1*vis2*vis3)
        if (amp_err <= 0D0) then
           num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = triple_data(i, xindex)
+          flagged_points(num_flagged, 1) = triple_data(i, xindex) - xzero
           flagged_points(num_flagged, 2) = amp
           flagged_points(num_flagged, 3) = amp - amp_err
           flagged_points(num_flagged, 4) = amp + amp_err
        else
           num_data = num_data + 1
-          data_points(num_data, 1) = triple_data(i, xindex)
+          data_points(num_data, 1) = triple_data(i, xindex) - xzero
           data_points(num_data, 2) = amp
           data_points(num_data, 3) = amp + amp_err
           data_points(num_data, 4) = amp - amp_err

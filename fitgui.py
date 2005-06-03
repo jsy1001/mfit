@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.6 2005/01/07 14:02:02 jsy1001 Exp $
+# $Id: fitgui.py,v 1.7 2005/06/03 09:47:58 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.6 $")[1]
+_revision = string.split("$Revision: 1.7 $")[1]
 
 
 class GUI:
@@ -69,7 +69,9 @@ class GUI:
         self.target_id = StringVar()
         self.nofit = IntVar()
         self.nofit.set(0)
-        self.plots = ['No plot', 'uv', 'vis2', 't3amp', 't3phi', 'vis2wl', 't3ampwl', 't3phiwl', 'post']
+        self.plots = ['No plot', 'uv', 'vis2', 't3amp', 't3phi',
+                      'vis2wl', 't3ampwl', 't3phiwl',
+                      'vis2mjd', 't3ampmjd', 't3phimjd', 'post']
         self.selPlot = StringVar()
         self.selPlot.set(self.plots[1])
         self.plotIndex = StringVar()
@@ -116,10 +118,12 @@ class GUI:
         Label(midFrame1, text='Plot:').pack(side=LEFT, anchor=NW)
         plotFrame = Frame(midFrame1)
         plotFrame.pack(side=LEFT)
-        for p in self.plots:
+        for i in range(len(self.plots)):
+            p = self.plots[i]
             Radiobutton(plotFrame, text=p, variable=self.selPlot,
-                        value=p).pack(side=TOP, anchor=W)
-        Entry(plotFrame, textvariable=self.plotIndex, width=3).pack(side=TOP)
+                        value=p).grid(row=i/2, column=i%2, sticky='w')
+        Entry(plotFrame, textvariable=self.plotIndex,
+              width=3).grid(row=len(self.plots), column=(len(self.plots)-1)%2)
         Label(midFrame1, text='From:').pack(side=LEFT)
         Entry(midFrame1, textvariable=self.plotFrom, width=5).pack(side=LEFT)
         Label(midFrame1, text='To:').pack(side=LEFT)

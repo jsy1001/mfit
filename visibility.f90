@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.10 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: visibility.f90,v 1.11 2005/06/03 09:47:58 jsy1001 Exp $
 
 module Visibility
 
@@ -29,17 +29,18 @@ implicit none
 contains
 !==============================================================================
 
-function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
+function cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd)
 
   !returns complex visibility real and imaginary parts for
   !multiple component model. model component details stored in 
   !the model_spec and model_param arrays.
   !u, v must be supplied in metres, lambda in nm
+  !mjd gives epoch of observation as Modified Julian Day
   
   !subroutine arguments
   character(len=128), dimension(:,:), intent(in) :: spec
   double precision, dimension(:,:), intent(in) :: param
-  double precision, intent(in) :: lambda, delta_lambda, u, v
+  double precision, intent(in) :: lambda, delta_lambda, u, v, mjd
   double complex :: cmplx_vis
   
   !parameters
@@ -47,7 +48,8 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
 
   !local variables
   integer :: i, iwave, navg, iavg, num_comps, order, iwb, ipar
-  double precision :: r, theta, B, a, phi, B_total, lambda1
+  double precision :: r, theta_t0, t0, dtheta_dt, theta
+  double precision :: B, a, phi, B_total, lambda1
   double precision :: epsilon, rho, F, x1, x2, x3
   double precision, dimension(0:10) :: alpha
   double complex :: sumvis
@@ -95,8 +97,11 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v)
         !major axis a, orientation phi, ellipticity epsilon
         !ld order order, ld parameters alpha
         r = mas2rad*param(i, 2+4*model_wldep(1)*(iwb-1))
-        theta = deg2rad*param(i, 3+4*model_wldep(1)*(iwb-1))
-        !XXX handle rotation
+        theta_t0 = deg2rad*param(i, 3+4*model_wldep(1)*(iwb-1))
+        t0 = param(i, 4+4*model_wldep(1)*(iwb-1))
+        dtheta_dt = deg2rad*param(i, 5+4*model_wldep(1)*(iwb-1))
+        if (dtheta_dt /= 0D0 .and. mjd < 0D0) stop 'Need observation time for time-dependent model'
+        theta = theta_t0 + (mjd - t0)*dtheta_dt
         B = param(i, 6+4*model_wldep(1)*(nwave-1)+model_wldep(2)*(iwb-1))
 
         ipar = 7 + (4*model_wldep(1)+model_wldep(2))*(nwave-1) &

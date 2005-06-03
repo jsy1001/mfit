@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.16 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: inout.f90,v 1.17 2005/06/03 09:47:58 jsy1001 Exp $
 
 module Inout
 
@@ -72,7 +72,7 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, &
   
   !allocate array size
   if(allocated(vis_data)) deallocate(vis_data)
-  allocate(vis_data(data_items,6))
+  allocate(vis_data(data_items,7))
   
   !read vis data properly and close
   !vis_data: lambda, delta_lambda, u, v, (vis^2), err
@@ -88,6 +88,7 @@ subroutine read_vis(info, file_name, source, max_lines, vis_data, &
        frac_error = sqrt( calib_error**2D0 + (default_error/vis)**2D0 )
        !hence calculate abs error on squared visibility
        vis_data(i,6) = 2D0*frac_error*vis_data(i,5)
+       vis_data(i,7) = -1D0 !MJD unknown
   end do
 
   close(11)
@@ -154,7 +155,7 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, &
   
   !allocate array size
   if(allocated(vis_data)) deallocate(vis_data)
-  allocate(vis_data(data_items,6))
+  allocate(vis_data(data_items,7))
   
   !read vis data properly and close
   !vis_data: lambda, delta_lambda, u, v, (vis^2), err
@@ -176,6 +177,7 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, &
         else
            vis_data(i,6) = 2D0*err
         end if
+        vis_data(i,7) = -1D0 !MJD unknown
         i = i + 1
         if (i > max_lines) then
            info = 'file exceeds maximum permitted length'
@@ -227,8 +229,9 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
 
   !local variables
   character(len=32) :: dummy, source1, source2
-  integer :: i, j, i1, i2, lines, num
-  double precision :: vis, vis_err, amp, amp_err, cp, cp_err
+  integer :: i, j, i1, i2, lines, num, year, month, day, hour, min
+  real :: sec
+  double precision :: vis, vis_err, amp, amp_err, cp, cp_err, mjd
   double precision, dimension(2) :: swap
   double precision, dimension(:,:), allocatable :: all_wb
   
@@ -256,8 +259,8 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
   !allocate vis and triple data array sizes
   if(allocated(vis_data)) deallocate(vis_data)
   if(allocated(triple_data)) deallocate(triple_data)
-  allocate(vis_data(i1,6))
-  allocate(triple_data(i2,10))
+  allocate(vis_data(i1,7))
+  allocate(triple_data(i2,11))
   
   !read data properly and close
   open (unit=11, action='read', file=file_name)
@@ -267,11 +270,15 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
   do i = 1, lines
      read (11, *) dummy
 
-     if (dummy == 'vis') then
+     if (dummy == 'group_date') then
+
+        read (12,*,err=95) dummy, year, month, day
+
+     else if (dummy == 'vis') then
 
         i1 = i1 + 1
         read (12,*,err=95) dummy, dummy, dummy, vis_data(i1,1:2), &
-             dummy, dummy, dummy, vis_data(i1,3:4), vis, vis_err
+             hour, min, sec, vis_data(i1,3:4), vis, vis_err
 
         !reverse signs of u, v, to correct for inconsistent sign in FT
         !doesn't actually matter for V^2 data
@@ -287,6 +294,9 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
         !and convert to absolute error
         vis_data(i1,6) = abs(vis_data(i1,5)) * sqrt((2D0*calib_error)**2D0 + &
                          (2D0*vis_err)**2D0 )
+        mjd = DateToMjd(year, month, day) + &
+             ((((hour*60) + min)*60) + sec)/86400.
+        vis_data(i1,7) = mjd
 
         if (vis_err<0D0) vis_data(i1,6) = -vis_data(i1,6)
 
@@ -294,7 +304,7 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
 
         i2 = i2 + 1
         read (12,*,err=95) dummy, dummy, dummy, dummy, triple_data(i2,1:2), &
-             dummy, dummy, dummy, triple_data(i2,3:6), &
+             hour, min, sec, triple_data(i2,3:6), &
              amp, amp_err, cp, cp_err
 
         !reverse signs of u1, v1, u2, v2 to correct for inconsistent sign in FT
@@ -310,6 +320,9 @@ subroutine read_mapdat(info, file_name, source, max_lines, &
 
         triple_data(i2,9) = cp
         triple_data(i2,10) = cp_err
+        mjd = DateToMjd(year, month, day) + &
+             ((((hour*60) + min)*60) + sec)/86400.
+        triple_data(i2,11) = mjd
 
      else if (dummy == 'source') then
 
@@ -592,8 +605,8 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
   do itab = 1, nt3
      triple_rows = triple_rows + t3_rows(itab)*t3_nwave(itab)
   end do
-  allocate(vis_data(vis_rows, 6))
-  allocate(triple_data(triple_rows, 10))
+  allocate(vis_data(vis_rows, 7))
+  allocate(triple_data(triple_rows, 11))
   allocate(all_wb(maxwave, 2))
   num_wb = 0
 
@@ -625,8 +638,8 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
      call ftmahd(unit, vis2_hdus(itab), hdutype, status)
      !read 1 row at a time to save memory
      do irow = 1, vis2_rows(itab)
-        call read_oi_vis2(unit, irow, nwave, target_id, mjd, vis2data, vis2err, &
-             ucoord, vcoord, vis2sta, flag, status)
+        call read_oi_vis2(unit, irow, nwave, target_id, mjd, &
+             vis2data, vis2err, ucoord, vcoord, vis2sta, flag, status)
         !map each binary table row to nwave rows of vis_data array
         wave1: do iwave = 1, nwave
            vis_data(count, 1:2) = tab_wb(iwave, :)
@@ -651,6 +664,7 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
            else
               vis_data(count, 6) = tot_error
            end if
+           vis_data(count, 7) = mjd
            count = count + 1
            do j = 1, num_wb
               if (tab_wb(iwave, 1) .eq. all_wb(j, 1) &
@@ -698,7 +712,7 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
         call read_oi_t3(unit, irow, nwave, target_id, mjd, &
              t3amp, t3amperr, t3phi, t3phierr, &
              ucoord, vcoord, u2coord, v2coord, t3sta, flag, status)
-        !map each binary table row to nwave rows of vis_data array
+        !map each binary table row to nwave rows of triple_data array
         wave2: do iwave = 1, nwave
            triple_data(count, 1:2) = tab_wb(iwave, :)
            !reverse signs of u1, v1, u2, v2 to correct for inconsistent sign in FT
@@ -725,6 +739,7 @@ subroutine read_oi_fits(info, file_name, user_target_id, source, &
               triple_data(count, 8) = t3amperr(iwave)
               triple_data(count, 10) = t3phierr(iwave)
            end if
+           triple_data(count, 11) = mjd
            count = count + 1
            do j = 1, num_wb
               if (tab_wb(iwave, 1) .eq. all_wb(j, 1) &
@@ -933,6 +948,52 @@ subroutine read_oi_t3(unit, row, nwave, target_id, mjd, &
   deallocate(isnull)
 
 end subroutine read_oi_t3
+
+!==============================================================================
+
+function DateToMjd(year, month, day)
+
+  !Return Modified Julian Day at 0h UT on specified date.
+  !
+  !Two-digit years are not supported: 99 means the year 99 AD
+  !month, day start at 1
+  !
+  !Code translated from routine julday in Numerical Recipes in C, Section 1.1
+
+  !function arguments
+  integer, intent(in) :: year, month, day
+  double precision :: DateToMjd
+
+  !local variables
+  integer :: ja, jy, jm
+  integer*8 :: jul
+  !Gregorian calendar adopted 15 Oct 1582:
+  integer*8, parameter :: greg = 15 + 31*(10+12*1582)
+
+  if (year == 0) then
+     print *, 'DateToMjd: There is no year zero.'
+     return
+  end if
+  if (year < 0) then
+     jy = year + 1
+  else
+     jy = year
+  end if
+  if (month > 2) then
+     jm = month + 1
+  else
+     jy = jy - 1
+     jm = month + 13
+  end if
+  jul = floor(365.25*jy) + floor(30.6001*jm) + day + 1720995
+  if (day + 31*(month+12*year) >= greg) then
+     ja = int(0.01*year)
+     jul = jul + 2 - ja + int(0.25*ja)
+  end if
+  !jul is Julian Day for noon on given date
+  DateToMjd = jul - 2400001
+
+end function DateToMjd
 
 !==============================================================================
 
