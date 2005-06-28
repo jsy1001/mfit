@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.17 2005/06/03 09:47:57 jsy1001 Exp $
+!$Id: clfit.f90,v 1.18 2005/06/28 16:13:27 jsy1001 Exp $
 
 program Main
 
@@ -26,17 +26,21 @@ program Main
 
   !other local variables
   double precision, dimension(:, :), allocatable :: wavebands
-  double precision, dimension(2) :: wb, wl
+  double precision, dimension(:), allocatable :: var_param
+  double precision, dimension(:), allocatable :: errguess
+  double precision, dimension(2) :: wb, wl, err
   character(len=width) :: spacer_line
   character(len=128) :: switch, arg, device, info, file_name, ext, source
-  character(len=128) :: xlabel, top_title, cvs_rev, revision
+  character(len=128) :: xlabel, ylabel, top_title, cvs_rev, revision
   character(len=8) :: sel_plot
-  integer :: narg, iarg, i, j, n, length, flag, index, user_target_id
+  integer :: narg, iarg, i, j, n, length, flag, user_target_id, margerr_var
+  integer, dimension(2) :: indx
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
-  double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
-  double precision :: calib_error, uxmin, uxmax, x0, sigma
+  double precision :: nlposterior, nlevidence, nlnpost, chisqrd, normchisqrd
+  double precision :: calib_error, uxmin, uxmax, uymin, uymax
+  double precision :: x0, y0, xsig, ysig
   real :: xzero
-  logical :: force_symm, nofit, zoom, mod_line
+  logical :: force_symm, nofit, zoom, mod_line, marg
 
   integer :: pgopen, istat
 
@@ -47,7 +51,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.17 $'
+  cvs_rev = '$Revision: 1.18 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -72,6 +76,7 @@ program Main
   wl = (/-1.0D0, -1.0D0/)
   user_target_id = -1 !default to 1st target in OI_TARGET
   calib_error = 0D0
+  margerr_var = -1
   do
      if (iarg == narg - 1) exit
      if (iarg > narg - 1) then
@@ -104,27 +109,48 @@ program Main
         case('-p', '--plot')
            call get_command_argument(iarg+1, sel_plot)
            iarg = iarg + 1
-           if (sel_plot == 'post') then
+           if (sel_plot(:4) == 'post' .or. sel_plot(:5) == 'mpost') then
               call get_command_argument(iarg+1, arg)
-              read(arg, *) index
+              read(arg, *) indx(1)
+              iarg = iarg + 1
+           end if
+           if (sel_plot == 'post2d' .or. sel_plot == 'mpost2d') then
+              call get_command_argument(iarg+1, arg)
+              read(arg, *) indx(2)
               iarg = iarg + 1
            end if
         case('-z', '--zoomplot')
            zoom = .true.
            call get_command_argument(iarg+1, sel_plot)
-           if (sel_plot == 'post') then
+           if (sel_plot(:4) == 'post' .or. sel_plot(:5) == 'mpost') then
               call get_command_argument(iarg+2, arg)
-              read(arg, *) index
+              read(arg, *) indx(1)
+              iarg = iarg + 1
+           end if
+           if (sel_plot == 'post2d' .or. sel_plot == 'mpost2d') then
+              call get_command_argument(iarg+2, arg)
+              read(arg, *) indx(2)
               iarg = iarg + 1
            end if
            call get_command_argument(iarg+2, arg)
            read(arg, *) uxmin
            call get_command_argument(iarg+3, arg)
            read(arg, *) uxmax
+           if (sel_plot == 'post2d' .or. sel_plot == 'mpost2d') then
+              call get_command_argument(iarg+4, arg)
+              read(arg, *) uymin
+              call get_command_argument(iarg+5, arg)
+              read(arg, *) uymax
+              iarg = iarg + 2
+           end if
            iarg = iarg + 3
         case('-t', '--target_id')
            call get_command_argument(iarg+1, arg)
            read(arg, *) user_target_id
+           iarg = iarg + 1
+        case('-m', '--margerr')
+           call get_command_argument(iarg+1, arg)
+           read(arg, *) margerr_var
            iarg = iarg + 1
         case default
            print *, 'Ignoring invalid command-line argument: ', arg
@@ -213,7 +239,7 @@ program Main
 
   end if
   if (info /= '') then
-     print *, info
+     print *, trim(info)
      stop
   end if
 
@@ -330,7 +356,7 @@ program Main
   info = ''
   call read_model(info, file_name, sel_wavebands)
   if (info /= '') then
-     print *, info
+     print *, trim(info)
      stop
   end if
 
@@ -459,7 +485,7 @@ program Main
                 xlabel, 'Closure phase /'//char(176), top_title, xzero)
         end if
      end if
-     !cannot do 'post' plot if --nofit
+     !cannot do '(m)post(2d)' plot if --nofit
   else
      !-------------------------------------------------------------------------
      !fit model to the data by minimising negative log posterior
@@ -535,6 +561,7 @@ program Main
 
         !----------------------------------------------------------------------
         !plot
+        call alloc_mg
         mod_line = (symm .and. size(sel_wavebands, 1) == 1)
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (sel_plot == 'vis2' .and. useful_vis > 0) then
@@ -636,20 +663,84 @@ program Main
                    xlabel, 'Closure phase /'//char(176), top_title, xzero)
            end if
         end if
-        if (sel_plot == 'post') then
+        if (sel_plot == 'post' .or. sel_plot == 'mpost') then
+           if (indx(1) > length) stop 'Invalid parameter number'
            if (.not. zoom) then
-              x0 = sol(index, 1)
-              if (sol(index, 2) == 0D0) then
+              x0 = sol(indx(1), 1)
+              if (sol(indx(1), 2) == 0D0) then
                  !was problem calculating errors from hessian
-                 sigma = model_prior(x_pos(index, 1), x_pos(index, 2))
+                 xsig = model_prior(x_pos(indx(1), 1), x_pos(indx(1), 2))
               else
-                 sigma = sol(index, 2)
+                 xsig = sol(indx(1), 2)
               end if
-              uxmin = x0 - 3*sigma
-              uxmax = x0 + 3*sigma
+              uxmin = x0 - 3*xsig
+              uxmax = x0 + 3*xsig
            end if
-           call plot_post(model_spec, fit_param, index, &
-                desc(index), '-ln(post)', top_title, uxmin, uxmax)
+           if (sel_plot == 'mpost') then
+              marg = .true.
+              nlnpost = nlevidence
+              ylabel = '-ln(MARG. postprob)'
+           else
+              marg = .false.
+              nlnpost = nlposterior - 0.5D0*log(2D0*pi) + &
+                   0.5D0*log(hes(indx(1),indx(1)))
+              ylabel = '-ln(postprob)'
+           end if
+           call plot_post(marg, nlnpost, indx(1), desc(indx(1)), &
+                ylabel, top_title, uxmin, uxmax)
+        end if
+        if (sel_plot == 'post2d' .or. sel_plot == 'mpost2d') then
+           if (indx(1) > length .or. indx(2) > length) &
+                stop 'Invalid parameter number'
+           if (.not. zoom) then
+              x0 = sol(indx(1), 1)
+              if (sol(indx(1), 2) == 0D0) then
+                 !was problem calculating errors from hessian
+                 xsig = model_prior(x_pos(indx(1), 1), x_pos(indx(1), 2))
+              else
+                 xsig = sol(indx(1), 2)
+              end if
+              uxmin = x0 - 3*xsig
+              uxmax = x0 + 3*xsig
+              y0 = sol(indx(2), 1)
+              if (sol(indx(2), 2) == 0D0) then
+                 !was problem calculating errors from hessian
+                 ysig = model_prior(x_pos(indx(2), 1), x_pos(indx(2), 2))
+              else
+                 ysig = sol(indx(2), 2)
+              end if
+              uymin = y0 - 3*ysig
+              uymax = y0 + 3*ysig
+           end if
+           if (sel_plot == 'mpost2d') then
+              marg = .true.
+              nlnpost = nlevidence
+              top_title = trim(top_title)//': -ln(MARG. postprob)'
+           else
+              marg = .false.
+              nlnpost = nlposterior - 0.5D0*log(2D0*pi) + &
+                   0.5D0*log(hes(indx(1),indx(1))) !!
+              top_title = trim(top_title)//': -ln(postprob)'
+           end if
+           call plot_post2d(marg, nlnpost, indx, desc(indx(1)), &
+                desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
+        end if
+        if (margerr_var >= 1 .and. margerr_var <= length) then
+           !check specified error bar
+           print *, 'checking error bar',margerr_var,' by marginalisation...'
+           allocate(errguess(length))
+           errguess = sol(:,2)
+           do i = 1, length
+              if (sol(i,2) < sqrt(1D0/hes(i,i))) &
+                   errguess(i) = sqrt(1D0/hes(i,i))
+           end do
+           call marg_err(sol(:,1), errguess, margerr_var, nlevidence, err)
+           print '(1x, a, 49x, a)', '                   ', 'fitted'
+           print '(1x, a, 49x, a)', 'num  parameter name', ' value'
+           write(*,77) margerr_var, desc(margerr_var), sol(margerr_var, 1), &
+                ' +', err(1), ' -', err(2)
+77         format(' (', i2, ') ', a55, 1x, f13.6, a, f12.6, a, f12.6) 
+           deallocate(errguess)
         end if
      end if
   end if
@@ -659,6 +750,7 @@ program Main
 
   !-------------------------------------------------------------------------
   !Deallocate model/fitting storage
+  call free_mg()
   call free_model() !model_*
   call free_fit() !fit_param, x_pos, x_info
   if (allocated(desc)) deallocate(desc)
@@ -758,11 +850,12 @@ contains
     print *, '-r|--waverange WL1 WL2  select all wavebands in this range'
     print *, '-t|--target_id ID       select this target (default is 1st in OI_TARGET table)'
     print *, '-c|--calerr FRAC        add calibration error (frac. err. in system visib.)'
-    print *, '-p|--plot      uv|post N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd'
+    print *, '-p|--plot      uv|post N|mpost N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd'
     print *, '                        make specified plot'
-    print *, '-z|--zoomplot  uv|post N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd XMIN XMAX'
+    print *, '-z|--zoomplot  uv|post N|mpost N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd XMIN XMAX'
     print *, '                        plot with specified x-axis range'
     print *, '-d|--device DEV         PGPLOT device to use'
+    print *, '-m|--margerr N          alternate error bar N by brute-force marginalisation'
     print *, ' '
 
   end subroutine print_usage

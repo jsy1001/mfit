@@ -1,4 +1,4 @@
-!$Id: modelplot.f90,v 1.1 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: modelplot.f90,v 1.2 2005/06/28 16:13:27 jsy1001 Exp $
 
 ! Plot sky brightness distribution for mfit-format model
 !
@@ -36,14 +36,14 @@ program Modelplot
   integer symbol
   real xmax
   real, dimension(nlevs_max) :: plevs, levs
-  real, dimension(6) :: tr(6)
+  real, dimension(6) :: tr
   real fg, bg
   data plevs/0.5,1.0,2.0,4.0,8.0,16.0,32.0,64.0/
 
   !functions
   integer pgopen
 
-  cvs_rev = '$Revision: 1.1 $'
+  cvs_rev = '$Revision: 1.2 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,'  mplot - greyscale/contour plot of mfit-format model'
@@ -62,7 +62,7 @@ program Modelplot
      !not necessary to normalise fluxes of model components,
      !as greyscale and contours are normalised to max. flux in image
      if (info == '') exit !success
-     print *, info
+     print *, trim(info)
   end do
   call print_model
 
@@ -310,27 +310,5 @@ contains
     inten_hest = mu**alpha
 
   end function inten_hest
-
-
-  function yesno(prompt, default)
-
-    !Get yes/no response
-    character(len=*), intent(in) :: prompt, default
-    logical yesno
-    character(len=128) :: response
-
-    print *, trim(prompt), ' [', default, '] ?'
-    read (*, '(a)') response
-    if (len_trim(response) == 0) then
-       response = default
-       print '(a)', trim(response)
-    end if
-    if (response(1:1) == 'y' .or. response(1:1) == 'Y') then
-       yesno = .true.
-    else
-       yesno = .false.
-    end if
-
-  end function yesno
 
 end program Modelplot

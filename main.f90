@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.21 2005/06/03 09:47:58 jsy1001 Exp $
+!$Id: main.f90,v 1.22 2005/06/28 16:13:27 jsy1001 Exp $
 
 program Main
 
@@ -27,12 +27,15 @@ program Main
   double precision, dimension(:, :), allocatable :: wavebands
   double precision, dimension(2) :: wb, wave
   character(len=width) :: spacer_line
-  character(len=128) :: info, file_name, ext, source, top_title, xrange, wavestr
+  character(len=128) :: info, file_name, ext, source
+  character(len=128) :: xlabel, ylabel, top_title, xrange, wavestr
   integer :: i, length, flag
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
-  double precision :: nlposterior, nlevidence, chisqrd, normchisqrd
-  double precision :: calib_error, uxmin, uxmax, temp
-  logical :: force_symm, mod_line
+  integer, dimension(2) :: indx
+  double precision :: nlposterior, nlevidence, nlnpost, chisqrd, normchisqrd
+  double precision :: calib_error, uxmin, uxmax, uymin, uymax, temp
+  double precision :: x0, y0, xsig, ysig
+  logical :: force_symm, mod_line, marg
 
   integer :: pgopen, istat
 
@@ -141,7 +144,7 @@ program Main
 
      end if
      if (info == '') exit
-     print *,info
+     print *, trim(info)
 
   end do read_data
 
@@ -279,7 +282,7 @@ program Main
         info = ''
         call read_model(info, file_name, sel_wavebands)
         if (info == '') exit
-        print *, info
+        print *, trim(info)
      end do
 
      print *, '...done'
@@ -420,6 +423,86 @@ program Main
                    'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                    top_title, uxmin, uxmax)
              end if
+        end if
+        if (yesno('Plot 1d cut through -ln(postprob)', 'no')) then
+           do
+              print *, 'enter variable number for x axis'
+              read *, indx(1)
+              if (indx(1) <= length) exit
+           end do
+           x0 = sol(indx(1), 1)
+           if (sol(indx(1), 2) == 0D0) then
+              !was problem calculating errors from hessian
+              xsig = model_prior(x_pos(indx(1), 1), x_pos(indx(1), 2))
+           else
+              xsig = sol(indx(1), 2)
+           end if
+           uxmin = x0 - 3*xsig
+           uxmax = x0 + 3*xsig
+           if (yesno('Marginalise over other variables', 'no')) then
+              marg = .true.
+              nlnpost = nlevidence
+              ylabel = '-ln(MARG. postprob)'
+           else
+              marg = .false.
+              nlnpost = nlposterior - 0.5D0*log(2D0*pi) + &
+                   0.5D0*log(hes(indx(1),indx(1)))
+              ylabel = '-ln(postprob)'
+           end if
+           call plot_post(marg, nlnpost, indx(1), desc(indx(1)), &
+                ylabel, top_title, uxmin, uxmax)
+           print *, 'enter x-axis range for replot ([return] to skip)'
+           read (*, '(a)') xrange
+           if (len_trim(xrange) .gt. 0) then
+              read (xrange, *) uxmin, uxmax
+              call plot_post(marg, nlnpost, indx(1), desc(indx(1)), &
+                   ylabel, top_title, uxmin, uxmax)
+           end if
+        end if
+        if (yesno('Plot 2d cut through -ln(postprob)', 'no')) then
+           do
+              print *, 'enter variable numbers for x and y axes'
+              read *, indx
+              if (indx(1) <= length .and. indx(2) <= length) exit
+           end do
+           x0 = sol(indx(1), 1)
+           if (sol(indx(1), 2) == 0D0) then
+              !was problem calculating errors from hessian
+              xsig = model_prior(x_pos(indx(1), 1), x_pos(indx(1), 2))
+           else
+              xsig = sol(indx(1), 2)
+           end if
+           uxmin = x0 - 3*xsig
+           uxmax = x0 + 3*xsig
+           y0 = sol(indx(2), 1)
+           if (sol(indx(2), 2) == 0D0) then
+              !was problem calculating errors from hessian
+              ysig = model_prior(x_pos(indx(2), 1), x_pos(indx(2), 2))
+           else
+              ysig = sol(indx(2), 2)
+           end if
+           uymin = y0 - 3*ysig
+           uymax = y0 + 3*ysig
+           if (yesno('Marginalise over other variables', 'no')) then
+              marg = .true.
+              nlnpost = nlevidence
+              top_title = trim(top_title)//': -ln(MARG. postprob)'
+           else
+              marg = .false.
+              nlnpost = nlposterior - 0.5D0*log(2D0*pi) + &
+                   0.5D0*log(hes(indx(1),indx(1))) !!
+              top_title = trim(top_title)//': -ln(postprob)'
+           end if
+           call plot_post2d(marg, nlnpost, indx, desc(indx(1)), &
+                desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
+           print *, 'enter x-axis range for replot ([return] to skip)'
+           read (*, '(a)') xrange
+           if (len_trim(xrange) .gt. 0) then
+              print *, 'enter y-axis range for replot'
+              read *, uymin, uymax
+              call plot_post2d(marg, nlnpost, indx, desc(indx(1)), &
+                   desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
+           end if
         end if
      end if
 

@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.15 2005/05/24 12:53:06 jsy1001 Exp $
+# $Id: makefile,v 1.16 2005/06/28 16:13:27 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -7,11 +7,14 @@ SHELL = /bin/sh
 # Sun Workshop Fortran 95
 F90 = /opt/SUNWspro/bin/f90
 FLINK = /opt/SUNWspro/bin/f90
-FFLAGC = -C -g -dalign -I/opt/local/include
-FFLAGL = -dalign -lf77compat
+#FFLAGC = -C -g -dalign -I/opt/local/include
+#FFLAGL = -dalign -lf77compat
+FFLAGC = -fast -dalign -I/opt/local/include
+FFLAGL = -fast -dalign -lf77compat
 pgplot_libs = -lpgplot -lX11
 fitsio_libs = -lfitsio
 pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+nag_libs = -lnag
 fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Solaris
@@ -22,6 +25,7 @@ fftw_libs = -lrfftw -lfftw -lm
 #pgplot_libs = -lpgplot -lX11
 #fitsio_libs = -lfitsio
 #pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+#nag_libs = -lnag
 #fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Linux
@@ -33,22 +37,23 @@ fftw_libs = -lrfftw -lfftw -lm
 #pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
 #fitsio_libs = -lfitsio
 #pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+#nag_libs = -lnag
 #fftw_libs = -L/usr/local/lib -lrfftw -lfftw -lm
 
 # *** Modify above this line for your system ***
 
 OBJECTS = maths.o fit.o visibility.o inout.o plot.o model.o \
-	gamma.o rjbesl.o
-MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
+	gamma.o rjbesl.o marginalise.o
+MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod marginalise.mod
 
 
 all: mfit clfit calc mplot ;
 
 mfit: main.o $(OBJECTS)
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs)  $(nag_libs) $(pda_libs) $(fftw_libs)
 
 clfit: clfit.o f2kcli.o $(OBJECTS)
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs)  $(nag_libs) $(pda_libs) $(fftw_libs)
 
 calc: calc.o maths.o gamma.o rjbesl.o
 	$(FLINK) $(FFLAGL) $^ -o $@ $(pda_libs)
@@ -85,11 +90,14 @@ visibility.o visibility.mod: visibility.f90 maths.mod model.mod
 inout.o inout.mod: inout.f90
 	$(F90) -c $(FFLAGC) inout.f90
 
-plot.o plot.mod: plot.f90 model.mod fit.mod
+plot.o plot.mod: plot.f90 model.mod fit.mod marginalise.mod
 	$(F90) -c $(FFLAGC) plot.f90
 
 model.o model.mod: model.f90 maths.mod
 	$(F90) -c $(FFLAGC) model.f90
+
+marginalise.o marginalise.mod: marginalise.f90 fit.mod model.mod
+	$(F90) -c $(FFLAGC) marginalise.f90
 
 gamma.o: gamma.f
 	$(F90) -c $(FFLAGC) gamma.f

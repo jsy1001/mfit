@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.17 2005/06/03 09:47:58 jsy1001 Exp $
+!$Id: inout.f90,v 1.18 2005/06/28 16:13:27 jsy1001 Exp $
 
 module Inout
 
@@ -8,11 +8,13 @@ module Inout
 !read_nvis
 !read_mapdat
 !read_oi_fits
+!yesno
 !
 !For internal use:
 !read_oi_wavelength
 !read_oi_vis2
 !read_oi_t3
+!DateToMjd
 
 implicit none
 
@@ -994,6 +996,29 @@ function DateToMjd(year, month, day)
   DateToMjd = jul - 2400001
 
 end function DateToMjd
+
+!==============================================================================
+
+function yesno(prompt, default)
+
+  !Get yes/no response
+  character(len=*), intent(in) :: prompt, default
+  logical yesno
+  character(len=128) :: response
+
+  print *, trim(prompt), ' [', default, '] ?'
+  read (*, '(a)') response
+  if (len_trim(response) == 0) then
+     response = default
+     print '(a)', trim(response)
+  end if
+  if (response(1:1) == 'y' .or. response(1:1) == 'Y') then
+     yesno = .true.
+  else
+     yesno = .false.
+  end if
+
+end function yesno
 
 !==============================================================================
 

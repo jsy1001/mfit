@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.8 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: model.f90,v 1.9 2005/06/28 16:13:27 jsy1001 Exp $
 
 module Model
 
@@ -566,11 +566,16 @@ subroutine read_model(info, file_name, wavebands)
   symm = .true.
   do i = 1, size(model_param, 1)
      !need all epsilon fixed at unity
-     if (.not.((model_param(i,7)==1D0).and.(model_prior(i,7)==0D0))) &
-          symm = .false.
+     ipar = 9 + (4*model_wldep(1) + model_wldep(2))*(nwave-1)
+     do j = 1, 1+model_wldep(3)*(nwave-1)
+        if (.not.((model_param(i,ipar+(j-1)*3)==1D0) &
+             .and.(model_prior(i,ipar+(j-1)*3)==0D0))) symm = .false.
+     end do
      !and all r fixed at zero
-     if (.not.((model_param(i,2)==0D0).and.(model_prior(i,2)==0D0))) &
-          symm = .false.
+     do j = 1, 1+model_wldep(1)*(nwave-1)
+        if (.not.((model_param(i,2+(j-1)*4)==0D0) &
+             .and.(model_prior(i,2+(j-1)*4)==0D0))) symm = .false.
+     end do
   end do
 
   deallocate(wb) !free local storage

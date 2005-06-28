@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.7 2005/06/03 09:47:58 jsy1001 Exp $
+# $Id: fitgui.py,v 1.8 2005/06/28 16:13:27 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.7 $")[1]
+_revision = string.split("$Revision: 1.8 $")[1]
 
 
 class GUI:
@@ -71,13 +71,22 @@ class GUI:
         self.nofit.set(0)
         self.plots = ['No plot', 'uv', 'vis2', 't3amp', 't3phi',
                       'vis2wl', 't3ampwl', 't3phiwl',
-                      'vis2mjd', 't3ampmjd', 't3phimjd', 'post']
+                      'vis2mjd', 't3ampmjd', 't3phimjd', 'post', 'mpost',
+                      'post2d', 'mpost2d']
         self.selPlot = StringVar()
         self.selPlot.set(self.plots[1])
-        self.plotIndex = StringVar()
-        self.plotIndex.set('1')
-        self.plotFrom = StringVar()
-        self.plotTo = StringVar()
+        self.plotXIndex = StringVar()
+        self.plotXIndex.set('1')
+        self.plotYIndex = StringVar()
+        self.plotYIndex.set('2')
+        self.plotXFrom = StringVar()
+        self.plotXTo = StringVar()
+        self.plotYFrom = StringVar()
+        self.plotYTo = StringVar()
+        self.margErr = IntVar()
+        self.margErr.set(0)
+        self.margErrVar = StringVar()
+        self.margErrVar.set('1')
 
         # Initialise GUI elements
         fileFrame = Frame(parent)
@@ -121,28 +130,42 @@ class GUI:
         for i in range(len(self.plots)):
             p = self.plots[i]
             Radiobutton(plotFrame, text=p, variable=self.selPlot,
-                        value=p).grid(row=i/2, column=i%2, sticky='w')
-        Entry(plotFrame, textvariable=self.plotIndex,
-              width=3).grid(row=len(self.plots), column=(len(self.plots)-1)%2)
-        Label(midFrame1, text='From:').pack(side=LEFT)
-        Entry(midFrame1, textvariable=self.plotFrom, width=5).pack(side=LEFT)
-        Label(midFrame1, text='To:').pack(side=LEFT)
-        Entry(midFrame1, textvariable=self.plotTo, width=5).pack(side=LEFT)
+                        value=p).grid(row=(i+1)/2, column=(i+1)%2, sticky=W)
+        Entry(plotFrame, textvariable=self.plotXIndex,
+              width=3).grid(row=len(self.plots)/2-1, column=2)
+        Entry(plotFrame, textvariable=self.plotYIndex,
+              width=3).grid(row=len(self.plots)/2, column=2)
+        rangeFrame = Frame(midFrame1)
+        rangeFrame.pack(side=LEFT)
+        Label(rangeFrame, text='X From:').grid(row=0, column=0, sticky=E)
+        Entry(rangeFrame, textvariable=self.plotXFrom, width=5).grid(row=0, column=1)
+        Label(rangeFrame, text='To:').grid(row=0, column=2)
+        Entry(rangeFrame, textvariable=self.plotXTo, width=5).grid(row=0, column=3)
+        Label(rangeFrame, text='[(m)post2d only] Y From:').grid(row=1, column=0, sticky=E)
+        Entry(rangeFrame, textvariable=self.plotYFrom, width=5).grid(row=1, column=1)
+        Label(rangeFrame, text='To:').grid(row=1, column=2)
+        Entry(rangeFrame, textvariable=self.plotYTo, width=5).grid(row=1, column=3)
         Button(midFrame1, text='Go', command=self.Go).pack(side=RIGHT,
                                                            anchor=NE, padx=4)
         Button(midFrame1, text='Save model',
                command=self.SaveModel).pack(side=RIGHT, anchor=NE, padx=4)
         Button(midFrame1, text='Load model',
                command=self.LoadModel).pack(side=RIGHT, anchor=NE, padx=4)
-        Checkbutton(parent, text="Don't fit (report goodness-of-fit only)",
-                    variable=self.nofit).pack(side=TOP, anchor=W, pady=4)
         midFrame2 = Frame(parent)
-        midFrame2.pack(side=TOP, fill=X)
-        Label(midFrame2, text='Results:').pack(side=LEFT, anchor=SW)
+        midFrame2.pack(side=TOP, fill=X, pady=4)
+        Checkbutton(midFrame2, text="Don't fit (report goodness-of-fit only)",
+                    variable=self.nofit).pack(side=LEFT, anchor=W, padx=8)
+        Entry(midFrame2, textvariable=self.margErrVar,
+              width=5).pack(side=LEFT, anchor=W)
+        Checkbutton(midFrame2, text="Error bar by marginalising",
+                    variable=self.margErr).pack(side=LEFT, anchor=W)
+        midFrame3 = Frame(parent)
+        midFrame3.pack(side=TOP, fill=X)
+        Label(midFrame3, text='Results:').pack(side=LEFT, anchor=SW)
         if dismissCommand is None: dismissCommand = parent.quit
-        Button(midFrame2, text='Dismiss',
+        Button(midFrame3, text='Dismiss',
                command=dismissCommand).pack(side=RIGHT, padx=4, pady=4)
-        Button(midFrame2, text='Clear results',
+        Button(midFrame3, text='Clear results',
                command=self.ClearResults).pack(side=RIGHT, padx=4, pady=4)
         self.Results = ScrolledText(parent, height=31, width=90,
                                     font=('Courier', 10), state=DISABLED)
@@ -248,25 +271,41 @@ class GUI:
             pass
         p = self.selPlot.get()
         if p != self.plots[0]: # not 'No plot'
-            if p == 'post':
+            if p == 'post' or p == 'mpost':
                 try:
-                    index = int(self.plotIndex.get())
+                    index = int(self.plotXIndex.get())
                 except ValueError:
                     index = 1
+            if p == 'post2d' or p == 'mpost2d':
+                try:
+                    indx = (int(self.plotXIndex.get()),
+                            int(self.plotYIndex.get()))
+                except ValueError:
+                    indx = (1, 2)
             try:
-                xmin = float(self.plotFrom.get())
-                xmax = float(self.plotTo.get())
+                xmin = float(self.plotXFrom.get())
+                xmax = float(self.plotXTo.get())
+                if p[-2:] == '2d':
+                    ymin = float(self.plotYFrom.get())
+                    ymax = float(self.plotYTo.get())
             except ValueError:
-                if p == 'post':
-                    optText += ' --plot post %d' % index
+                if p == 'post' or p == 'mpost':
+                    optText += ' --plot %s %d' % (p, index)
+                elif p == 'post2d' or p == 'mpost2d':
+                    optText += ' --plot %s %d %d' % (p, indx[0], indx[1])
                 else:
                     optText += ' --plot %s' % p
             else:
-                if p == 'post':
-                    optText += ' --zoomplot post %d %.3f %.3f' % (index, xmin, xmax)
+                if p == 'post' or p == 'mpost':
+                    optText += ' --zoomplot %s %d %.3f %.3f' % (p, index, xmin, xmax)
+                elif p == 'post2d' or p == 'mpost2d':
+                    optText += ' --zoomplot %s %d %d %.3f %.3f  %.3f %.3f' % \
+                               (p, indx[0], indx[1], xmin, xmax, ymin, ymax)
                 else:
                     optText += ' --zoomplot %s %.3f %.3f' % (p, xmin, xmax)
         if self.nofit.get(): optText += ' --nofit'
+        if self.margErr.get():
+            optText += ' --margerr %s' % (self.margErrVar.get())
         command = '%s%s --device %s %s %s' % (
             self.exe, optText, self.device, self.fileName.get(),
             self._tempName)
