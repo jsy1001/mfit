@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.22 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: main.f90,v 1.23 2005/09/13 09:52:51 jsy1001 Exp $
 
 program Main
 
@@ -485,22 +485,19 @@ program Main
            uymax = y0 + 3*ysig
            if (yesno('Marginalise over other variables', 'no')) then
               marg = .true.
-              nlnpost = nlevidence
               top_title = trim(top_title)//': -ln(MARG. postprob)'
            else
               marg = .false.
-              nlnpost = nlposterior - 0.5D0*log(2D0*pi) + &
-                   0.5D0*log(hes(indx(1),indx(1))) !!
               top_title = trim(top_title)//': -ln(postprob)'
            end if
-           call plot_post2d(marg, nlnpost, indx, desc(indx(1)), &
+           call plot_post2d(marg, nlposterior, indx, desc(indx(1)), &
                 desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               print *, 'enter y-axis range for replot'
               read *, uymin, uymax
-              call plot_post2d(marg, nlnpost, indx, desc(indx(1)), &
+              call plot_post2d(marg, nlposterior, indx, desc(indx(1)), &
                    desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
            end if
         end if

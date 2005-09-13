@@ -1,4 +1,4 @@
-!$Id: marginalise.f90,v 1.1 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: marginalise.f90,v 1.2 2005/09/13 09:52:51 jsy1001 Exp $
 
 module Marginalise
 
@@ -109,6 +109,7 @@ contains
     do iv = 1, size(x_pos, 1)
        if (mg_marg(iv)) then
           ndim = ndim + 1
+          mg_var(iv) = fit_param(x_pos(iv, 1), x_pos(iv, 2)) !needed for prior
        else
           mg_param(x_pos(iv, 1), x_pos(iv, 2)) = mg_var(iv)
        end if
@@ -119,6 +120,8 @@ contains
     lhd = likelihood(vis_data, triple_data, model_spec, mg_param)
     pri = prior(mg_var, x_pos, model_param, model_prior)
     post = lhd + pri - mg_nlnorm
+    !BUT, if model very improbable, a small *fractional* reduction in
+    !chi-squared from varying marginalised parameters can still cause overflow
 
     !special case - no marginalisation to do
     if (ndim == 0) then
@@ -141,13 +144,14 @@ contains
           if (alim(idim) < x_info(iv, 2)) alim(idim) = x_info(iv, 2)
           if (blim(idim) > x_info(iv, 3)) blim(idim) = x_info(iv, 3)
           !beware periodicities in theta
-          do iwave = 1, nwave
-             if (x_pos(iv, 2) == 3+4*model_wldep(1)*(iwave-1)) then
-                alim(idim) = modulo(alim(idim), 360D0)
-                blim(idim) = modulo(blim(idim), 360D0)
-                if (alim(idim) >= blim(idim)) alim(idim) = alim(idim) - 360D0
-             end if
-          end do
+          !!CAUSES PROBS for relto theta
+          !do iwave = 1, nwave
+          !   if (x_pos(iv, 2) == 3+4*model_wldep(1)*(iwave-1)) then
+          !      alim(idim) = modulo(alim(idim), 360D0)
+          !      blim(idim) = modulo(blim(idim), 360D0)
+          !      if (alim(idim) >= blim(idim)) alim(idim) = alim(idim) - 360D0
+          !   end if
+          !end do
           idim = idim + 1
        end if
     end do
@@ -156,7 +160,7 @@ contains
     if (ndim >= 2) then
        minpts = 1
        alpha = 2**ndim + 2*ndim**2 + 2*ndim + 1
-       maxpts = 10000*alpha
+       maxpts = 50000*alpha
        lenwrk = (ndim+2)*(1+maxpts/alpha)
        if (lenwrk < (2*ndim + 4)) lenwrk = 2*ndim + 4
        allocate(wrk(lenwrk))
@@ -250,7 +254,7 @@ contains
 
     !local variables
     integer :: iv, iz
-    double precision :: lhd, pri
+    double precision :: lhd, pri, lprob
 
     !copy subset of variable parameters in z to mg_param and mg_var,
     !otherwise use fit_param values (copied in marg_post)
@@ -266,7 +270,15 @@ contains
     !neg log posterior = neg log likelihood + neg log prior - neg log evidence
     lhd = likelihood(vis_data, triple_data, model_spec, mg_param)
     pri = prior(mg_var, x_pos, model_param, model_prior) !initial guesses in model_param
-    prob = exp(-(lhd + pri - mg_nlnorm - post))
+    lprob = -(lhd + pri - mg_nlnorm - post)
+    !As above, if model very improbable, a small *fractional* reduction in
+    !chi-squared from varying marginalised parameters can cause overflow
+    if (lprob < 500D0) then
+       prob = exp(lprob)
+    else
+       prob = exp(500D0)
+    end if
+    !!print '(5f9.1,g11.3)', lhd, pri, mg_nlnorm, post, lprob, prob
 
   end function prob
 

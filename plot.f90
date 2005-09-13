@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.15 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: plot.f90,v 1.16 2005/09/13 09:52:51 jsy1001 Exp $
 
 module Plot
   
@@ -580,7 +580,7 @@ contains
        mg_marg(indx) = .false.
        mg_param = fit_param
     else
-       num_points = 100
+       num_points = 50
     end if
     allocate(post_points(num_points, 2))
     do i = 1, num_points
@@ -642,16 +642,19 @@ contains
 
   !============================================================================
 
-  subroutine plot_post2d(plotmargd, nlevidence, indx, &
+  subroutine plot_post2d(plotmargd, nlposterior, indx, &
        x_title, y_title, top_title, uxmin, uxmax, uymin, uymax, device)
 
+    !nlposterior is minimum of negative log posterior (in case this is not
+    ! sufficiently close to a grid point), needed to plot correct n-sigma
+    ! contours in unmarginalised case
     !indx(i) is into x_pos array of variable parameters
     !x_pos, x_info must be initialised on entry to this routine i.e. must have
-    !called minimiser() from Fit module
+    ! called minimiser() from Fit module
 
     !subroutine arguments
     logical, intent(in) :: plotmargd
-    double precision, intent(in) :: nlevidence
+    double precision, intent(in) :: nlposterior
     integer, intent(in), dimension(2) :: indx
     character(len=*), intent(in) :: x_title, y_title, top_title
     double precision, intent(in) :: uxmin, uxmax
@@ -669,8 +672,9 @@ contains
     logical :: invgray
     real, dimension(6) :: tr
     real fg, bg
-    integer, parameter :: nlevs_max=6
-    real, dimension(nlevs_max) :: levs, plevs=(/0.50,1.36,2.00,3.32,4.50,7.55/)
+    integer, parameter :: nlevs_max=3
+    !delta (chi^2)/2 values for 2-parameter 1-, 2-, 3-sigma confidence regions
+    real, dimension(nlevs_max) :: levs=(/1.15,3.08,5.90/)
 
     !functions
     integer :: pgopen
@@ -722,9 +726,9 @@ contains
 
     !calculate grid of points
     if (plotmargd) then
-       num_points = 10
-    else
        num_points = 20
+    else
+       num_points = 40
     end if
     allocate(post_points(num_points, num_points))
     do i = 1, num_points
@@ -736,7 +740,7 @@ contains
              mg_param(x_pos(indx(2), 1), x_pos(indx(2), 2)) = yval
              mg_var(indx(1)) = xval
              mg_var(indx(2)) = yval
-             mg_nlnorm = nlevidence
+             mg_nlnorm = nlposterior
              post_points(i, j) = marg_post(info)
              if (info /= '') print *, trim(info)
           else
@@ -746,7 +750,7 @@ contains
              var_param(indx(2)) = yval
              lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
              pri = prior(var_param, x_pos, model_param, model_prior)
-             post_points(i, j) = lhd + pri - nlevidence !!?
+             post_points(i, j) = lhd + pri - nlposterior
           end if
        end do
     end do
@@ -771,7 +775,12 @@ contains
     tr(3) = 0.
     tr(5) = 0.
 
-    post_points = post_points - minval(post_points) !shift so bottom is zero
+    print *, minval(post_points)
+    if (plotmargd) then
+       !(marginalisation can shift minimum)
+       post_points = post_points - minval(post_points)
+    end if
+
     invgray = .true. !make minimum bright
     if (invgray) then
        fg = minval(post_points)
@@ -783,14 +792,22 @@ contains
     call pggray(post_points, num_points, num_points, &
          1, num_points, 1, num_points, fg, bg, tr)
       
-    do i = 1, size(plevs,1)
-       levs(i) = plevs(i)/100.*maxval(post_points)
-    end do
+    write (51, *) (levs(i), i=1, size(levs,1))
     call pgsci(2)
     call pgcont(post_points, num_points, num_points, &
-         1, num_points, 1, num_points, levs, size(plevs,1), tr)
+         1, num_points, 1, num_points, levs, size(levs,1), tr)
     call pgsci(1)
     call pgbox('ABCNST', 0., 0, 'ABCNST', 0., 0)
+
+    !write plotted points to file
+    do j = 1, num_points
+       yval = ymin + ((j-1.)/(num_points-1.))*(ymax-ymin)
+       do i = 1, num_points
+          xval = xmin + ((i-1.)/(num_points-1.))*(xmax-xmin)
+          write (48, *) xval, yval, post_points(i,j)
+       end do
+       write (48, *)
+    end do
 
     if (allocated(var_param)) deallocate(var_param)
     if (allocated(post_points)) deallocate(post_points)

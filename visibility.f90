@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.11 2005/06/03 09:47:58 jsy1001 Exp $
+!$Id: visibility.f90,v 1.12 2005/09/13 09:52:51 jsy1001 Exp $
 
 module Visibility
 
@@ -47,7 +47,7 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd)
   double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
 
   !local variables
-  integer :: i, iwave, navg, iavg, num_comps, order, iwb, ipar
+  integer :: i, iwave, navg, iavg, num_comps, order, iwb, ipar, relto
   double precision :: r, theta_t0, t0, dtheta_dt, theta
   double precision :: B, a, phi, B_total, lambda1
   double precision :: epsilon, rho, F, x1, x2, x3
@@ -96,8 +96,16 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd)
         !get position r and theta, brightness I
         !major axis a, orientation phi, ellipticity epsilon
         !ld order order, ld parameters alpha
-        r = mas2rad*param(i, 2+4*model_wldep(1)*(iwb-1))
-        theta_t0 = deg2rad*param(i, 3+4*model_wldep(1)*(iwb-1))
+        relto = model_pos_relto(i)
+        if (relto >= 1 .and. relto <= num_comps) then
+           r = mas2rad*param(i, 2+4*model_wldep(1)*(iwb-1)) &
+                *param(relto, 2+4*model_wldep(1)*(iwb-1))
+           theta_t0 = deg2rad*param(i, 3+4*model_wldep(1)*(iwb-1)) &
+                *param(relto, 3+4*model_wldep(1)*(iwb-1))
+        else
+           r = mas2rad*param(i, 2+4*model_wldep(1)*(iwb-1))
+           theta_t0 = deg2rad*param(i, 3+4*model_wldep(1)*(iwb-1))
+        end if
         t0 = param(i, 4+4*model_wldep(1)*(iwb-1))
         dtheta_dt = deg2rad*param(i, 5+4*model_wldep(1)*(iwb-1))
         if (dtheta_dt /= 0D0 .and. mjd < 0D0) stop 'Need observation time for time-dependent model'

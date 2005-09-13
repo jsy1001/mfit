@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.18 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: clfit.f90,v 1.19 2005/09/13 09:52:51 jsy1001 Exp $
 
 program Main
 
@@ -51,7 +51,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.18 $'
+  cvs_rev = '$Revision: 1.19 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -714,15 +714,12 @@ program Main
            end if
            if (sel_plot == 'mpost2d') then
               marg = .true.
-              nlnpost = nlevidence
               top_title = trim(top_title)//': -ln(MARG. postprob)'
            else
               marg = .false.
-              nlnpost = nlposterior - 0.5D0*log(2D0*pi) + &
-                   0.5D0*log(hes(indx(1),indx(1))) !!
               top_title = trim(top_title)//': -ln(postprob)'
            end if
-           call plot_post2d(marg, nlnpost, indx, desc(indx(1)), &
+           call plot_post2d(marg, nlposterior, indx, desc(indx(1)), &
                 desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
         end if
         if (margerr_var >= 1 .and. margerr_var <= length) then

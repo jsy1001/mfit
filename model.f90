@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.9 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: model.f90,v 1.10 2005/09/13 09:52:51 jsy1001 Exp $
 
 module Model
 
@@ -23,6 +23,11 @@ include 'fftw_f77.i'
 !specifies nature of model cpts -
 !holds 3 items per component: 1 name, 2 shape and 3 LD type
 character(len=128), dimension(:,:), allocatable :: model_spec
+
+!if model_pos_relto(icpt) is a valid model component, r & theta for
+!component icpt are treated as multipliers for r & theta for the specified
+!(other) component
+integer, dimension(:), allocatable :: model_pos_relto
 
 !model_wldep(i) is unity if position, flux, shape_param, ld_param respectively
 !is fn(waveband), else zero
@@ -90,7 +95,7 @@ subroutine read_model(info, file_name, wavebands)
   character(len=32), dimension(:), allocatable :: wb
   character(len=128) :: clv_filename, shape_type, ld_type
   character(len=256) :: line
-  integer :: i, j, k, iwave
+  integer :: i, j, k, iwave, loc, relto
   integer :: nlines, comps, order, pos, npar, ipar, nread, nn
   
   !check for zero length filename
@@ -113,11 +118,10 @@ subroutine read_model(info, file_name, wavebands)
      if (len_trim(line) == 0) cycle
      read (line, *) dummy !read keyword & qualifiers
      if (dummy == 'component') comps = comps+1
-     if (dummy(1:16) == 'position#fofwave' &
-          .or. dummy == 'position#rotate#fofwave') then
+     if (index(dummy, '#fofwave') /= 0) then
         model_wldep(1) = 1
-        ! qualifiers could be "#fofwave#rotate" or "#rotate#fofwave"
-        if (dummy(9:15) == '#rotate' .or. dummy(17:23) == '#rotate') then
+        ! qualifiers could be any combination of #fofwave, #rotate, #reltoN
+        if (index(dummy, '#rotate') /= 0) then
            !{r, theta(t0), t0, d(theta)/dt} poss. repeated for each waveband
            nn = (countsym(line)-1)/4
         else
@@ -266,6 +270,7 @@ subroutine read_model(info, file_name, wavebands)
   allocate(model_prior(comps,npar))
   allocate(model_limits(npar,2))
   allocate(model_desc(comps,npar))
+  allocate(model_pos_relto(comps))
   model_param = 0D0
   model_prior = 0D0
   clvcomp = 0 !no model component yet has numerical CLV
@@ -289,7 +294,7 @@ subroutine read_model(info, file_name, wavebands)
   model_limits(1,1:2) = dble((/0,10/))
   numbers = (/' 1',' 2',' 3',' 4',' 5',' 6',' 7',' 8',' 9','10'/)
   do j = 1, comps
-     cpt = 'component '// trim(adjustl(numbers(j))) // ', '
+     cpt = 'cpt '// trim(adjustl(numbers(j))) // ', '
      model_desc(j, 1) = trim(cpt) // ' LD order'
   end do
 
@@ -316,7 +321,7 @@ subroutine read_model(info, file_name, wavebands)
      read (11,*,err=94,end=2) dummy
      if (dummy == 'component') then
         j = j+1
-        cpt = 'component '// trim(adjustl(numbers(j))) // ', '
+        cpt = 'cpt '// trim(adjustl(numbers(j))) // ', '
         
         !read component name
         read (11,*,err=95,end=95) dummy, model_spec(j,1)
@@ -386,6 +391,14 @@ subroutine read_model(info, file_name, wavebands)
         !read position r and theta etc.
         read (11,*,err=95,end=95) dummy
         if (dummy(:8) /= 'position') goto 96
+        loc = index(dummy, '#relto')
+        if (loc /= 0) then
+           read (dummy(loc+6:), *) model_pos_relto(j)
+        else
+           model_pos_relto(j) = 0
+        end if
+        relto = model_pos_relto(j)
+        !loop over wavebands, assign parameter limits and descriptions
         do k = 1, 1+model_wldep(1)*(nwave-1)
            if (j == 1) then
               model_limits(2+(k-1)*4,1:2) = dble((/0, 500/))
@@ -393,24 +406,51 @@ subroutine read_model(info, file_name, wavebands)
               model_limits(4+(k-1)*4,1:2) = dble((/10000, 100000/))
               model_limits(5+(k-1)*4,1:2) = dble((/-1000, 1000/))
            end if
+           if (relto >= 1 .and. relto <= comps) then
+              !allow negative radius multipliers
+              !(really need different limits for relto/non-relto components)
+              model_limits(2+(k-1)*4,1:2) = dble((/-500, 500/))
+           end if
            !defaults for t0 and d(theta)/dt
            model_param(j, 4+(k-1)*4) = 10000D0
            model_param(j, 5+(k-1)*4) = 0D0
            !descriptions
            if (model_wldep(1) == 1) then
-              model_desc(j, 2+(k-1)*4) = trim(cpt) // trim(wb(k)) // ' position radius (mas)'
-              model_desc(j, 3+(k-1)*4) = trim(cpt) // trim(wb(k)) // ' position angle(t0) (deg)'
-              model_desc(j, 4+(k-1)*4) = trim(cpt) // trim(wb(k)) // ' t0 (MJD)'
-              model_desc(j, 5+(k-1)*4) = trim(cpt) // trim(wb(k)) // ' d(PA)/dt (deg/day)'
+              if (relto >= 1 .and. relto <= comps) then
+                 model_desc(j, 2+(k-1)*4) = trim(cpt) // trim(wb(k)) &
+                      // ' position radius as multiple of cpt ' &
+                      // trim(adjustl(numbers(relto))) // ' radius'
+                 model_desc(j, 3+(k-1)*4) = trim(cpt) // trim(wb(k)) &
+                      // ' position angle(t0) as multiple of cpt ' &
+                      // trim(adjustl(numbers(relto))) // ' angle'
+              else
+                 model_desc(j, 2+(k-1)*4) = trim(cpt) // trim(wb(k)) &
+                      // ' position radius (mas)'
+                 model_desc(j, 3+(k-1)*4) = trim(cpt) // trim(wb(k)) &
+                      // ' position angle(t0) (deg)'
+              end if
+              model_desc(j, 4+(k-1)*4) = trim(cpt) // trim(wb(k)) &
+                   // ' t0 (MJD)'
+              model_desc(j, 5+(k-1)*4) = trim(cpt) // trim(wb(k)) &
+                   // ' d(PA)/dt (deg/day)'
            else
-              model_desc(j, 2+(k-1)*4) = trim(cpt) // ' position radius (mas)'
-              model_desc(j, 3+(k-1)*4) = trim(cpt) // ' position angle(t0) (deg)'
+              if (relto >= 1 .and. relto <= comps) then
+                 model_desc(j, 2+(k-1)*4) = trim(cpt) &
+                      // ' position radius as multiple of cpt ' &
+                      // trim(adjustl(numbers(relto))) // ' radius'
+                 model_desc(j, 3+(k-1)*4) = trim(cpt) &
+                      // ' position angle(t0) as multiple of cpt ' &
+                      // trim(adjustl(numbers(relto))) // ' angle'
+              else
+                 model_desc(j, 2+(k-1)*4) = trim(cpt) // ' position radius (mas)'
+                 model_desc(j, 3+(k-1)*4) = trim(cpt) // ' position angle(t0) (deg)'
+              end if
               model_desc(j, 4+(k-1)*4) = trim(cpt) // ' t0 (MJD)'
               model_desc(j, 5+(k-1)*4) = trim(cpt) // ' d(PA)/dt (deg/day)'
            end if
         end do
-        ! qualifiers could be "#fofwave#rotate" or "#rotate#fofwave"
-        if (dummy(9:15) == '#rotate' .or. dummy(17:23) == '#rotate') then
+        ! qualifiers could be any combination of #fofwave, #rotate, #reltoN
+        if (index(dummy, '#rotate') /= 0) then
            !{r, theta(t0), t0, d(theta)/dt} poss. repeated for each waveband
            backspace(11)
            nread = 4*(1 + model_wldep(1)*(nwave-1))
@@ -725,6 +765,7 @@ subroutine free_model()
   if (allocated(model_prior)) deallocate(model_prior)
   if (allocated(model_limits)) deallocate(model_limits)
   if (allocated(model_desc)) deallocate(model_desc)
+  if (allocated(model_pos_relto)) deallocate(model_pos_relto)
   call free_clv()
 
 end subroutine free_model

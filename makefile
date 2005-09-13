@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.16 2005/06/28 16:13:27 jsy1001 Exp $
+# $Id: makefile,v 1.17 2005/09/13 09:52:51 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -7,10 +7,10 @@ SHELL = /bin/sh
 # Sun Workshop Fortran 95
 F90 = /opt/SUNWspro/bin/f90
 FLINK = /opt/SUNWspro/bin/f90
-#FFLAGC = -C -g -dalign -I/opt/local/include
-#FFLAGL = -dalign -lf77compat
-FFLAGC = -fast -dalign -I/opt/local/include
-FFLAGL = -fast -dalign -lf77compat
+FFLAGC = -C -g -dalign -I/opt/local/include
+FFLAGL = -dalign -lf77compat
+#FFLAGC = -fast -dalign -I/opt/local/include
+#FFLAGL = -fast -dalign -lf77compat
 pgplot_libs = -lpgplot -lX11
 fitsio_libs = -lfitsio
 pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
