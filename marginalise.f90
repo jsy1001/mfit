@@ -1,4 +1,4 @@
-!$Id: marginalise.f90,v 1.2 2005/09/13 09:52:51 jsy1001 Exp $
+!$Id: marginalise.f90,v 1.3 2006/08/07 16:51:30 jsy1001 Exp $
 
 module Marginalise
 
@@ -311,7 +311,7 @@ contains
     !local variables
     double precision x0, x1, sigma, rtb
     double precision dx, xmid, fmid
-    integer sign, nb, i, j, ifail
+    integer nb, i, j, ifail
     integer, parameter :: max_iter = 20
     real, parameter :: tol = 0.1
     integer, dimension(2), parameter :: sign = (/1, -1/)

@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.17 2005/09/13 09:52:51 jsy1001 Exp $
+# $Id: makefile,v 1.18 2006/08/07 16:51:30 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -9,7 +9,7 @@ F90 = /opt/SUNWspro/bin/f90
 FLINK = /opt/SUNWspro/bin/f90
 FFLAGC = -C -g -dalign -I/opt/local/include
 FFLAGL = -dalign -lf77compat
-#FFLAGC = -fast -dalign -I/opt/local/include
+#FFLAGC = -g -fast -dalign -I/opt/local/include
 #FFLAGL = -fast -dalign -lf77compat
 pgplot_libs = -lpgplot -lX11
 fitsio_libs = -lfitsio
@@ -30,12 +30,11 @@ fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Linux
 #F90 = /usr/local/bin/f95
-#FLINK = f77
+#FLINK = /usr/local/bin/f95
 #FFLAGC = -g -mismatch -I/usr/local/include
-# Not sure about next line
 #FFLAGL = -lg2c -lm
 #pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
-#fitsio_libs = -lfitsio
+#fitsio_libs = -L/star/lib -lfitsio
 #pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
 #nag_libs = -lnag
 #fftw_libs = -L/usr/local/lib -lrfftw -lfftw -lm
@@ -95,6 +94,8 @@ plot.o plot.mod: plot.f90 model.mod fit.mod marginalise.mod
 
 model.o model.mod: model.f90 maths.mod
 	$(F90) -c $(FFLAGC) model.f90
+# work around problems compiling on AP linux cluster
+#	$(F90) -f77 -c $(FFLAGC) model.f90
 
 marginalise.o marginalise.mod: marginalise.f90 fit.mod model.mod
 	$(F90) -c $(FFLAGC) marginalise.f90
