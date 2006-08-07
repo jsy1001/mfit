@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.16 2005/09/13 09:52:51 jsy1001 Exp $
+!$Id: plot.f90,v 1.17 2006/08/07 17:42:49 jsy1001 Exp $
 
 module Plot
   
@@ -7,6 +7,8 @@ module Plot
   use Marginalise
 
   !subroutines contained:
+  !
+  !plot_model_pts - call PGPLOT to plot model points; save points to file
   !
   !plot_triple_phase_bas - plot closure phase against longest proj. baseline
   !in triangle
@@ -33,6 +35,43 @@ module Plot
   implicit none
 
 contains
+
+  !============================================================================
+
+  subroutine plot_model_pts(x_title, y_title, n, pts, symbol)
+
+    !subroutine arguments
+    character(len=*), intent(in) :: x_title, y_title
+    integer, intent(in) :: n, symbol
+    real, dimension(:, :), intent(in) :: pts
+
+    !local variables
+    integer, parameter :: iunit = 12
+    character(len=*), parameter :: modpts_filename = 'model_pts.dat'
+    integer :: i
+
+    !plot points/line
+    if (symbol > 0) then
+       call pgpt(n, pts(:, 1), pts(:, 2), symbol)
+    else
+       call pgline(n, pts(:, 1), pts(:, 2))
+    end if
+
+    !save points to text file, suitable for use with e.g. gnuplot
+    open (unit=iunit, file=modpts_filename, status='replace', action='write', &
+         err=91)
+    write (iunit, '(a)') '# Model points from last mfit plot'
+    write (iunit, '(a, 2a20)') '# ', trim(x_title), trim(y_title)
+    do i = 1, n
+       write (iunit, '(2x, 2f20.6)') pts(i, 1), pts(i, 2)
+    end do
+
+    close (iunit)
+    return
+
+91  print *, 'Cannot open file '//trim(modpts_filename)
+
+  end subroutine plot_model_pts
 
   !============================================================================
 
@@ -160,8 +199,7 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    !!call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
-    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 13)
+    call plot_model_pts(x_title, y_title, num_model, model_points, 13)
 
     if (allocated(data_points)) deallocate(data_points)
     if (allocated(flagged_points)) deallocate(flagged_points)
@@ -291,7 +329,7 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+    call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
     if (allocated(data_points)) deallocate(data_points)
     if (allocated(flagged_points)) deallocate(flagged_points)
@@ -446,10 +484,9 @@ contains
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
     if (mod_line) then
-       call pgline(num_model, model_points(:, 1), model_points(:, 2))
+       call plot_model_pts(x_title, y_title, num_model, model_points, -1)
     else
-       !!call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
-       call pgpt(num_model, model_points(:, 1), model_points(:, 2), 13)
+       call plot_model_pts(x_title, y_title, num_model, model_points, 13)
     end if
 
     if (allocated(data_points)) deallocate(data_points)
@@ -943,7 +980,7 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+    call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
     if (allocated(data_points)) deallocate(data_points)
     if (allocated(flagged_points)) deallocate(flagged_points)
@@ -1080,7 +1117,7 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+    call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
     if (allocated(data_points)) deallocate(data_points)
     if (allocated(flagged_points)) deallocate(flagged_points)
@@ -1215,7 +1252,7 @@ contains
     call pgerry(num_data, data_points(:, 1), &
          data_points(:, 3), data_points(:, 4), 1.0)
     call pgsci(3)
-    call pgpt(num_model, model_points(:, 1), model_points(:, 2), 7)
+    call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
     if (allocated(data_points)) deallocate(data_points)
     if (allocated(flagged_points)) deallocate(flagged_points)
