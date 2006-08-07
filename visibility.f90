@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.12 2005/09/13 09:52:51 jsy1001 Exp $
+!$Id: visibility.f90,v 1.13 2006/08/07 15:02:00 jsy1001 Exp $
 
 module Visibility
 
@@ -19,6 +19,7 @@ module Visibility
 !gaussian          happy - thesis ok
 !hestroffer        happy - agrees with paper
 !gauss_hermite     not happy - db thesis seems incorrect
+!two_layer         happy-ish can take a long time to run
 !clvvis            tested
 
 use Maths !picks up pi parameter from here
@@ -124,9 +125,16 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd)
 
         !configure array of ld parameters
         !nb alpha(0) set differently for different models
-        ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
-             + 3*model_wldep(3))*(nwave-1) + max_order*model_wldep(4)*(iwb-1)
-        alpha(1:order) = param(i, ipar:ipar+order-1)
+        if (trim(spec(i,3)) == 'two-layer') then
+           ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
+                + 3*model_wldep(3))*(nwave-1)
+           alpha(1:4) = param(i, ipar:ipar+3)
+           alpha(5) = param(i, ipar+4+model_wldep(4)*(iwb-1))
+        else
+           ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
+                + 3*model_wldep(3))*(nwave-1) + max_order*model_wldep(4)*(iwb-1)
+           alpha(1:order) = param(i, ipar:ipar+order-1)
+        end if
         
         !loop over wavelengths within bandpass (will normalise later)
         sumvis = 0D0
@@ -162,6 +170,9 @@ function cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd)
                  !alpha is array of gauss-hermite coeffs -20 (0th defined as 1)
                  alpha(0) = 1D0
                  F = gauss_hermite(a, rho, order, alpha)
+              case ('two-layer')
+                 !alpha is array of two-layer atmosphere model parameters
+                 F = two_layer(a,rho,lambda1*1D-9,alpha)
               case default
                  !must be numerical CLV
                  F = clvvis(a, rho, iwb)
@@ -392,6 +403,75 @@ function gauss_hermite(a, rho, nmax, alpha)
   gauss_hermite = (x1/x2)
 
 end function gauss_hermite
+
+!==============================================================================
+
+function two_layer (a, rho, lambda, alpha)
+
+  !subroutine arguments, note alpha is an array of parameters
+  !alpha = <steps> <temp1> <temp2> <r2/r1> <tau>
+  double precision :: two_layer, a, rho, lambda
+  double precision, dimension (0:10) :: alpha !though we only care about 1:4
+
+  !constants
+  double precision :: h = 6.63D-34  !plancks constant
+  double precision :: c = 3.0D+08   !speed of light
+  double precision :: k = 1.38D-23  !boltzmann constant
+
+  !function variables
+  integer :: i, steps
+  double precision :: step_size, cosine, r, sample, norm
+  double precision :: p1, p2
+  steps = int (alpha (1))
+
+  !calculate planck functions
+  p1 = 2 * h * c * c / lambda**5 / (exp (h * c / lambda / k / alpha (2)) -1)
+  p2 = 2 * h * c * c / lambda**5 / (exp (h * c / lambda / k / alpha (3)) -1)
+
+  !calculate intensities and multiply by J0(2PIqr)r as we integrate
+  step_size = a * alpha (4) / steps
+  two_layer = 0
+  norm = 0
+  do i = 1, steps-1, 2
+     r = i * step_size
+     sample = calc_sample (i) * r
+     norm = norm + sample
+     two_layer = two_layer + sample * bess0 (2 * pi * rho * r)
+  end do
+  two_layer = two_layer * 2
+  norm = norm * 2
+  do i = 2, steps-1, 2
+     r = i * step_size
+     sample = calc_sample (i) * r
+     norm = norm + sample
+     two_layer = two_layer + sample * bess0 (2 * pi * rho * r)
+  end do
+  two_layer = two_layer * 2
+  norm = norm * 2
+
+  r = steps * step_size
+  sample = calc_sample (steps) * r
+  norm = norm + sample
+  two_layer = two_layer + sample * bess0 (2 * pi * rho * r)
+
+  two_layer = two_layer / norm
+
+  contains
+
+    function calc_sample (step)
+      integer :: step
+      double precision :: calc_sample, cosine
+
+      cosine = sqrt (1 - (dble (step) / (steps+1))**2)
+      if (r < a) then
+         calc_sample = exp (-alpha (5) / cosine)
+         calc_sample = p1 * calc_sample + p2 * (1 - calc_sample)
+      else
+         calc_sample = p2 * (1 - exp (-2 * alpha (5) / cosine))
+      end if
+    end function calc_sample
+
+end function two_layer
 
 !==============================================================================
 

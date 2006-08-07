@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.18 2005/06/03 09:47:58 jsy1001 Exp $
+!$Id: fit.f90,v 1.19 2006/08/07 15:02:00 jsy1001 Exp $
 
 module Fit
 
@@ -185,8 +185,8 @@ contains
     end do
     !preset limits to values from the limits array used in model input
     do i = 1, n
-       x_info(i,2) = model_limits(x_pos(i,2),1)
-       x_info(i,3) = model_limits(x_pos(i,2),2)
+       x_info(i,2) = model_limits(x_pos(i,1),x_pos(i,2),1)
+       x_info(i,3) = model_limits(x_pos(i,1),x_pos(i,2),2)
        !alpha(1) in hestroffer model must be > 0
        if (trim(model_spec(x_pos(i,1),3)) == 'hestroffer') then
           if (model_wldep(4) == 1) then

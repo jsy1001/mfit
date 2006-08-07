@@ -1,4 +1,4 @@
-!$Id: maths.f90,v 1.6 2005/01/06 18:45:12 jsy1001 Exp $
+!$Id: maths.f90,v 1.7 2006/08/07 15:02:00 jsy1001 Exp $
 
 module Maths
 
@@ -17,6 +17,7 @@ module Maths
 !functions contained
 !
 !argument(z) -   returns the argument of double complex z
+!bess0(x) -      returns 0th order bessel function of double precision x
 !bess1(x) -      returns 1st order bessel function of double precision x
 !comb(n,p) -     returns combinatorial nCp for integers n, p
 !fact(x) -       returns factorial of integer x
@@ -178,6 +179,27 @@ function argument(z)
   argument = atan2(aimag(z), dble(z))
 
 end function argument
+
+!==============================================================================
+
+function bess0(x)
+
+  !function arguments
+  double precision :: bess0, x
+  
+  !local variables
+  integer :: ncalc
+  double precision, dimension(1) :: output
+  
+  call RJBESL(x, 0D0, 1, output, ncalc)
+  if (ncalc .lt. 0) then
+     stop 'maths error: bessel: an argument to RJBESL is out of range'
+  else if (ncalc .lt. 1) then
+     stop 'maths error: bessel: not all requested function values could be calculated accurately'
+  end if
+  bess0 = output (1)
+
+end function bess0
 
 !==============================================================================
 

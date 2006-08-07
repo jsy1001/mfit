@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.10 2005/09/13 09:52:51 jsy1001 Exp $
+!$Id: model.f90,v 1.11 2006/08/07 15:02:00 jsy1001 Exp $
 
 module Model
 
@@ -45,7 +45,9 @@ real, dimension(:, :), allocatable :: model_wb
 ! {r, theta(t0), t0, d(theta)/dt} possibly repeated for each waveband
 ! {brightness}                    possibly repeated for each waveband
 ! {major axis, phi, epsilon}      possibly repeated for each waveband
-! {LD coeffs 1-max_order}         possibly repeated for each waveband
+!  {LD coeffs 1-max_order}         possibly repeated for each waveband
+! EXCEPT for 'ld_type two-layer', which has
+!  {LD coeffs 1-5}                 coeff 5 possibly repeated for each waveband
 double precision, dimension(:,:), allocatable :: model_param
 integer max_order !at least one component has this many LD coeffs
 
@@ -53,7 +55,7 @@ integer max_order !at least one component has this many LD coeffs
 double precision, dimension(:,:), allocatable :: model_prior
 
 !limits on legal values for parameters (both variable and non-variable)
-double precision, dimension(:,:), allocatable :: model_limits
+double precision, dimension(:,:,:), allocatable :: model_limits
 
 !descriptions of model parameters
 character(len=55), dimension(:, :), allocatable :: model_desc
@@ -118,7 +120,7 @@ subroutine read_model(info, file_name, wavebands)
      if (len_trim(line) == 0) cycle
      read (line, *) dummy !read keyword & qualifiers
      if (dummy == 'component') comps = comps+1
-     if (index(dummy, '#fofwave') /= 0) then
+     if (dummy(:8) == 'position' .and. index(dummy, '#fofwave') /= 0) then
         model_wldep(1) = 1
         ! qualifiers could be any combination of #fofwave, #rotate, #reltoN
         if (index(dummy, '#rotate') /= 0) then
@@ -188,6 +190,9 @@ subroutine read_model(info, file_name, wavebands)
               order = 1
            case ('taylor','gauss-hermite') 
               read (11,*,err=95,end=95) dummy, order
+           case ('two-layer')
+              read (11,*,err=95,end=95) dummy
+              order = 5
            case default
               if (ld_type(1:1) == '<') then
                  read (11,*,err=95,end=95) dummy
@@ -202,7 +207,11 @@ subroutine read_model(info, file_name, wavebands)
         if (order > max_order) max_order = order
      else if (dummy == 'ld_param#fofwave') then
         model_wldep(4) = 1
-        nn = (countsym(line)-1)/order
+        if (trim(ld_type) == 'two-layer') then
+           nn = countsym(line)-5
+        else
+           nn = (countsym(line)-1)/order
+        end if
         if (nwave == -1) then
            nwave = nn
         else if (nn /= nwave) then
@@ -268,7 +277,7 @@ subroutine read_model(info, file_name, wavebands)
   npar = npar + max_order*(1 + model_wldep(4)*(nwave-1)) !LD coeffs
   allocate(model_param(comps,npar))
   allocate(model_prior(comps,npar))
-  allocate(model_limits(npar,2))
+  allocate(model_limits(comps,npar,2))
   allocate(model_desc(comps,npar))
   allocate(model_pos_relto(comps))
   model_param = 0D0
@@ -291,9 +300,9 @@ subroutine read_model(info, file_name, wavebands)
   !later to ensure parameter values stay legal. Model values not within
   !these limits trigger error on reading the model
   !Remainder filled in as we read model file
-  model_limits(1,1:2) = dble((/0,10/))
   numbers = (/' 1',' 2',' 3',' 4',' 5',' 6',' 7',' 8',' 9','10'/)
   do j = 1, comps
+     model_limits(j,1,1:2) = dble((/0,10/))
      cpt = 'cpt '// trim(adjustl(numbers(j))) // ', '
      model_desc(j, 1) = trim(cpt) // ' LD order'
   end do
@@ -358,6 +367,9 @@ subroutine read_model(info, file_name, wavebands)
               order = 1
            case ('taylor','gauss-hermite') 
               read (11,*,err=95,end=95) dummy, order
+           case ('two-layer')
+              read (11,*,err=95,end=95) dummy
+              order = 5
            case default
               if (model_spec(j,3)(1:1) == '<') then
                  if (clvcomp /= 0) then
@@ -400,16 +412,13 @@ subroutine read_model(info, file_name, wavebands)
         relto = model_pos_relto(j)
         !loop over wavebands, assign parameter limits and descriptions
         do k = 1, 1+model_wldep(1)*(nwave-1)
-           if (j == 1) then
-              model_limits(2+(k-1)*4,1:2) = dble((/0, 500/))
-              model_limits(3+(k-1)*4,1:2) = dble((/-720, 720/))
-              model_limits(4+(k-1)*4,1:2) = dble((/10000, 100000/))
-              model_limits(5+(k-1)*4,1:2) = dble((/-1000, 1000/))
-           end if
+           model_limits(j,2+(k-1)*4,1:2) = dble((/0, 500/))
+           model_limits(j,3+(k-1)*4,1:2) = dble((/-720, 720/))
+           model_limits(j,4+(k-1)*4,1:2) = dble((/10000, 100000/))
+           model_limits(j,5+(k-1)*4,1:2) = dble((/-1000, 1000/))
            if (relto >= 1 .and. relto <= comps) then
               !allow negative radius multipliers
-              !(really need different limits for relto/non-relto components)
-              model_limits(2+(k-1)*4,1:2) = dble((/-500, 500/))
+              model_limits(j,2+(k-1)*4,1:2) = dble((/-500, 500/))
            end if
            !defaults for t0 and d(theta)/dt
            model_param(j, 4+(k-1)*4) = 10000D0
@@ -475,8 +484,7 @@ subroutine read_model(info, file_name, wavebands)
              model_param(j, ipar:ipar+model_wldep(2)*(nwave-1))
         if (dummy(:4) /= 'flux') goto 96
         do k = 1, 1+model_wldep(2)*(nwave-1)
-           if (j == 1) &
-                model_limits(ipar+(k-1),1:2) = dble((/-100, 100/))
+           model_limits(j,ipar+(k-1),1:2) = dble((/-100, 100/))
            if (model_wldep(2) == 1) then
               model_desc(j, ipar+(k-1)) = trim(cpt) // trim(wb(k)) // ' flux (arb units)'
            else
@@ -498,11 +506,9 @@ subroutine read_model(info, file_name, wavebands)
            model_param(j,ipar+(k-1)*3) = 0D0
            model_param(j,ipar+(k-1)*3+1) = 0D0
            model_param(j,ipar+(k-1)*3+2) = 1D0
-           if (j == 1) then
-              model_limits(ipar+(k-1)*3,1:2) = dble((/0, 1000/))
-              model_limits(ipar+(k-1)*3+1,1:2) = dble((/-720, 720/))
-              model_limits(ipar+(k-1)*3+2,1:2) = dble((/0, 10/))
-           end if
+           model_limits(j,ipar+(k-1)*3,1:2) = dble((/0, 1000/))
+           model_limits(j,ipar+(k-1)*3+1,1:2) = dble((/-720, 720/))
+           model_limits(j,ipar+(k-1)*3+2,1:2) = dble((/0, 10/))
            if (model_wldep(3) == 1) then
               model_desc(j,ipar+(k-1)*3) = trim(cpt) // trim(wb(k)) // ' major axis (mas)'
               model_desc(j,ipar+(k-1)*3+1) = trim(cpt) // trim(wb(k)) // ' orientation (deg)'
@@ -545,36 +551,65 @@ subroutine read_model(info, file_name, wavebands)
               if (dummy(:8) /= 'ld_param') goto 96
               read (11,*,err=95,end=95) dummy
            case default
-              nread = order*(1 + model_wldep(4)*(nwave-1))
+              if (trim(model_spec(j,3)) == 'two-layer') then
+                 nread = 5 + model_wldep(4)*(nwave-1)
+              else
+                 nread = order*(1 + model_wldep(4)*(nwave-1))
+              end if
               read (11,*,err=95,end=95) dummy, &
                    model_param(j, ipar:ipar+nread-1)
               if (dummy(:8) /= 'ld_param') goto 96
               read (11,*,err=95,end=95) dummy, &
                    model_prior(j, ipar:ipar+nread-1)
         end select
-        if (j == 1) then
-           model_limits(ipar: &
+        if (trim(model_spec(j,3)) == 'two-layer') then
+           !different limits for LD parameters if 2-layer component
+           model_limits(j,ipar:ipar+2,1) = 0D0
+           model_limits(j,ipar:ipar+2,2) = 1D5
+           model_limits(j,ipar+3,1) = 1D0
+           model_limits(j,ipar+3,2) = 100D0
+           do k = 1, 1+model_wldep(4)*(nwave-1)
+              model_limits(j,ipar+3+k,1) = 0D0
+              model_limits(j,ipar+3+k,2) = 100D0
+           end do
+        else
+           model_limits(j, ipar: &
                 ipar+max_order*(1 + model_wldep(4)*(nwave-1))-1,1) = -100D0
-           model_limits(ipar: &
+           model_limits(j, ipar: &
                 ipar+max_order*(1 + model_wldep(4)*(nwave-1))-1,2) = 100D0
         end if
         !LD param descriptions
-        do k = 1, int(model_param(j, 1)) !order for this cpt
+        if (trim(model_spec(j,3)) == 'two-layer') then
+           model_desc(j,ipar) = trim(cpt) // ' NStep '
+           model_desc(j,ipar+1) = trim(cpt) // ' Temp1 /K '
+           model_desc(j,ipar+2) = trim(cpt) // ' Temp2 /K '
+           model_desc(j,ipar+3) = trim(cpt) // ' R2/R1 '
            if (model_wldep(4) == 1) then
               do iwave = 1, nwave
-                 model_desc(j, ipar+max_order*(iwave-1)+k-1) = trim(cpt) &
-                      // trim(wb(iwave)) // ' LD parameter ' // adjustl(numbers(k))
+                 model_desc(j,ipar+3+iwave) = trim(cpt) &
+                      // trim(wb(iwave)) // ' Optical depth '
               end do
            else
-              model_desc(j, ipar+k-1) = trim(cpt) // ' LD parameter ' &
-                   // adjustl(numbers(k))
+              model_desc(j,ipar+4) = trim(cpt) // ' Optical depth '
            end if
-        end do
+        else
+           do k = 1, int(model_param(j, 1)) !order for this cpt
+              if (model_wldep(4) == 1) then
+                 do iwave = 1, nwave
+                    model_desc(j, ipar+max_order*(iwave-1)+k-1) = trim(cpt) &
+                         // trim(wb(iwave)) // ' LD parameter ' // adjustl(numbers(k))
+                 end do
+              else
+                 model_desc(j, ipar+k-1) = trim(cpt) // ' LD parameter ' &
+                      // adjustl(numbers(k))
+              end if
+           end do
+        end if
 
         !check to ensure everything inside limits
         do k=1, size(model_limits,1)
-           if (model_param(j,k) < model_limits(k,1)) goto 100
-           if (model_param(j,k) > model_limits(k,2)) goto 100
+           if (model_param(j,k) < model_limits(j,k,1)) goto 100
+           if (model_param(j,k) > model_limits(j,k,2)) goto 100
         end do
         !ensure alpha>0 for hestroffer case
         if (trim(model_spec(j,3)) == 'hestroffer') then
@@ -717,21 +752,41 @@ subroutine print_model()
      print '(1x, a)', trim(line2)
      !ld params
      if (order >= 1) then
-        ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
-             + 3*model_wldep(3))*(nwave-1)
-        line1 = 'LD params:'
-        line2 = '    prior:'
-        do iwave = 1, nwave
-           if (model_wldep(4) == 1) then
-              line1 = trim(line1) // trim(wb(iwave)) //  ':'
-              line2 = trim(line2) // trim(wb(iwave)) //  ':'
-           end if
-           write (ch1, '(10f7.3)') real(model_param(i,ipar+max_order*(iwave-1):ipar+max_order*(iwave-1)+order-1))
-           write (ch2, '(10f7.3)') real(model_prior(i,ipar+max_order*(iwave-1):ipar+max_order*(iwave-1)+order-1))
-           line1 = trim(line1) // trim(ch1)
-           line2 = trim(line2) // trim(ch2)
-           if (model_wldep(4) == 0) exit
-        end do
+        if (trim(model_spec(i,3)) == 'two-layer') then
+           ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
+                + 3*model_wldep(3))*(nwave-1)
+           write (line1, '(a, 4f9.3)') 'LD params:', &
+                real(model_param(i,ipar:ipar+3))
+           write (line2, '(a, 4f9.3)') '    prior:', &
+                real(model_prior(i,ipar:ipar+3))
+           do iwave = 1, nwave
+              if (model_wldep(4) == 1) then
+                 line1 = trim(line1) // trim(wb(iwave)) //  ':'
+                 line2 = trim(line2) // trim(wb(iwave)) //  ':'
+              end if
+              write (ch1, '(f7.3)') real(model_param(i,ipar+3+iwave))
+              write (ch2, '(f7.3)') real(model_prior(i,ipar+3+iwave))
+              line1 = trim(line1) // trim(ch1)
+              line2 = trim(line2) // trim(ch2)
+              if (model_wldep(4) == 0) exit
+           end do
+        else
+           ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
+                + 3*model_wldep(3))*(nwave-1)
+           line1 = 'LD params:'
+           line2 = '    prior:'
+           do iwave = 1, nwave
+              if (model_wldep(4) == 1) then
+                 line1 = trim(line1) // trim(wb(iwave)) //  ':'
+                 line2 = trim(line2) // trim(wb(iwave)) //  ':'
+              end if
+              write (ch1, '(10f7.3)') real(model_param(i,ipar+max_order*(iwave-1):ipar+max_order*(iwave-1)+order-1))
+              write (ch2, '(10f7.3)') real(model_prior(i,ipar+max_order*(iwave-1):ipar+max_order*(iwave-1)+order-1))
+              line1 = trim(line1) // trim(ch1)
+              line2 = trim(line2) // trim(ch2)
+              if (model_wldep(4) == 0) exit
+           end do
+        end if
         print '(1x, a)', trim(line1)
         print '(1x, a)', trim(line2)
      end if
