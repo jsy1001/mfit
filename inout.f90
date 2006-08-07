@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.18 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: inout.f90,v 1.19 2006/08/07 15:00:45 jsy1001 Exp $
 
 module Inout
 
@@ -6,6 +6,7 @@ module Inout
 !
 !read_vis
 !read_nvis
+!read_calib
 !read_mapdat
 !read_oi_fits
 !yesno
@@ -201,6 +202,161 @@ subroutine read_nvis(info, file_name, source, max_lines, vis_data, &
   return
   
   end subroutine read_nvis
+
+!==============================================================================
+
+subroutine read_calib(info, file_name, source, max_lines, vis_data, &
+     waveband, wavebands, calib_error)
+
+  !Reads ouput produced by the MSC V2 calibration applications
+  !wbCalib (wide band) and nbCalib (narrow band)
+  !
+  !Determines which application output it is by looking at item 7 in table
+  !if integer (no '.') it is NChannels and nbCalib data,
+  !if floating point then it is wavelength and wbCalib data
+
+  character(len=*), intent(in) :: file_name
+  character(len=128), intent(out) :: info, source
+  integer, intent(in) :: max_lines
+  double precision, dimension(:,:), allocatable, intent(out) :: vis_data
+  double precision, intent (in) :: waveband
+  double precision, dimension(:,:), allocatable, intent(out) :: wavebands
+  double precision, intent(in) :: calib_error
+
+  !local variables
+  character(len=1024) :: line, dummy
+  integer :: i, j, k, data_items, loc, channels, bands
+  logical :: newband
+  double precision, dimension (:), allocatable :: data
+  double precision :: frac_error
+  
+  !check for zero length filename
+  if (file_name == '') then
+     info = 'blank filename'
+     return
+  end if
+
+  !count number of data lines
+  !if nbCalib data increment data lines by NChannels
+  data_items = 0
+  open (unit=11, status='old', action='read', err=92, file=file_name)
+  do i = 1, max_lines+1
+     read (11, '(a)', err=94, end=1) line
+     line = trim (adjustl (line))
+     if (line(1:1) /= '#' .and. len_trim(line) > 0) then
+        !remove '/' character (confuses read statement)
+        do
+           loc = index (line, '/')
+           if (loc == 0) exit
+           line (loc:loc) = '.'
+        end do
+        !determine if wbCalib or nbCalib and read data from line
+        read (line, *, err=94) source, dummy, dummy, dummy, dummy, dummy, dummy
+        if (index (dummy, '.') /= 0) then
+           data_items = data_items + 1
+        else
+           read (dummy, *, err=94) channels
+           data_items = data_items + channels
+        end if
+     end if
+  end do
+  info = 'file exceeds maximum permitted length'
+  close (11)
+  return
+
+1 close (11)
+
+  !allocate array size
+  if(allocated(vis_data)) deallocate(vis_data)
+  allocate(vis_data(data_items,7))
+
+  !read *Calib data and close
+  i = 1
+  bands = 0
+  open (unit=11, status='old', action='read', err=92, file=file_name)
+  do
+     !read line and check if comment or data
+     read (11, '(a)', err=92, end=2) line
+     line = trim (adjustl (line))
+     if (line(1:1) /= '#' .and. len_trim(line) > 0) then
+        !remove '/' character (confuses read statement)
+        do
+           loc = index (line, '/')
+           if (loc == 0) exit
+           line (loc:loc) = '.'
+        end do
+
+        !determine if wbCalib or nbCalib and read data from line
+        read (line, *, err=94) dummy, dummy, dummy, dummy, dummy, dummy, dummy
+        if (index (dummy, '.') /= 0) then
+           !we have wbCalib data
+           channels = 1
+           allocate (data (7))
+           read (line, *, err=94) dummy, dummy, dummy, dummy, dummy, dummy, &
+                data(1:7), dummy, vis_data(i,3:4)
+        else
+           !we have nbCalib data
+           read (dummy, *, err=94) channels
+           allocate (data (channels*7))
+           read (line, *, err=94) dummy, dummy, dummy, dummy, dummy, dummy, dummy, &
+                data(1:channels*7), dummy, vis_data(i,3:4)
+        end if
+
+        !conform data
+        do j = 0, channels-1
+           vis_data(i+j,1) = data(j*7+1) * 1D+3
+           newband = .true.
+           do k = 1, i+j-1
+              if (vis_data(k,1) == vis_data(i+j,1)) newband = .false.
+           end do
+           if (newband) bands = bands + 1
+           vis_data(i+j,2) = waveband
+           vis_data(i+j,3:4) = vis_data(i,3:4)
+           vis_data(i+j,5) = data(j*7+2)
+           !calculate fractional error on mod V
+           frac_error = sqrt( calib_error**2D0 + (0.5*data(j*7+3)/sqrt(abs(vis_data(i+j,5))))**2D0 )
+           !hence calculate abs error on squared visibility
+           vis_data(i+j,6) = 2D0*frac_error*vis_data(i+j,5)
+           vis_data(i+j,7) = -1D0 !MJD unknown
+        end do
+
+        !deallocate arrays
+        deallocate (data)
+
+        !increment i
+        i = i + channels
+    end if
+  end do
+
+2 close(11)
+
+  !set waveband data
+  allocate (wavebands(bands,2))
+  do i = 1, bands
+     do j = 1, data_items
+        newband = .true.
+        do k = 1, i
+           if (vis_data(j,1) == wavebands(k,1)) newband = .false.
+        end do
+        if (newband) then
+           wavebands(i, 1) = vis_data (j, 1)
+           exit
+        end if
+     end do
+     wavebands(i, 2) = waveband
+  end do
+
+  return
+
+  !error trapping 
+92 info = 'cannot read from file'
+  close (11)
+  return
+94 info = 'unknown read problem - possible invalid file format'
+  close (11)
+  return
+
+end subroutine read_calib
 
 !==============================================================================
 

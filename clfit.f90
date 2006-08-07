@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.19 2005/09/13 09:52:51 jsy1001 Exp $
+!$Id: clfit.f90,v 1.20 2006/08/07 15:00:45 jsy1001 Exp $
 
 program Main
 
@@ -51,7 +51,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.19 $'
+  cvs_rev = '$Revision: 1.20 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -232,6 +232,17 @@ program Main
      !read_oi_fits allocates vis_data, triple_data, and wavebands
      call read_oi_fits(info, file_name, user_target_id, source, &
           vis_data, triple_data, wavebands, calib_error)
+     force_symm = .false.
+
+  else if (ext(len_trim(ext)-4:len_trim(ext)) == 'calib') then
+     !Model is forced to be centrosymmetric (real visibilities)
+     !.*Calib has no waveband data so must be supplied by wavelength range
+     if (wb(2) .eq. -1.0D0) &
+          stop 'need waveband for wbCalib format'
+     print '(1x, a, f8.2, a)', 'Assuming waveband for data is', wb(2), ' nm'
+     call read_calib(info, file_name, source, max_lines, vis_data, &
+          wb(2), wavebands, calib_error)
+     allocate(triple_data(0, 0))
      force_symm = .false.
 
   else
