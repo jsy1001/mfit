@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.17 2006/08/07 17:42:49 jsy1001 Exp $
+!$Id: plot.f90,v 1.18 2006/08/10 08:33:07 jsy1001 Exp $
 
 module Plot
   
@@ -8,7 +8,11 @@ module Plot
 
   !subroutines contained:
   !
-  !plot_model_pts - call PGPLOT to plot model points; save points to file
+  !plot_pts - call PGPLOT to plot points; save points to file
+  !
+  !plot_model_pts - wrapper for plot_pts, used for model points
+  !
+  !plot_data_pts - call PGPLOT to plot data points; optionally save to file
   !
   !plot_triple_phase_bas - plot closure phase against longest proj. baseline
   !in triangle
@@ -38,16 +42,15 @@ contains
 
   !============================================================================
 
-  subroutine plot_model_pts(x_title, y_title, n, pts, symbol)
+  subroutine plot_pts(x_title, y_title, n, pts, symbol, save_filename)
 
     !subroutine arguments
-    character(len=*), intent(in) :: x_title, y_title
+    character(len=*), intent(in) :: x_title, y_title, save_filename
     integer, intent(in) :: n, symbol
     real, dimension(:, :), intent(in) :: pts
 
     !local variables
     integer, parameter :: iunit = 12
-    character(len=*), parameter :: modpts_filename = 'model_pts.dat'
     integer :: i
 
     !plot points/line
@@ -58,20 +61,79 @@ contains
     end if
 
     !save points to text file, suitable for use with e.g. gnuplot
-    open (unit=iunit, file=modpts_filename, status='replace', action='write', &
+    open (unit=iunit, file=save_filename, status='replace', action='write', &
          err=91)
     write (iunit, '(a)') '# Model points from last mfit plot'
-    write (iunit, '(a, 2a20)') '# ', trim(x_title), trim(y_title)
+    write (iunit, '(a, 2a25)') '# ', trim(x_title), trim(y_title)
     do i = 1, n
-       write (iunit, '(2x, 2f20.6)') pts(i, 1), pts(i, 2)
+       write (iunit, '(2x, 2f25.6)') pts(i, 1), pts(i, 2)
     end do
-
     close (iunit)
+
     return
 
-91  print *, 'Cannot open file '//trim(modpts_filename)
+91  print *, 'Cannot open file '//trim(save_filename)
+
+  end subroutine plot_pts
+
+  !============================================================================
+
+  subroutine plot_model_pts(x_title, y_title, n, pts, symbol)
+
+    !subroutine arguments
+    character(len=*), intent(in) :: x_title, y_title
+    integer, intent(in) :: n, symbol
+    real, dimension(:, :), intent(in) :: pts
+
+    !local variables
+    character(len=*), parameter :: save_filename = 'model_pts.dat'
+
+    call plot_pts(x_title, y_title, n, pts, symbol, save_filename)
 
   end subroutine plot_model_pts
+
+  !============================================================================
+
+  subroutine plot_data_pts(x_title, y_title, n, pts, symbol, savepts)
+
+    !subroutine arguments
+    character(len=*), intent(in) :: x_title, y_title
+    integer, intent(in) :: n, symbol
+    real, dimension(:, :), intent(in) :: pts
+    logical, intent(in) :: savepts
+
+    !local variables
+    integer, parameter :: iunit = 12
+    character(len=*), parameter :: save_filename = 'data_pts.dat'
+    integer :: i
+
+    !plot points/line
+    if (symbol > 0) then
+       call pgpt(n, pts(:, 1), pts(:, 2), symbol)
+       call pgerry(n, pts(:, 1), pts(:, 3), pts(:, 4), 1.0)
+    else
+       call pgline(n, pts(:, 1), pts(:, 2))
+       call pgerry(n, pts(:, 1), pts(:, 3), pts(:, 4), 1.0)
+    end if
+
+    if (savepts) then
+       !save points to text file, suitable for use with e.g. gnuplot
+       open (unit=iunit, file=save_filename, status='replace', &
+            action='write', err=91)
+       write (iunit, '(a)') '# Data points from last mfit plot'
+       write (iunit, '(a, 3a25)') '# ', trim(x_title), trim(y_title), 'Error'
+       do i = 1, n
+          write (iunit, '(2x, 3f25.6)') pts(i, 1), pts(i, 2), &
+               0.5*abs(pts(i, 4) - pts(i, 3))
+       end do
+       close (iunit)
+    end if
+
+    return
+
+91  print *, 'Cannot open file '//trim(save_filename)
+
+  end subroutine plot_data_pts
 
   !============================================================================
 
@@ -191,13 +253,10 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
-    call pgerry(num_flagged, flagged_points(:, 1), &
-         flagged_points(:, 3), flagged_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
+         9, .false.)
     call pgsci(1)
-    call pgpt(num_data, data_points(:, 1), data_points(:, 2), 2)
-    call pgerry(num_data, data_points(:, 1), &
-         data_points(:, 3), data_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 13)
 
@@ -321,13 +380,10 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
-    call pgerry(num_flagged, flagged_points(:, 1), &
-         flagged_points(:, 3), flagged_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
+         9, .false.)
     call pgsci(1)
-    call pgpt(num_data, data_points(:, 1), data_points(:, 2), 2)
-    call pgerry(num_data, data_points(:, 1), &
-         data_points(:, 3), data_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
@@ -475,13 +531,10 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
-    call pgerry(num_flagged, flagged_points(:, 1), &
-         flagged_points(:, 3), flagged_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
+         9, .false.)
     call pgsci(1)
-    call pgpt(num_data, data_points(:, 1), data_points(:, 2), 2)
-    call pgerry(num_data, data_points(:, 1), &
-         data_points(:, 3), data_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     if (mod_line) then
        call plot_model_pts(x_title, y_title, num_model, model_points, -1)
@@ -665,11 +718,13 @@ contains
        call pgsci(7)
        call pgsls(2)
     end if
-    call pgline(num_points, post_points(:, 1), post_points(:, 2))
+    call plot_pts(x_title, '-ln(postprob)', num_points, post_points, -1, &
+         'post1d.dat')
     call pgsci(1)
     call pgsls(1)
     if (plotmargd) &
-         call pgline(num_points, mpost_points(:, 1), mpost_points(:, 2))
+         call plot_pts(x_title, y_title, num_points, mpost_points, -1, &
+         'mpost1d.dat')
 
     if (allocated(var_param)) deallocate(var_param)
     if (allocated(post_points)) deallocate(post_points)
@@ -699,6 +754,8 @@ contains
     character(len=*), intent(in), optional :: device
 
     !local variables
+    integer, parameter :: iunit = 12
+    character(len=*), parameter :: save_filename = 'post2d.dat'
     double precision, dimension(:), allocatable :: var_param
     real, dimension(:, :), allocatable :: post_points
     double precision :: xval, yval, lhd, pri
@@ -836,18 +893,28 @@ contains
     call pgsci(1)
     call pgbox('ABCNST', 0., 0, 'ABCNST', 0., 0)
 
-    !write plotted points to file
+    !write plotted points to text file
+    open (unit=iunit, file=save_filename, status='replace', action='write', &
+         err=91)
+    write (iunit, '(a)') &
+         '# -ln(norm. posterior probability) points from last such mfit plot'
+    write (iunit, '(a, 3a25)') '# ', trim(x_title), trim(y_title), &
+         '-ln(postprob/peak)'
     do j = 1, num_points
        yval = ymin + ((j-1.)/(num_points-1.))*(ymax-ymin)
        do i = 1, num_points
           xval = xmin + ((i-1.)/(num_points-1.))*(xmax-xmin)
-          write (48, *) xval, yval, post_points(i,j)
+          write (iunit, '(2x, 3f25.6)') xval, yval, post_points(i,j)
        end do
-       write (48, *)
+       write (iunit, *)
     end do
+    close (iunit)
 
     if (allocated(var_param)) deallocate(var_param)
     if (allocated(post_points)) deallocate(post_points)
+    return
+
+91  print *, 'Cannot open file '//trim(save_filename)
 
   end subroutine plot_post2d
 
@@ -972,13 +1039,10 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
-    call pgerry(num_flagged, flagged_points(:, 1), &
-         flagged_points(:, 3), flagged_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
+         9, .false.)
     call pgsci(1)
-    call pgpt(num_data, data_points(:, 1), data_points(:, 2), 2)
-    call pgerry(num_data, data_points(:, 1), &
-         data_points(:, 3), data_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
@@ -1109,13 +1173,10 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
-    call pgerry(num_flagged, flagged_points(:, 1), &
-         flagged_points(:, 3), flagged_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
+         9, .false.)
     call pgsci(1)
-    call pgpt(num_data, data_points(:, 1), data_points(:, 2), 2)
-    call pgerry(num_data, data_points(:, 1), &
-         data_points(:, 3), data_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
@@ -1244,13 +1305,10 @@ contains
     call pgenv(xmin, xmax, ymin, ymax, 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
-    call pgpt(num_flagged, flagged_points(:, 1), flagged_points(:, 2), 9)
-    call pgerry(num_flagged, flagged_points(:, 1), &
-         flagged_points(:, 3), flagged_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
+         9, .false.)
     call pgsci(1)
-    call pgpt(num_data, data_points(:, 1), data_points(:, 2), 2)
-    call pgerry(num_data, data_points(:, 1), &
-         data_points(:, 3), data_points(:, 4), 1.0)
+    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 7)
 
