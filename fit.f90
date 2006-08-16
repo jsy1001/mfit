@@ -1,18 +1,6 @@
-!$Id: fit.f90,v 1.19 2006/08/07 15:02:00 jsy1001 Exp $
+!$Id: fit.f90,v 1.20 2006/08/16 09:20:22 jsy1001 Exp $
 
 module Fit
-
-!callable subroutines contained
-!
-!minimiser - wrapper to the minimising routine. this subroutine preps
-!            the arrays into true parameter space and fixed model space
-!            before calling the actual minimising alogrithm
-!likelihood - returns negative log likelihood of data given data, model
-!prior - returns negative log prior given model 
-!
-!local subroutines contained
-!
-!posterior - returns negative log posterior of model and data
 
 use Maths
 use Visibility
@@ -20,7 +8,27 @@ use Model
 
 implicit none
 
-!module variables contained:
+private
+
+!callable subroutines contained
+!
+!minimiser - wrapper to the minimising routine. this subroutine preps
+!            the arrays into true parameter space and fixed model space
+!            before calling the actual minimising alogrithm
+!free_fit - frees storage allocated by minimiser
+!likelihood - returns negative log likelihood of data given data, model
+!prior - returns negative log prior given model 
+!
+!local subroutines contained
+!
+!posterior - returns negative log posterior of model and data
+
+public :: minimiser, free_fit, gof, likelihood, prior
+
+!public module variables contained:
+
+public :: vis_data, triple_data, sel_wavebands
+public :: fit_param, x_pos, x_bound
 
 !data arrays
 double precision, dimension(:,:), allocatable :: vis_data, triple_data
@@ -34,11 +42,16 @@ double precision, dimension(:,:), allocatable :: fit_param
 !positions of variable parameters in model_param and fit_param arrays
 integer, dimension(:,:), allocatable :: x_pos
 
-!1st column is of typical length scales for variables and set equal to the
-!prior width. 2nd and 3rd columns hold lower and upper bounds on the
+!1st and 2nd columns hold lower and upper bounds on the
 !value of the parameter in question - used to prevent negative/other illegal
 !values causing problems (esp in visibility calculations)
-double precision, dimension(:,:), allocatable :: x_info
+double precision, dimension(:,:), allocatable :: x_bound
+
+
+!private module variables contained:
+
+!typical length scales for variables
+double precision, dimension(:), allocatable :: x_scale
 
 contains
 
@@ -58,6 +71,7 @@ contains
     ! flag =  4:  Iteration limit (150) exceeded
     ! flag =  5:  Too many large steps,
     !             function may be unbounded
+    ! flag =  6:  position found by minimiser appears not to be a minimum
     !
     !Corresponding message text will be in info,
     !parameter values will be in fit_param
@@ -76,7 +90,7 @@ contains
     !local variables
     integer :: i, j, k, iwave, ipar, n, lwork
     character(len=128) :: name, comp
-    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det
+    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det, grad
     double precision, dimension(:), allocatable ::  x, temp_x, work
     logical :: illegal
 
@@ -99,9 +113,10 @@ contains
        end do
     end do
 
-    !allocate variable array and read in the variables
-    !x is a vector holding the values of the model parameters that are allowed
-    !to vary, x_pos holds the positions of the values in the model_param array
+    !allocate arrays associated with fit variables
+    !x is a vector holding the SCALED values of the model parameters
+    !that are allowed to vary,
+    !x_pos holds the positions of the values in the model_param array
     !that defines the model.
     allocate(x(n))
     allocate(temp_x(n))
@@ -114,7 +129,6 @@ contains
              k = k+1
              x_pos(k,1) = i
              x_pos(k,2) = j
-             x(k) = model_param(i,j)
              desc(k) = model_desc(i,j)
           end if
        end do
@@ -169,35 +183,43 @@ contains
     !fit_param is identical to model_param, it holds the def'n of the model
     !with the difference that fit_param is designed to vary as the model is
     !adjusted to fit. x_pos is used to update the variable parameters in 
-    !the array with their values from x
+    !the array with their values from x (after undoing the scaling)
     if (allocated(fit_param)) deallocate(fit_param)
     allocate(fit_param(size(model_param,1),size(model_param,2)))
     fit_param = model_param
 
-    !compile x_info array
-    !1st column is of typical length scales for variables and set equal to the
-    !prior width. 2nd and 3rd columns hold lower and upper bounds on the
+    !compile x_scale array
+    !contains typical length scales for variables - based on prior width
+    allocate(x_scale(n))
+    do i = 1, n
+       x_scale(i) = 1D-4*model_prior(x_pos(i,1),x_pos(i,2))
+    end do
+
+    !assign initial values of fit variables (=SCALED variable model parameters)
+    do i = 1, n
+       x(i) = model_param(x_pos(i,1),x_pos(i,2))/x_scale(i)
+    end do
+
+    !compile x_bound array
+    !1st and 2nd columns hold lower and upper bounds on the
     !value of the parameter in question - used to prevent negative/other
     !illegal values causing problems (esp in visibility calculations)
-    allocate(x_info(n,3))
-    do i = 1, n
-       x_info(i,1) = model_prior(x_pos(i,1),x_pos(i,2))
-    end do
+    allocate(x_bound(n,2))
     !preset limits to values from the limits array used in model input
     do i = 1, n
-       x_info(i,2) = model_limits(x_pos(i,1),x_pos(i,2),1)
-       x_info(i,3) = model_limits(x_pos(i,1),x_pos(i,2),2)
+       x_bound(i,1) = model_limits(x_pos(i,1),x_pos(i,2),1)
+       x_bound(i,2) = model_limits(x_pos(i,1),x_pos(i,2),2)
        !alpha(1) in hestroffer model must be > 0
        if (trim(model_spec(x_pos(i,1),3)) == 'hestroffer') then
           if (model_wldep(4) == 1) then
              do iwave = 1, nwave
                 if (x_pos(i,2) == (10+(4*model_wldep(1)+model_wldep(2) &
                      +3*model_wldep(3))*(nwave-1) &
-                     + max_order*model_wldep(4)*(iwave-1))) x_info(i,2) = 0D0
+                     + max_order*model_wldep(4)*(iwave-1))) x_bound(i,1) = 0D0
              end do
           else
              if (x_pos(i,2) == (10+(4*model_wldep(1)+model_wldep(2) &
-                  +3*model_wldep(3))*(nwave-1))) x_info(i,2) = 0D0
+                  +3*model_wldep(3))*(nwave-1))) x_bound(i,1) = 0D0
           end if
        end if
     end do
@@ -225,8 +247,10 @@ contains
     temp_x = x !starting point
     call PDA_UNCMND(n, temp_x, posterior, x, nlposterior, flag, work, lwork)
     deallocate(work)
-    ! solution is in x
-    sol(:,1) = x
+    ! scaled solution is in x
+    do i = 1, n
+       sol(i,1) = x(i)*x_scale(i)
+    end do
 
     !set return message
     select case(flag)
@@ -248,8 +272,10 @@ contains
        stop 'Unexpected status value from PDA_UNCMND'
     end select
 
+    !XXX don't trust flag equal to 2 or 3 either?
+    !XXX but almost never get 0 or 1, even when it works!
     if (flag < 0 .or. flag > 3) return ! not a minimum, so skip hessian calc.
-    
+
     !find error in x position more rigorously by considering hessian
     !hessian matrix Aij has components (d2/(dyi*dyj))P({y}) where yi and yj
     !are parameters i and j, P({y}) is the neg log posterior for model with
@@ -261,41 +287,52 @@ contains
     !increments deltai, deltaj are chosen to minimise
     !uncertainty in second derivative in presence of roundoff error
 
-    !find hessian elements (nb Aij=Aji symmetric)
-    deltai = 5D-3
-    deltaj = 5D-3
+    !Find hessian elements (nb Aij=Aji symmetric) by finite differences. Steps
+    !are uniform in SCALED parameters.
+    !We rescale the matrix elements to get the true Hessian that
+    !relates to the unscaled parameters
+    deltai = 1D0
+    deltaj = 1D0
     do i = 1, n
        do j = 1, i
-          temp_x = sol(:,1)
+          temp_x = x
           if (j == i) then
              !P(i)
              call posterior(n, temp_x, P)
              !P(i-di)
-             temp_x(i) = sol(i,1)-deltai
+             temp_x(i) = x(i)-deltai
              call posterior(n, temp_x, P_l)
              !P(i+di)
-             temp_x(i) = sol(i,1)+deltai
-             call posterior(n, temp_x, P_u) 
+             temp_x(i) = x(i)+deltai
+             call posterior(n, temp_x, P_u)
+             !check we are at a minimum w.r.t. this parameter
+             grad = (P_u - P_l)/(2D0*deltai)
+             if (abs(grad) > 1D-3) then
+                flag = 6
+                info = 'Final position not a local minimum'
+                return
+             end if
              !hessian by numeric method
              diff = P_u + P_l - (2D0*P)
-             if (diff/=0D0) hes(i,i) = diff/(deltai**2)
+             if (diff/=0D0) hes(i,i) = diff / ((deltai**2)*(x_scale(i)**2))
           else
              !P(i+di,j+dj)
-             temp_x(i) = sol(i,1)+deltai
-             temp_x(j) = sol(j,1)+deltaj
+             temp_x(i) = x(i)+deltai
+             temp_x(j) = x(j)+deltaj
              call posterior(n, temp_x, P_u)
              !P(i+di,j-dj)
-             temp_x(j) = sol(j,1)-deltaj
+             temp_x(j) = x(j)-deltaj
              call posterior(n, temp_x, P_i)   
              !P(i-di,j-dj)
-             temp_x(i) = sol(i,1)-deltai
+             temp_x(i) = x(i)-deltai
              call posterior(n, temp_x, P_l)
              !P(i-di,j+dj)
-             temp_x(j) = sol(j,1)+deltaj
+             temp_x(j) = x(j)+deltaj
              call posterior(n, temp_x, P_j)  
              !hessian by numeric method
              diff = P_u + P_l - P_i - P_j
-             if (diff/=0D0) hes(i,j) = diff/(4D0*deltai*deltaj)
+             if (diff/=0D0) hes(i,j) = &
+                  diff / ((4D0*deltai*deltaj)*(x_scale(i)*x_scale(j)))
              hes(j,i) = hes(i,j) !since hessian is symmetric
           end if
        end do
@@ -323,6 +360,7 @@ contains
     !ideal case: error on a single parameter x is taken as the sqroot(cov(x,x))
     !negative cov(x,x) case: estimated error reported as zero (as occurs for
     !minimisation failure too)
+    !also need to undo parameter scaling
     do i = 1, n
        if (cov(i,i)>0) then
           sol(i,2) = sqrt(cov(i,i))
@@ -481,22 +519,22 @@ logical :: violation
 !if position is out of range then return very large energy 
 violation = .false.
 do i = 1, n !over variable parameters
-   if (x(i) < x_info(i,2)) violation = .true.
-   if (x(i) > x_info(i,3)) violation = .true.
+   if (x(i)*x_scale(i) < x_bound(i,1)) violation = .true.
+   if (x(i)*x_scale(i) > x_bound(i,2)) violation = .true.
 end do
 if (violation) then
    post = 1.0d10
    return
 end if 
 
-!update fit_param with current position x
+!update fit_param with current position x, undoing scaling
 do i = 1, n
-   fit_param(x_pos(i,1),x_pos(i,2)) = x(i)
+   fit_param(x_pos(i,1),x_pos(i,2)) = x(i)*x_scale(i)
 end do
 
 !form E = neg log posterior = neg log likelihood + neg log prior
 lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
-pri = prior(x, x_pos, model_param, model_prior)
+pri = prior(x_pos, fit_param, model_param, model_prior)
 post = lhd + pri
 
 end subroutine posterior
@@ -591,13 +629,12 @@ end function likelihood
 
 !==============================================================================
 
-function prior(x, x_pos, model_param, model_prior)
+function prior(x_pos, fit_param, model_param, model_prior)
 
 !function arguments
 double precision :: prior
-double precision, dimension(:), intent(in) :: x
 integer, dimension(:,:), intent(in) :: x_pos
-double precision, dimension(:,:), intent(in) :: model_param
+double precision, dimension(:,:), intent(in) :: fit_param, model_param
 double precision, dimension(:,:), intent(in) :: model_prior
 
 !local variables
@@ -611,7 +648,7 @@ do i = 1, size(x_pos,1)
 
    value0 = model_param(x_pos(i,1),x_pos(i,2)) !parameter original value
    err = model_prior(x_pos(i,1),x_pos(i,2)) !parameter prior width
-   value = x(i) !parameter current value as it is varied
+   value = fit_param(x_pos(i,1),x_pos(i,2)) !parameter current value as it is varied
 
    !calculate normalised contribution to the prior
    prior = prior + (((value-value0)**2D0)/(2D0*(err**2D0))) + log(err*sqrt(2D0*pi))
@@ -627,7 +664,8 @@ subroutine free_fit()
   !Deallocate fitting storage
   if (allocated(fit_param)) deallocate(fit_param)
   if (allocated(x_pos)) deallocate(x_pos)
-  if (allocated(x_info)) deallocate(x_info)
+  if (allocated(x_bound)) deallocate(x_bound)
+  if (allocated(x_scale)) deallocate(x_scale)
 
 end subroutine free_fit
 

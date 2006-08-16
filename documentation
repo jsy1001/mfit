@@ -57,10 +57,13 @@ Data files
 
 mfit and clfit (and hence fitgui) will read the following types of data file:
 
-.fits	    OI Exchange format - see
+*fits	    OIFITS format - see
 	    http://www.mrao.cam.ac.uk/~jsy1001/exchange/
 	    Only the squared visibility and triple product data types are
 	    used. The file must have extension .fits
+
+*calib      MSC wbCalib and nbCalib formats
+            The code for reading these formats has not been tested extensively.
 
 [The file formats below have been used for COAST data, but won't be of much
  interest to the community. Details are in the COAST Data Reduction Manual]
@@ -358,8 +361,12 @@ posterior. The numerical calculation of the Hessian matrix can sometimes
 erroneously cross such discontinuities. If you suspect this is happening, it is
 advisable to plot cuts through the posterior.
 
+Closure phases that are linear combinations of other measured closure
+phases are (perhaps) incorrectly counted as independent data points when
+evaluating the number of degrees of freedom.
 
-$Id: documentation,v 1.11 2005/01/06 18:45:12 jsy1001 Exp $
+
+$Id: documentation,v 1.12 2006/08/16 09:20:22 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

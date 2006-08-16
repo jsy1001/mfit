@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.23 2005/09/13 09:52:51 jsy1001 Exp $
+!$Id: main.f90,v 1.24 2006/08/16 09:20:22 jsy1001 Exp $
 
 program Main
 
@@ -506,7 +506,7 @@ program Main
      !-------------------------------------------------------------------------
      !Deallocate model/fitting storage
      call free_model() !model_*
-     call free_fit() !fit_param, x_pos, x_info
+     call free_fit() !fit_param, x_pos, x_bound
      if (allocated(desc)) deallocate(desc)
      if (allocated(sol)) deallocate(sol)
      if (allocated(hes)) deallocate(hes)

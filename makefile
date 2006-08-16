@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.18 2006/08/07 16:51:30 jsy1001 Exp $
+# $Id: makefile,v 1.19 2006/08/16 09:20:22 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -89,7 +89,7 @@ visibility.o visibility.mod: visibility.f90 maths.mod model.mod
 inout.o inout.mod: inout.f90
 	$(F90) -c $(FFLAGC) inout.f90
 
-plot.o plot.mod: plot.f90 model.mod fit.mod marginalise.mod
+plot.o plot.mod: plot.f90 model.mod fit.mod marginalise.mod visibility.mod
 	$(F90) -c $(FFLAGC) plot.f90
 
 model.o model.mod: model.f90 maths.mod

@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.20 2006/08/07 15:00:45 jsy1001 Exp $
+!$Id: clfit.f90,v 1.21 2006/08/16 09:20:22 jsy1001 Exp $
 
 program Main
 
@@ -51,7 +51,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.20 $'
+  cvs_rev = '$Revision: 1.21 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -742,7 +742,7 @@ program Main
               if (sol(i,2) < sqrt(1D0/hes(i,i))) &
                    errguess(i) = sqrt(1D0/hes(i,i))
            end do
-           call marg_err(sol(:,1), errguess, margerr_var, nlevidence, err)
+           call marg_err(sol(:,1), errguess, margerr_var, err)
            print '(1x, a, 49x, a)', '                   ', 'fitted'
            print '(1x, a, 49x, a)', 'num  parameter name', ' value'
            write(*,77) margerr_var, desc(margerr_var), sol(margerr_var, 1), &
@@ -760,7 +760,7 @@ program Main
   !Deallocate model/fitting storage
   call free_mg()
   call free_model() !model_*
-  call free_fit() !fit_param, x_pos, x_info
+  call free_fit() !fit_param, x_pos, x_bound
   if (allocated(desc)) deallocate(desc)
   if (allocated(sol)) deallocate(sol)
   if (allocated(hes)) deallocate(hes)

@@ -1,10 +1,11 @@
-!$Id: plot.f90,v 1.18 2006/08/10 08:33:07 jsy1001 Exp $
+!$Id: plot.f90,v 1.19 2006/08/16 09:20:22 jsy1001 Exp $
 
 module Plot
   
   use Model
   use Fit
   use Marginalise
+  use Visibility
 
   !subroutines contained:
   !
@@ -615,7 +616,7 @@ contains
        x_title, y_title, top_title, uxmin, uxmax, device)
 
     !indx is into x_pos array of variable parameters
-    !x_pos, x_info must be initialised on entry to this routine i.e. must have
+    !x_pos, x_bound must be initialised on entry to this routine i.e. must have
     !called minimiser() from Fit module
 
     !subroutine arguments
@@ -627,7 +628,6 @@ contains
     character(len=*), intent(in), optional :: device
 
     !local variables
-    double precision, dimension(:), allocatable :: var_param
     real, dimension(:, :), allocatable :: post_points, mpost_points
     double precision :: val, lhd, pri, sav
     integer :: nvar, num_points, i, istat
@@ -640,27 +640,23 @@ contains
     !return if nothing to plot
     nvar = size(x_pos, 1)
     if (indx < 1 .or. indx > nvar) return
-    if (uxmax < x_info(indx, 2)) return
-    if (uxmin > x_info(indx, 3)) return
+    if (uxmax < x_bound(indx, 1)) return
+    if (uxmin > x_bound(indx, 2)) return
 
-    !adjust x range if necessary - need to keep within x_info limits
-    if (uxmin < x_info(indx, 2)) then
-       xmin = x_info(indx, 2)
+    !adjust x range if necessary - need to keep within x_bound limits
+    if (uxmin < x_bound(indx, 1)) then
+       xmin = x_bound(indx, 1)
     else
        xmin = uxmin
     end if
-    if (uxmax > x_info(indx, 3)) then
-       xmax = x_info(indx, 3)
+    if (uxmax > x_bound(indx, 2)) then
+       xmax = x_bound(indx, 2)
     else
        xmax = uxmax
     end if
 
     !copy model parameters
     sav = fit_param(x_pos(indx, 1), x_pos(indx, 2))
-    allocate(var_param(nvar))
-    do i = 1, nvar
-       var_param(i) = fit_param(x_pos(i, 1), x_pos(i, 2))
-    end do
 
     !calculate grid of points
     if (plotmargd) then
@@ -678,20 +674,16 @@ contains
        post_points(i, 1) = val
        if (plotmargd) then
           mpost_points(i, 1) = val
-          mg_var(indx) = val
           mg_param(x_pos(indx, 1), x_pos(indx, 2)) = val
-          mg_nlnorm = nlevidence
           mpost_points(i, 2) = marg_post(info)
           if (info /= '') print *, trim(info)
        end if
        fit_param(x_pos(indx, 1), x_pos(indx, 2)) = val
-       var_param(indx) = val
        lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
-       pri = prior(var_param, x_pos, model_param, model_prior)
+       pri = prior(x_pos, fit_param, model_param, model_prior)
        post_points(i, 2) = lhd + pri - nlevidence !fix normalisation later
     end do
     fit_param(x_pos(indx, 1), x_pos(indx, 2)) = sav
-    
 
     !calculate y range
     if (plotmargd) then
@@ -726,7 +718,6 @@ contains
          call plot_pts(x_title, y_title, num_points, mpost_points, -1, &
          'mpost1d.dat')
 
-    if (allocated(var_param)) deallocate(var_param)
     if (allocated(post_points)) deallocate(post_points)
     if (allocated(mpost_points)) deallocate(mpost_points)
 
@@ -741,7 +732,7 @@ contains
     ! sufficiently close to a grid point), needed to plot correct n-sigma
     ! contours in unmarginalised case
     !indx(i) is into x_pos array of variable parameters
-    !x_pos, x_info must be initialised on entry to this routine i.e. must have
+    !x_pos, x_bound must be initialised on entry to this routine i.e. must have
     ! called minimiser() from Fit module
 
     !subroutine arguments
@@ -756,7 +747,6 @@ contains
     !local variables
     integer, parameter :: iunit = 12
     character(len=*), parameter :: save_filename = 'post2d.dat'
-    double precision, dimension(:), allocatable :: var_param
     real, dimension(:, :), allocatable :: post_points
     double precision :: xval, yval, lhd, pri
     double precision, dimension(2) :: sav
@@ -777,29 +767,29 @@ contains
     nvar = size(x_pos, 1)
     if (indx(1) < 1 .or. indx(1) > nvar) return
     if (indx(2) < 1 .or. indx(2) > nvar) return
-    if (uxmax < x_info(indx(1), 2)) return
-    if (uxmin > x_info(indx(1), 3)) return
-    if (uymax < x_info(indx(2), 2)) return
-    if (uymin > x_info(indx(2), 3)) return
+    if (uxmax < x_bound(indx(1), 1)) return
+    if (uxmin > x_bound(indx(1), 2)) return
+    if (uymax < x_bound(indx(2), 1)) return
+    if (uymin > x_bound(indx(2), 2)) return
 
-    !adjust ranges if necessary - need to keep within x_info limits
-    if (uxmin < x_info(indx(1), 2)) then
-       xmin = x_info(indx(1), 2)
+    !adjust ranges if necessary - need to keep within x_bound limits
+    if (uxmin < x_bound(indx(1), 1)) then
+       xmin = x_bound(indx(1), 1)
     else
        xmin = uxmin
     end if
-    if (uxmax > x_info(indx(1), 3)) then
-       xmax = x_info(indx(1), 3)
+    if (uxmax > x_bound(indx(1), 2)) then
+       xmax = x_bound(indx(1), 2)
     else
        xmax = uxmax
     end if
-    if (uymin < x_info(indx(2), 2)) then
-       ymin = x_info(indx(2), 2)
+    if (uymin < x_bound(indx(2), 1)) then
+       ymin = x_bound(indx(2), 1)
     else
        ymin = uymin
     end if
-    if (uymax > x_info(indx(2), 3)) then
-       ymax = x_info(indx(2), 3)
+    if (uymax > x_bound(indx(2), 2)) then
+       ymax = x_bound(indx(2), 2)
     else
        ymax = uymax
     end if
@@ -807,10 +797,6 @@ contains
     !copy model parameters
     sav(1) = fit_param(x_pos(indx(1), 1), x_pos(indx(1), 2))
     sav(2) = fit_param(x_pos(indx(2), 1), x_pos(indx(2), 2))
-    allocate(var_param(nvar))
-    do i = 1, nvar
-       var_param(i) = fit_param(x_pos(i, 1), x_pos(i, 2))
-    end do
     if (plotmargd) then
        mg_marg = .true.
        mg_marg(indx(1)) = .false.
@@ -832,18 +818,13 @@ contains
           if (plotmargd) then
              mg_param(x_pos(indx(1), 1), x_pos(indx(1), 2)) = xval
              mg_param(x_pos(indx(2), 1), x_pos(indx(2), 2)) = yval
-             mg_var(indx(1)) = xval
-             mg_var(indx(2)) = yval
-             mg_nlnorm = nlposterior
              post_points(i, j) = marg_post(info)
              if (info /= '') print *, trim(info)
           else
              fit_param(x_pos(indx(1), 1), x_pos(indx(1), 2)) = xval
              fit_param(x_pos(indx(2), 1), x_pos(indx(2), 2)) = yval
-             var_param(indx(1)) = xval
-             var_param(indx(2)) = yval
              lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
-             pri = prior(var_param, x_pos, model_param, model_prior)
+             pri = prior(x_pos, fit_param, model_param, model_prior)
              post_points(i, j) = lhd + pri - nlposterior
           end if
        end do
@@ -892,6 +873,8 @@ contains
          1, num_points, 1, num_points, levs, size(levs,1), tr)
     call pgsci(1)
     call pgbox('ABCNST', 0., 0, 'ABCNST', 0., 0)
+    call pgsci(3)
+    call pgpt1(real(sav(1)), real(sav(2)), 12) !mark pos'n found by minimiser
 
     !write plotted points to text file
     open (unit=iunit, file=save_filename, status='replace', action='write', &
@@ -910,7 +893,6 @@ contains
     end do
     close (iunit)
 
-    if (allocated(var_param)) deallocate(var_param)
     if (allocated(post_points)) deallocate(post_points)
     return
 
