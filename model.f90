@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.11 2006/08/07 15:02:00 jsy1001 Exp $
+!$Id: model.f90,v 1.12 2006/08/17 13:34:32 jsy1001 Exp $
 
 module Model
 
@@ -16,7 +16,7 @@ use Maths
 
 implicit none
 
-include 'fftw_f77.i'
+include 'fftw3.f'
 
 !module variables contained:
 
@@ -967,7 +967,9 @@ subroutine calcvis_clv(model_diam)
   double precision, intent(in) :: model_diam
 
   !local variables
-  integer threshold, ixcen, iycen, ix, iy, i, j, lookup, sign, plan
+  integer threshold, ixcen, iycen, ix, iy, i, j, lookup, sign
+  !integer plan
+  integer*8 :: plan
   integer icalc, ncalc
   real flux, radius, max_rad, frac, delta, factor
   double precision, dimension(:,:), allocatable :: map2d
@@ -984,10 +986,14 @@ subroutine calcvis_clv(model_diam)
   ncalc = size(clv_inten, 2) !either unity or no. of wavebands
 
   if (ncalc > 20) then
-     call rfftw_f77_create_plan(plan, 2*nxsiz+1, FFTW_REAL_TO_COMPLEX, &
+     !call rfftw_f77_create_plan(plan, 2*nxsiz+1, FFTW_REAL_TO_COMPLEX, &
+     !     FFTW_MEASURE)
+     call dfftw_plan_dft_r2c_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
           FFTW_MEASURE)
   else
-     call rfftw_f77_create_plan(plan, 2*nxsiz+1, FFTW_REAL_TO_COMPLEX, &
+     !call rfftw_f77_create_plan(plan, 2*nxsiz+1, FFTW_REAL_TO_COMPLEX, &
+     !     FFTW_ESTIMATE)
+     call dfftw_plan_dft_r2c_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
           FFTW_ESTIMATE)
   end if
 
@@ -1049,7 +1055,8 @@ subroutine calcvis_clv(model_diam)
      end do
 
      !and take the fourier transform of this real (symmetric) array
-     call rfftw_f77_one(plan, map1d, map1d_rft)
+     !call rfftw_f77_one(plan, map1d, map1d_rft)
+     call dfftw_execute(plan)
 
      !normalise to zero freq. value and fudge the sign
      sign = 1
@@ -1069,7 +1076,8 @@ subroutine calcvis_clv(model_diam)
      write(20, *) clv_mbase(i), clv_mvis(i, 1)
   end do
 
-  call rfftw_f77_destroy_plan(plan)
+  !call rfftw_f77_destroy_plan(plan)
+  call dfftw_destroy_plan(plan)
   !free storage
   deallocate(map2d)
   deallocate(map1d)

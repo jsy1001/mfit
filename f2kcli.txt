@@ -1,8 +1,8 @@
        F2KCLI : A Multi-Platform Fortran Command Line Interface
        ========================================================
-          (c) Interactive Software Services Ltd. 2001-2003
+          (c) Interactive Software Services Ltd. 2001-2005
 
-Version : 1.05
+Version : 1.08
 
 Contents: 1. Introduction
           2. Conditions of Use
@@ -17,12 +17,13 @@ Contents: 1. Introduction
              6.2  16-bit DOS
              6.3  Win16/WDBOS
              6.4  Win32
-             6.5  Unix/Linux
-             6.6  VMS
-             6.7  PRIMOS
-             6.8  RISC OS
-             6.9  OS/2
-             6.10 Mac OS/X
+             6.5  Win64 (EM64T/AMD64)
+             6.6  Unix/Linux
+             6.7  VMS
+             6.8  PRIMOS
+             6.9  RISC OS
+             6.10 OS/2
+             6.11 Mac OS/X
           7. Portability
           8. Support/Feedback
           9. Changes
@@ -33,7 +34,7 @@ Contents: 1. Introduction
    ------------
 
 F2KCLI is an implementation of the Fortran command line interface as
-proposed in the draft F2K standard:
+defined in the Fortran F2003 standard (previously known as "F2K"):
 
  COMMAND_ARGUMENT_COUNT : Returns the number of command arguments.
  GET_COMMAND_ARGUMENT   : Returns a command argument.
@@ -43,8 +44,8 @@ proposed in the draft F2K standard:
 The F2KCLI file set provides versions of these routines for a wide range
 of Fortran 77/9x compilers across a variety of different platforms. It
 is intended to provide the definitive solution to the long standing lack
-of standardised command line access in Fortran, until F2K compilers
-become generally available later in the decade.
+of standardised command line access in Fortran, until F2003 compilers
+become generally available.
 
 Source code is supplied for every supported compiler. While some
 implementations are written entirely in Fortran using compiler specific
@@ -63,10 +64,10 @@ For the latest version of F2KCLI go to:
    -----------------
 
 F2KCLI has been developed by Interactive Software Services Ltd. based on
-the proposed F2K standard, on a voluntary basis. The F2KCLI source code,
-object code and documentation is copyright Interactive Software Services
-Ltd. 2001-2003  (with the obvious  exception of the  definitions  of the
-proposed F2K command line interface routines themselves).
+the F2003 standard, on a voluntary basis. The F2KCLI source code, object
+code and documentation is copyright Interactive Software Services Ltd.
+2001-2005 (with the obvious  exception of the  definitions  of the F2003
+command line interface routines themselves).
 
 This software is provided 'as-is', without any express or implied
 warranty.  In no event will the copyright owner be held liable for any
@@ -81,9 +82,9 @@ including commercial applications, subject to the following conditions:
    be appreciated but is not required.
 
 2. The supplied source code may be altered, but only to correct any
-   failure to conform to the proposed F2K command line interface
-   standard or to allow its use with a previously unsupported
-   compiler/platform combination.
+   failure to conform to the F2003 command line interface standard or
+   to allow its use with a previously unsupported compiler/platform
+   combination.
 
 3. Altered source versions must be plainly marked as such and must not
    be misrepresented as being the original software.
@@ -125,6 +126,7 @@ combinations:
 |16-bit DOS      |MS Fortran 4.x/5.x |dos16         |dos16\msf     | * |
 |16-bit DOS      |Prospero Fortran   |dos16         |dos16\prospero| * |
 |16-bit DOS      |Watcom F77         |dos16         |dos16\watcom  | * |
+|16-bit DOS      |Watfor77           |dos16\watfor  |              | * |
 +----------------+-------------------+--------------+--------------+---+
 |Win16/WDBOS     |Salford FTN77      |dos32\ftn77   |win16\ftn77   | * |
 |Win16/WDBOS     |Salford FTN90      |dos32\ftn9x   |win16\ftn90   | * |
@@ -136,18 +138,21 @@ combinations:
 |Win32           |g77 (mingw32)      |win32         |win32\gnu     | * |
 |Win32           |Intel Fortran 4-6  |win32         |win32\intel   | * |
 |Win32           |Intel Fortran 7    |win32         |win32\intel7  | * |
+|Win32           |Intel Vis. Fortran |win32         |win32\intel8  | * |
 |Win32           |Lahey Elf90        |win32         |win32\elf90   | * |
 |Win32           |Lahey LF90         |win32         |win32\lf90    | * |
 |Win32           |Lahey LF95 5.0-5.6 |win32         |win32\lf95    | * |
-|Win32           |Lahey LF95 5.7     |win32         |win32\lf95_57 | * |
+|Win32           |Lahey LF95 5.7/7.x |win32         |win32\lf95_57 | * |
 |Win32           |MS PowerStation 4.0|win32         |win32\mfp     | * |
 |Win32           |NAS FortranPlus    |win32\nas     |              | * |
 |Win32           |Salford FTN77      |win32         |win32\ftn77   | * |
 |Win32           |Salford FTN90      |win32         |win32\ftn90   | * |
 |Win32           |Salford FTN95      |win32         |win32\ftn95   | * |
-|Win32           |Visual Fortran/x86 |win32         |win32\vf_x86  | * |
-|Win32           |Visual Fortran/AXP |win32         |win32\vf_axp  | * |
+|Win32           |DVF/CVF (Intel)    |win32         |win32\vf_x86  | * |
+|Win32           |DVF/CVF (Alpha)    |win32         |win32\vf_axp  | * |
 |Win32           |Watcom F77         |win32         |win32\watcom  | * |
++----------------+-------------------+--------------+--------------+---+
+|Win64 (EM64T)   |Intel Vis. Fortran |win64e        |win64e\intel8 | * |
 +----------------+-------------------+--------------+--------------+---+
 |Unix/Linux      |g77                |unix\f77      |              | * |
 |Unix/Linux      |f2c                |unix\f77      |              | * |
@@ -164,14 +169,14 @@ combinations:
 |Solaris (SPARC) |Fujitsu f95        |unix\f90      |              | * |
 |Solaris (SPARC) |NAS FortranPlus    |unix\nas      |              | * |
 |Solaris (Intel) |Sunsoft f77        |unix\f77      |              | * |
-|Solaris (Intel) |Portland pgf77     |unix\f77      |              | * |
+|Solaris (Intel) |Portland pgf77     |unix\pgf77    |              | * |
 |Intel/Linux     |Lahey LF95         |unix\f90      |              | * |
 |Intel/Linux     |Fujitsu f95        |unix\f90      |              | * |
 |Intel/Linux     |Absoft Pro Fortran |unix\f90      |              | * |
-|Intel/Linux     |Portland pgf77     |unix\f77      |              | * |
-|Intel/Linux     |Portland pgf90     |unix\f90      |              | * |
+|Intel/Linux     |Portland pgf77     |unix\pgf77    |              | * |
+|Intel/Linux     |Portland pgf90     |unix\pgf90    |              | * |
 |Intel/Linux     |NAS FortranPlus    |unix\nas      |              | * |
-|Intel/Linux     |Intel Fortran v5   |unix\f90      |              | * |
+|Intel/Linux     |Intel Fortran      |unix\f90      |              | * |
 |Alpha/Linux     |Compaq f95         |unix\f90      |              | * |
 |Ultrix          |Digital f77        |unix\f77      |              | * |
 |Tru64 Unix      |Digital/Compaq f77 |unix\f77      |              | * |
@@ -195,7 +200,8 @@ combinations:
 |OS/2            |g77                |os2\gnu       |              | * |
 |OS/2            |Watcom F77         |os2\watcom    |os2\watcom    |   |
 +----------------+-------------------+--------------+--------------+---+
-|Mac OS X        |Absoft Pro Fortran |macos\f90     |              | ? |
+|Mac OS X        |Absoft Pro Fortran |macos\f90     |              | * |
+|Mac OS X        |IBM XL Fortran     |macos\f90     |              | * |
 +----------------+-------------------+--------------+--------------+---+
 
 "Source Directory" indicates the F2KCLI sub-directory which contains the
@@ -230,6 +236,11 @@ Notes:
 (3) "32-bit DOS" means a DOS based compiler which relies on a 32-bit
     DOS extender such as Phar Lap, DOS4/GW, DBOS, etc.
 
+(4) The Watfor77 implementation was contributed by E.P.Chandler and
+    is untested by Interactive Software Services. It is provided in
+    the form of a text file describing required modifications to
+    the generic 16-bit DOS F2KCLI source code.
+
 ------------------------------------------------------------------------
 
 4. Using F2KCLI
@@ -249,7 +260,7 @@ To use F2KCLI in your application just:
 
 Implementation specific issues are noted in the source code comments.
 The calling interface for the command line interface routines, as
-defined in the draft F2K standard, is also quoted as comments in the
+defined in the F2003 standard, is also quoted as comments in the
 source code for each implementation of F2KCLI, so their definition
 is not repeated here. Instead this section describes general issues
 with regard to using F2KCLI in your application.
@@ -263,23 +274,23 @@ the three F2KCLI routines should therefore contain the statement:
 
     USE F2KCLI
 
-If/when your code eventually migrates to a full F2K compiler, simply
+If/when your code eventually migrates to a full F2003 compiler, simply
 delete this line.
 
-The optional arguments defined by the draft F2K standard are fully
+The optional arguments defined by the F2003 standard are fully
 implemented. Any of the optional arguments can be omitted, in the
 normal Fortran 9x manner.
 
 4.2 Fortran 77 Compilers
     --------------------
 
-While the proposed definition of the F2K command line interface uses
-several features which only became standard in Fortran 90 (names longer
-than 6 characters, underscores in names and optional arguments), in
-practice it is still feasible to implement this interface with most
-Fortran 77 compilers. F2KCLI includes all of the 'optional' arguments
-specified in the draft standard, but these arguments *must* be specified
-in full (even if they are not used) when called from Fortran 77 code.
+While the definition of the F2003 command line interface uses several
+features which only became standard in Fortran 90 (names longer than 6
+characters, underscores in names and optional arguments), in practice
+it is still feasible to implement this interface with most Fortran 77
+compilers. F2KCLI includes all of the 'optional' arguments specified
+in the standard, but these arguments *must* be specified in full (even
+if they are not used) when called from Fortran 77 code.
 
 The other issue when calling the F2KCLI routines from Fortran 77 code
 concerns the COMMAND_ARGUMENT_COUNT function. Unfortunately, this does
@@ -288,7 +299,7 @@ used IARGC() function which it replaces). Hence the caller must
 explicitly declare COMMAND_ARGUMENT_COUNT as being of type INTEGER.
 A suitable declaration is provided in the f2kcli.inc include file in the
 'test' directory. Such declarations should be deleted from the calling
-code if/when it migrates to a Fortran 9x or F2K compiler.
+code if/when it migrates to a Fortran 9x or F2003 compiler.
 
 4.3 Quotes
     ------
@@ -454,6 +465,10 @@ Each example assumes that:
     file testcli
     lib f2kcli
 
+6.2.5 Watfor77
+
+    See source\dos16\watfor77\readme.txt
+
 6.3 Win16/WDBOS
     -----------
 
@@ -496,7 +511,7 @@ Each example assumes that:
 
 6.4.2 Absoft Fortran 9x
 
-    f90 testcli.f90 f2kcli.lib
+    f95 testcli.f90 f2kcli.lib
 
 6.4.3 F (mingw32)
 
@@ -519,34 +534,42 @@ Each example assumes that:
 
     ifl testcli.f90 f2kcli.lib
 
-6.4.7 Lahey Elf90
+6.4.7 Intel Visual Fortran 8.x
+
+    ifort testcli.f90 f2kcli.lib
+
+    (Note : This implementation can also be used with IVF9. That compiler
+     release adds built-in support for the F2003 cli intrinsics, though
+     command argument zero reporting is inferior to the F2KCLI equivalent.)
+
+6.4.8 Lahey Elf90
 
     elf90 -winconsole testcli.f90
     (The -win option is also compatible with this implementation)
 
-6.4.8 Lahey LF90
+6.4.9 Lahey LF90
 
     lf90 -winconsole testcli.f90
     (The -win option is also compatible with this implementation)
 
-6.4.9 Lahey LF95 5.0-5.6
+6.4.10 Lahey LF95 5.0-5.6
 
-    lf90 -winconsole testcli.f90 -lib f2kcli.lib
+    lf95 testcli.f90 -lib f2kcli.lib
 
-6.4.10 Lahey LF95 5.7
+6.4.11 Lahey LF95 5.7/7.x
 
-    lf90 -winconsole testcli.f90 -lib f2kcli.lib
+    lf95 testcli.f90 -lib f2kcli.lib
 
-6.4.11 MS PowerStation 4.0
+6.4.12 MS PowerStation 4.0
 
     fl32 testcli.f90 f2kcli.lib
 
-6.4.12 NAS FortranPlus
+6.4.13 NAS FortranPlus
 
     f95 -c f2kcli.f90
     f95 testcli.f90
 
-6.4.13 Salford FTN77/Win32
+6.4.14 Salford FTN77/Win32
 
     ftn77 testcli
     slink
@@ -554,7 +577,7 @@ Each example assumes that:
     lo f2kcli.lib
     file
 
-6.4.14 Salford FTN90/Win32
+6.4.15 Salford FTN90/Win32
 
     ftn90 testcli
     slink
@@ -562,7 +585,7 @@ Each example assumes that:
     lo f2kcli.lib
     file
 
-6.4.15 Salford FTN95/Win32
+6.4.16 Salford FTN95/Win32
 
     ftn95 testcli
     slink
@@ -570,15 +593,15 @@ Each example assumes that:
     lo f2kcli.lib
     file
 
-6.4.16 Visual Fortran (Intel)
+6.4.17 Digital/Compaq Visual Fortran 5.0-6.6 (Intel)
 
     df testcli.f90 f2kcli.lib
 
-6.4.17 Visual Fortran (Alpha)
+6.4.18 Digital/Compaq Visual Fortran (Alpha)
 
     df testcli.f90 f2kcli.lib
 
-6.4.18 Watcom F77
+6.4.19 Watcom F77
 
     wfc386 testcli
     wlink @testcli.lnk
@@ -591,150 +614,165 @@ Each example assumes that:
 
     For a windowed/GUI application change "nt" to "nt_win".
 
-6.5 Unix/Linux
+6.5 Win64 (EM64T/AMD64T)
+    -------------------
+
+6.5.1 Intel Visual Fortran 8.x
+
+    ifort testcli.f90 f2kcli.lib
+
+    (Note : This implementation can also be used with IVF9. That compiler
+     release adds built-in support for the F2003 cli intrinsics, though
+     command argument zero reporting is inferior to the F2KCLI equivalent.)
+
+6.6 Unix/Linux
     ----------
 
-6.5.1 g77
+6.6.1 g77
 
     g77 -o testcli testcli.f f2kcli.f
 
-6.5.2 f2c
+6.6.2 f2c
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.3 NAGware f95
+6.6.3 NAGware f95
 
     f95 -o testcli f2kcli.f90 testcli.f90
 
-6.5.4 F
+6.6.4 F
 
     F -o testcli f2kcli.f90 testcli.f90
 
-6.5.5 EPC f77
+6.6.5 EPC f77
 
     epcf77 -o testcli testcli.f f2kcli.f
 
-6.5.6 EPC f90
+6.6.6 EPC f90
 
     epcf90 -o testcli f2kcli.f90 testcli.f90
 
-6.5.7 Microway NDP f77
+6.6.7 Microway NDP f77
 
     mf486 -o testcli testcli.f f2kcli.f
 
-6.5.8 Green Hills f77
+6.6.8 Green Hills f77
 
     ghf77 -o testcli testcli.f f2kcli.f
 
-6.5.9 SVS f77
+6.6.9 SVS f77
 
     svs -o testcli testcli.f f2kcli.f
 
-6.5.10 Sunsoft f77 (Solaris)
+6.6.10 Sunsoft f77 (Solaris)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.11 Sunsoft f90 (Solaris)
+6.6.11 Sunsoft f90 (Solaris)
 
     f90 -o testcli f2kcli.f90 testcli.f90
 
-6.5.12 Fujitsu f90 (Solaris)
+6.6.12 Fujitsu f90 (Solaris)
 
     f95 -Am -o testcli f2kcli.f90 testcli.f90
 
-6.5.13 NAS FortranPlus (Linux & Solaris)
+6.6.13 NAS FortranPlus (Linux & Solaris)
 
     f95 -o testcli f2kcli.f90 testcli.f90
 
-6.5.14 Portland pgf77 (Linux & Solaris)
+6.6.14 Portland pgf77 (Linux & Solaris)
 
     pgf77 -o testcli testcli.f f2kcli.f
 
-6.5.15 Portland pgf90 (Linux)
+6.6.15 Portland pgf90 (Linux)
 
     pgf90 -o testcli f2kcli.f90 testcli.f90
 
-6.5.16 Lahey/Fujitsu LF95 (Linux)
+6.6.16 Lahey/Fujitsu LF95 (Linux)
 
     lf95 -o testcli f2kcli.f90 testcli.f90
 
-6.5.17 Fujitsu Fortran 95 (Linux)
+6.6.17 Fujitsu Fortran 95 (Linux)
 
     f95 -Am -o testcli f2kcli.f90 testcli.f90
 
-6.5.18 Absoft Pro Fortran (Linux)
+6.6.18 Absoft Pro Fortran (Linux)
 
-    f90 -o testcli f2kcli.f90 testcli.f90 -lU77
+    f95 -o testcli f2kcli.f90 testcli.f90 -lU77
 
-6.5.19 Compaq f95 (Alpha/Linux)
+6.6.19 Compaq f95 (Alpha/Linux)
 
     fort -o testcli f2kcli.f90 testcli.f90
 
-6.5.20 Digital f77 (Ultrix)
+6.6.20 Digital f77 (Ultrix)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.21 Digital/Compaq f77 (Tru64)
+6.6.21 Digital/Compaq f77 (Tru64)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.22 Digital/Compaq f90 (Tru64)
+6.6.22 Digital/Compaq f90 (Tru64)
 
     f90 -o testcli f2kcli.f90 testcli.f90
 
-6.5.23 MIPS f77 (IRIX)
+6.6.23 MIPS f77 (IRIX)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.24 IBM xlf f77 (AIX)
+6.6.24 IBM xlf f77 (AIX)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.25 IBM xlf f90 (AIX)
+6.6.25 IBM xlf f90 (AIX)
 
     xlf -o testcli f2kcli.f90 testcli.f90
 
-6.5.26 HP f77 (HP/UX)
+6.6.26 HP f77 (HP/UX)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.27 Salford FTN77/ix
+6.6.27 Salford FTN77/ix
 
     ftn77 -o testcli testcli.f f2kcli.f
 
-6.5.28 Acornsoft f77 (RISC iX)
+6.6.28 Acornsoft f77 (RISC iX)
 
     f77 -o testcli testcli.f f2kcli.f
 
-6.5.29 Intel Fortran v5 (Linux)
+6.6.29 Intel Fortran v5-v7 (Linux)
 
     ifc -o testcli f2kcli.f90 testcli.f90 -Vaxlib
 
-6.6 VMS
+6.6.30 Intel Fortran v8 (Linux)
+
+    ifort -o testcli f2kcli.f90 testcli.f90
+
+6.7 VMS
     ---
 
-6.6.1 Digital/Compaq f77 (VAX)
+6.7.1 Digital/Compaq f77 (VAX)
 
     FORT F2KCLI
     FORT TESTCLI
     LINK TESTCLI,F2KCLI
 
-6.6.2 Digital/Compaq f77 (Alpha)
+6.7.2 Digital/Compaq f77 (Alpha)
 
     FORT F2KCLI
     FORT TESTCLI
     LINK TESTCLI,F2KCLI
 
-6.6.3 Digital/Compaq f90 (Alpha)
+6.7.3 Digital/Compaq f90 (Alpha)
 
     F90 F2KCLI.F90
     F90 TESTCLI.F90
     LINK TESTCLI,F2KCLI
 
-6.7 PRIMOS
+6.8 PRIMOS
     ------
 
-6.7.1 Salford FTN77
+6.8.1 Salford FTN77
 
     FTN77 -INTL -LOGL TESTCLI.F77
     FTN77 -INTL -LOGL F2KCLI.F77
@@ -745,10 +783,10 @@ Each example assumes that:
     LI
     FILE TESTCLI
 
-6.8 RISC OS
+6.9 RISC OS
     -------
 
-6.8.1 Acornsoft Fortran 77
+6.9.1 Acornsoft Fortran 77
 
     objasm asm.f2kgetcl aof.f2kgetcl -quit -stamp
     f77 f2kcli
@@ -761,14 +799,14 @@ Each example assumes that:
     is invoked. It also requires the objasm assembler as originally
     supplied with the RISC OS Software Developers Toolkit.
 
-6.9 OS/2
-    ----
+6.10 OS/2
+     ----
 
-6.9.1 g77
+6.10.1 g77
 
     g77 -o testcli testcli.f f2kcli.f
 
-6.9.2 Watcom Fortran 77
+6.10.2 Watcom Fortran 77
 
     wfc386 testcli
     wlink @testcli.lnk
@@ -788,12 +826,16 @@ Each example assumes that:
     option offset=0x10000
     option protmode
 
-6.10 Mac OS X
+6.11 Mac OS X
      --------
 
-6.10.1 Absoft Pro Fortran
+6.11.1 Absoft Pro Fortran
 
     f95 -o testcli f2kcli.f90 testcli.f90 -lU77
+
+6.11.2 IBM XL Fortran
+
+    xlf -o testcli f2kcli.f90 testcli.f90
 
 ------------------------------------------------------------------------
 
@@ -808,8 +850,7 @@ mainly due to:
 - Fundamental differences in operating system design.
 - Limitations in some existing command line access routines,
   as provided by individual compiler's run time libraries.
-- The proposed definition of command line access as specified in the
-  draft F2K standard.
+- The definition of command line access as specified in the F2003 standard.
 
 In general, the most portable usage of F2KCLI can be achieved by
 understanding the following:
@@ -839,14 +880,13 @@ understanding the following:
 
     (i) The full pathname of the current executable. Generally this is
         a very useful piece of information, where available, though
-        arguably not what the proposed standard specifies. Most DOS,
-        Windows and VMS implementations of F2KCLI return this information.
+        arguably not what the standard specifies. Most DOS, Windows and
+        VMS implementations of F2KCLI return this information.
     or:
    (ii) The actual string which appeared as the very first token on the
         command line which invoked the application. Typically, a less
         useful piece of information but closer to the wording of the
-        proposed standard. All Unix implementations fall into this
-        category.
+        standard. All Unix implementations fall into this category.
     or:
   (iii) Nothing at all. Entirely standard confirming, but even less
         useful than (ii) ! If you interrogate argument zero, your code
@@ -859,10 +899,26 @@ understanding the following:
     use consistent values for the STATUS argument, but a few versions
     will return implementation dependent values. Furthermore, the values
     returned by F2KCLI will almost certainly be different to those
-    reported by vendor-specific implementations provided in future F2K
-    compilers. Therefore, the most portable usage of STATUS will just be
-    to verify that it is zero or simply to ignore/omit it completely.
-    Either treatment will be standard conforming.
+    reported by compiler-specific implementations. Therefore, the most
+    portable usage of STATUS will just be to verify that it is zero or
+    simply to ignore/omit it completely. Either treatment will be standard
+    conforming.
+
+(e) Some compilers developers have begun providing their own implementations
+    of the F2003 command line intrinsics in their Fortran 95 compilers.
+    Examples include Intel Fortran v9, g95, gfortran and Salford FTN95.
+    In general, we would encourage use of the compiler-supplied
+    implementations in preference to F2KCLI. Simply comment out the
+    USE F2KCLI declaration in Fortran 9x calling code or the equivalent
+    INCLUDE 'f2kcli.inc' statement in Fortran 77 calling code. However,
+    it should be noted that most compiler-specific implementations which
+    we have seen to date offer inferior handling of command argument zero
+    (see the discussion in (c) above). It would appear that most compiler
+    runtime implementors are only providing the the information described
+    in (c)(ii) above, even on platforms where the functionality described
+    in (c)(i) is feasible. We would encourage users to lobby the
+    developers of their chosen compiler to implement functionality which
+    at least matches that of F2KCLI in this respect.
 
 ------------------------------------------------------------------------
 
@@ -872,8 +928,8 @@ understanding the following:
 While F2KCLI is provided 'as-is', without any express or implied
 warranty, ISS Ltd. will endeavour to provide support covering:
 
-(1) Correction of bugs causing failure to conform to the proposed F2K
-    command line interface.
+(1) Correction of bugs causing failure to conform to the F2003 command
+    line interface.
 
 (2) Corrections of errors in this documentation.
 
@@ -978,3 +1034,62 @@ Version 1.05 (21/Feb/2003)
 
   - A leftover "-c" argument has been removed from the instructions for
     compiling with Intel Fortran v7.0 under Windows.
+
+Version 1.06 (27/Nov/2003)
+
+  - Support for Digital/Compaq Visual Fortran on Intel/Win32 platforms
+    has been split into "DVF/CVF 5.0-6.5" and "CVF 6.6" due to the lack
+    of backward module compatibility in the CVF 6.6c update. A new
+    binary directory called cvf66 has been added for CVF 6.6 users.
+
+  - Support has been added for the Win32 and Linux versions of Intel
+    Fortran v8, the so-called "combined technology" release which merges
+    Visual Fortran and Intel Fortran.
+
+  - References to "Visual Fortran" have been revised to differentiate
+    between Digital/Compaq Visual Fortran and Intel Visual Fortran (a.k.a.
+    Intel Fortran 8.x). While they are source compatible, they are not
+    binary/module compatible and use different default calling conventions.
+    They also have different compiler driver names.
+
+  - The compile/link instructions for the Win32 versions of LF95 have been
+    corrected. Also, references to "LF95 5.7" have been revised to
+    "LF95 5.7/7.x" since the Fortran 95 which ships as part of Lahey
+    Fortran 7 is effectively the same compiler which shipped previously
+    as v5.7.
+
+Version 1.07 (4/Dec/2003)
+
+  - The Intel/Win32 version for DVF/DVF 5.0-6.6 was been restored to a
+    unified version. A fix to the compiled f2kcli.mod file enables the same
+    version to be used with all versions of Visual Fortran from 5.0c through
+    6.6c. In fact this also fixes a long standing issue, namely that the
+    supplied f2kcli.mod file was not previously compatible with early versions
+    of Visual Fortran, such as v5.
+
+Version 1.08 (14/Oct/2005)
+   
+  - The wording of this document and the F2KCLI home page have been updated
+    to reflect the formal adoption of Fortran 2003 as an official standard.
+
+  - The INTEGER and EXTERNAL declarations for IARGC have been removed from the
+    generic Unix f77 and f90 versions. We were persuaded to add these at 1.04,
+    for the specific benefit of the PGI compilers. In retrospect, making this
+    change to the generic Unix sources was inappropriate and caused problems
+    with at least one compiler which otherwise worked correctly with the
+    generic source. Separate PGI specific sources are now provided in the
+    unix/pgf77 and unix/pgf90 directories instead.
+
+  - IBM XL Fortran on Mac OS X has been added to the list of supported
+    compilers. It works with the existing source code in the macos/f90
+    sub-directory.
+
+  - The Portability section of this manual has been updated, with respect
+    to availability of the F2003 command line intrinsics in some Fortran
+    95 compilers.
+
+  - A contribution from E.P.Chandler has been added, showing how the
+    16-bit DOS version of F2KCLI can be modified to work Watfor77.
+
+  - Source code has been added for EM64T/AMD64 based Win64 platforms
+    running Intel Visual Fortran.

@@ -1,48 +1,54 @@
-# $Id: makefile,v 1.19 2006/08/16 09:20:22 jsy1001 Exp $
+# $Id: makefile,v 1.20 2006/08/17 13:34:32 jsy1001 Exp $
 #
 # Makefile for building mfit
 
 SHELL = /bin/sh
 
-# Sun Workshop Fortran 95
-F90 = /opt/SUNWspro/bin/f90
-FLINK = /opt/SUNWspro/bin/f90
-FFLAGC = -C -g -dalign -I/opt/local/include
-FFLAGL = -dalign -lf77compat
-#FFLAGC = -g -fast -dalign -I/opt/local/include
-#FFLAGL = -fast -dalign -lf77compat
-pgplot_libs = -lpgplot -lX11
-fitsio_libs = -lfitsio
-pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
-nag_libs = -lnag
-fftw_libs = -lrfftw -lfftw -lm
+ifeq ($(OSTYPE),solaris)
+  # Sun Workshop Fortran 95
+  F90 = /opt/SUNWspro/bin/f90
+  FLINK = /opt/SUNWspro/bin/f90
+  FFLAGC = -C -g -dalign -I/opt/local/include
+  FFLAGL = -dalign -lf77compat
+  #FFLAGC = -g -fast -dalign -I/opt/local/include
+  #FFLAGL = -fast -dalign -lf77compat
+  f2kcli_src = f2kcli.f90
 
-# NAGWare Fortran 95 on Solaris
-#F90 = /opt/NAGWare/bin/f95
-#FLINK = /opt/NAGWare/bin/f95
-#FFLAGC = -g -mismatch -I/opt/local/include
-#FFLAGL = -lF77 -lM77
-#pgplot_libs = -lpgplot -lX11
-#fitsio_libs = -lfitsio
-#pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
-#nag_libs = -lnag
-#fftw_libs = -lrfftw -lfftw -lm
+  # NAGWare Fortran 95 on Solaris
+  #F90 = /opt/NAGWare/bin/f95
+  #FLINK = /opt/NAGWare/bin/f95
+  #FFLAGC = -g -mismatch -I/opt/local/include
+  #FFLAGL = -lF77 -lM77
+  #f2kcli_src = f2kcli_nagw.f90
 
-# NAGWare Fortran 95 on Linux
-#F90 = /usr/local/bin/f95
-#FLINK = /usr/local/bin/f95
-#FFLAGC = -g -mismatch -I/usr/local/include
-#FFLAGL = -lg2c -lm
-#pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
-#fitsio_libs = -L/star/lib -lfitsio
-#pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
-#nag_libs = -lnag
-#fftw_libs = -L/usr/local/lib -lrfftw -lfftw -lm
+  # Libraries needed on Solaris
+  pgplot_libs = -lpgplot -lX11
+  fitsio_libs = -lfitsio
+  pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+  nag_libs = -lnag
+  fftw_libs = -lfftw3 -lm
+else
+  # NAGWare Fortran 95 on Linux
+  F90 = /usr/local/bin/f95
+  FLINK = /usr/local/bin/f95
+  FFLAGC = -g -mismatch -I/usr/local/include
+  #FFLAGL = -lg2c -lm
+  # uncomment next line to build semi-static binary (for systems without f95):
+  FFLAGL = -unsharedf95 -lg2c -lm
+  f2kcli_src = f2kcli_nagw.f90
+
+  # Libraries needed on Linux
+  pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
+  fitsio_libs = -L/star/lib -lfitsio
+  pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+  nag_libs = -lnag
+  fftw_libs = -L/usr/local/lib -lfftw3 -lm
+endif
 
 # *** Modify above this line for your system ***
 
 OBJECTS = maths.o fit.o visibility.o inout.o plot.o model.o \
-	gamma.o rjbesl.o marginalise.o
+  gamma.o rjbesl.o marginalise.o
 MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod marginalise.mod
 
 
@@ -74,8 +80,8 @@ clfit.o: clfit.f90 f2kcli.mod inout.mod plot.mod visibility.mod fit.mod model.mo
 calc.o: calc.f90 maths.mod
 	$(F90) -c $(FFLAGC) calc.f90
 
-f2kcli.o f2kcli.mod: f2kcli.f90
-	$(F90) -c $(FFLAGC) f2kcli.f90
+f2kcli.o f2kcli.mod: $(f2kcli_src)
+	$(F90) -c $(FFLAGC) $< -o f2kcli.o
 
 maths.o maths.mod: maths.f90
 	$(F90) -c $(FFLAGC) maths.f90
@@ -94,8 +100,6 @@ plot.o plot.mod: plot.f90 model.mod fit.mod marginalise.mod visibility.mod
 
 model.o model.mod: model.f90 maths.mod
 	$(F90) -c $(FFLAGC) model.f90
-# work around problems compiling on AP linux cluster
-#	$(F90) -f77 -c $(FFLAGC) model.f90
 
 marginalise.o marginalise.mod: marginalise.f90 fit.mod model.mod
 	$(F90) -c $(FFLAGC) marginalise.f90

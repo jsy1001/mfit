@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.9 2006/08/07 15:00:45 jsy1001 Exp $
+# $Id: fitgui.py,v 1.10 2006/08/17 13:34:32 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.9 $")[1]
+_revision = string.split("$Revision: 1.10 $")[1]
 
 
 class GUI:
@@ -314,7 +314,7 @@ class GUI:
         fd = self._popen4.fromchild.fileno() # stdout & stderr of child process
         oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, oldflags|os.O_NONBLOCK)
-        tkinter.createfilehandler(fd, READABLE, self._DisplayOutput)
+        self.parent.tk.createfilehandler(fd, READABLE, self._DisplayOutput)
 
     def _DisplayOutput(self, fd, mask):
         """Read and display output from child process."""
@@ -329,7 +329,7 @@ class GUI:
                                 % os.WEXITSTATUS(status), 'error')
             else:
                 self.ShowResult('Subprocess exited normally\n', 'commentary')
-            tkinter.deletefilehandler(fd)
+            self.parent.tk.deletefilehandler(fd)
             os.remove(self._tempName)
             # Execute post-callback
             if callable(self.postFitCallback):
