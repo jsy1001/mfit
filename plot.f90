@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.19 2006/08/16 09:20:22 jsy1001 Exp $
+!$Id: plot.f90,v 1.20 2006/08/17 13:46:18 jsy1001 Exp $
 
 module Plot
   
@@ -746,7 +746,7 @@ contains
 
     !local variables
     integer, parameter :: iunit = 12
-    character(len=*), parameter :: save_filename = 'post2d.dat'
+    character(len=20) :: save_filename
     real, dimension(:, :), allocatable :: post_points
     double precision :: xval, yval, lhd, pri
     double precision, dimension(2) :: sav
@@ -807,8 +807,10 @@ contains
     !calculate grid of points
     if (plotmargd) then
        num_points = 20
+       save_filename = 'mpost2d.dat'
     else
        num_points = 40
+       save_filename = 'post2d.dat'
     end if
     allocate(post_points(num_points, num_points))
     do i = 1, num_points
@@ -882,7 +884,7 @@ contains
     write (iunit, '(a)') &
          '# -ln(norm. posterior probability) points from last such mfit plot'
     write (iunit, '(a, 3a25)') '# ', trim(x_title), trim(y_title), &
-         '-ln(postprob/peak)'
+         trim(top_title)
     do j = 1, num_points
        yval = ymin + ((j-1.)/(num_points-1.))*(ymax-ymin)
        do i = 1, num_points
