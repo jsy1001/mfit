@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.20 2006/08/16 09:20:22 jsy1001 Exp $
+!$Id: fit.f90,v 1.21 2006/08/17 13:45:40 jsy1001 Exp $
 
 module Fit
 
@@ -90,20 +90,48 @@ contains
     !local variables
     integer :: i, j, k, iwave, ipar, n, lwork
     character(len=128) :: name, comp
-    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det, grad
-    double precision, dimension(:), allocatable ::  x, temp_x, work
+    double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det
+    double precision, dimension(:), allocatable ::  x, temp_x, grad
+    double precision, dimension(:), allocatable :: work
     logical :: illegal
+    !for E04XAF
+    logical :: hes_fail
+    integer :: iwarn, ifail
+    integer, dimension(:), allocatable :: pinf
+    integer, dimension(1) :: iuser
+    double precision :: objf
+    double precision, dimension(:), allocatable :: x_us, hforw, hcntrl
+    double precision, dimension(1) :: user
 
     interface
-       subroutine PDA_UNCMND(n, x0, fcn, x, f, info, w, lw)
+       subroutine PDA_UNCMND(n, x0, fcn, x, f, pinf, w, lw)
          integer, intent(in) :: n, lw
          double precision, dimension(n) :: x0, x
          external fcn
          double precision, intent(out) :: f
-         integer, intent(out) :: info
+         integer, intent(out) :: pinf
          double precision, dimension(lw), intent(out) :: w
        end subroutine PDA_UNCMND
-    end interface
+
+       subroutine E04XAF(msglvl, n, epsrf, x, mode, objfun, lhes, hforw, &
+            objf, objgrd, hcntrl, hesian, &
+            iwarn, work, iuser, user, pinf, ifail)
+         integer, intent(in) :: msglvl, n, mode, lhes
+         integer, intent(inout) :: ifail
+         integer, intent(out) :: iwarn
+         integer, dimension(n), intent(out) :: pinf
+         integer, dimension(*), intent(in) :: iuser
+         double precision, intent(in) :: epsrf
+         double precision, dimension(n), intent(in) :: x
+         double precision, dimension(n), intent(inout) :: hforw
+         double precision, intent(out) :: objf
+         double precision, dimension(n), intent(out) :: objgrd, hcntrl
+         double precision, dimension(lhes, *), intent(out) :: hesian
+         double precision, dimension(*), intent(out) :: work
+         double precision, dimension(*), intent(in) :: user
+         external objfun
+       end subroutine E04XAF
+   end interface
 
     !go through model arrays and count number of variable parameters
     n = 0
@@ -120,6 +148,7 @@ contains
     !that defines the model.
     allocate(x(n))
     allocate(temp_x(n))
+    allocate(grad(n))
     allocate(x_pos(n,2))
     allocate(desc(n))
     k = 0
@@ -306,8 +335,8 @@ contains
              temp_x(i) = x(i)+deltai
              call posterior(n, temp_x, P_u)
              !check we are at a minimum w.r.t. this parameter
-             grad = (P_u - P_l)/(2D0*deltai)
-             if (abs(grad) > 1D-3) then
+             grad(i) = (P_u - P_l)/(2D0*deltai)
+             if (abs(grad(i)) > 1D0) then
                 flag = 6
                 info = 'Final position not a local minimum'
                 return
@@ -337,6 +366,45 @@ contains
           end if
        end do
     end do
+
+    !calculate Hessian using NAg routine
+    allocate(pinf(n))
+    allocate(x_us(n))
+    allocate(hforw(n))
+    allocate(hcntrl(n))
+    allocate(work(n*(n+1)))
+    !work with unscaled parameters, so we calculate true Hessian
+    do i = 1, n
+       x_us(i) = sol(i, 1)
+       hforw(i) = x_scale(i)
+    end do
+    ifail = 1 !silent
+    call E04XAF(1, n, 1D-9, x_us, 2, objfun, size(hes,1), hforw, &
+         objf, grad, hcntrl, hes, &
+         iwarn, work, iuser, user, pinf, ifail)
+    if (ifail == 1) then
+       stop 'E04XAF returned with ifail=1, indicates programming error'
+    else if (ifail == 2) then
+       print *, 'E04XAF had a problem with parameter(s):'
+       hes_fail = .false.
+       do i = 1, n
+          if (pinf(i) /= 0) then
+             print *, 'Parameter', i, ': diagnostic code = ', pinf(i)
+          if (pinf(i) < 4) hes_fail = .true.
+          end if
+       end do
+       if (hes_fail) then
+          info = 'Problem(s) calculating Hessian'
+          return
+       end if
+    end if
+    do i = 1, n
+       print *, hcntrl(i), hcntrl(i)/x_scale(i)
+    end do
+    deallocate(pinf)
+    deallocate(hforw)
+    deallocate(hcntrl)
+    deallocate(work)
 
     !calculate covariance matrix (is inverse of the hessian)
     cov = hes
@@ -387,6 +455,7 @@ contains
     !deallocate local storage
     if (allocated(x)) deallocate(x)
     if (allocated(temp_x)) deallocate(temp_x)
+    if (allocated(grad)) deallocate(grad)
 
     return
 
@@ -497,6 +566,50 @@ contains
     end do
 
   end subroutine gof
+
+!==============================================================================
+
+subroutine objfun(mode, n, x_us, objf, objgrd, nstate, iuser, user)
+
+! Calculate -ln(posterior), given arguments supplied by E04XAF
+
+!subroutine arguments - as specified by E04XAF
+integer, intent(in) :: mode, n, nstate
+double precision, dimension(n), intent(in) :: x_us
+double precision, intent(out) :: objf
+double precision, dimension(n), intent(out) :: objgrd !not used if mode /= 1
+!we don't use iuser or user
+integer, dimension(*), intent(in) :: iuser
+double precision, dimension(*), intent(in) :: user
+
+!local variables
+double precision :: lhd, pri
+integer :: i
+logical :: violation
+
+!check for range violations in current position
+!if position is out of range then return very large energy 
+violation = .false.
+do i = 1, n !over variable parameters
+   if (x_us(i) < x_bound(i,1)) violation = .true.
+   if (x_us(i) > x_bound(i,2)) violation = .true.
+end do
+if (violation) then
+   objf = 1.0d10
+   return
+end if 
+
+!update fit_param with current position x_us
+do i = 1, n
+   fit_param(x_pos(i,1),x_pos(i,2)) = x_us(i)
+end do
+
+!form E = neg log posterior = neg log likelihood + neg log prior
+lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
+pri = prior(x_pos, fit_param, model_param, model_prior)
+objf = lhd + pri
+
+end subroutine objfun
 
 !==============================================================================
 
