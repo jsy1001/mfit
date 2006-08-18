@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.10 2006/08/17 13:34:32 jsy1001 Exp $
+# $Id: fitgui.py,v 1.11 2006/08/18 16:22:19 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.10 $")[1]
+_revision = string.split("$Revision: 1.11 $")[1]
 
 
 class GUI:
@@ -297,12 +297,12 @@ class GUI:
                     optText += ' --plot %s' % p
             else:
                 if p == 'post' or p == 'mpost':
-                    optText += ' --zoomplot %s %d %.3f %.3f' % (p, index, xmin, xmax)
+                    optText += ' --zoomplot %s %d %.4f %.4f' % (p, index, xmin, xmax)
                 elif p == 'post2d' or p == 'mpost2d':
-                    optText += ' --zoomplot %s %d %d %.3f %.3f  %.3f %.3f' % \
+                    optText += ' --zoomplot %s %d %d %.4f %.4f  %.4f %.4f' % \
                                (p, indx[0], indx[1], xmin, xmax, ymin, ymax)
                 else:
-                    optText += ' --zoomplot %s %.3f %.3f' % (p, xmin, xmax)
+                    optText += ' --zoomplot %s %.4f %.4f' % (p, xmin, xmax)
         if self.nofit.get(): optText += ' --nofit'
         if self.margErr.get():
             optText += ' --margerr %s' % (self.margErrVar.get())
