@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.20 2006/08/17 13:34:32 jsy1001 Exp $
+# $Id: makefile,v 1.21 2006/08/31 08:52:52 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -31,7 +31,7 @@ else
   # NAGWare Fortran 95 on Linux
   F90 = /usr/local/bin/f95
   FLINK = /usr/local/bin/f95
-  FFLAGC = -g -mismatch -I/usr/local/include
+  FFLAGC = -C -g -mismatch -I/usr/local/include
   #FFLAGL = -lg2c -lm
   # uncomment next line to build semi-static binary (for systems without f95):
   FFLAGL = -unsharedf95 -lg2c -lm
@@ -47,9 +47,10 @@ endif
 
 # *** Modify above this line for your system ***
 
-OBJECTS = maths.o fit.o visibility.o inout.o plot.o model.o \
-  gamma.o rjbesl.o marginalise.o
-MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod marginalise.mod
+OBJECTS = maths.o fit.o visibility.o inout.o plot.o postplot.o model.o \
+  gamma.o rjbesl.o marginalise.o wrap.o bayes.o
+MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod postplot.mod \
+  model.mod marginalise.mod wrap.mod bayes.mod
 
 
 all: mfit clfit calc mplot ;
@@ -71,10 +72,11 @@ clean:
 
 # source files containing module definitions must be compiled before source
 # files that USE those modules
-main.o: main.f90 inout.mod plot.mod visibility.mod fit.mod model.mod
+main.o: main.f90 inout.mod model.mod fit.mod plot.mod postplot.mod wrap.mod
 	$(F90) -c $(FFLAGC) main.f90
 
-clfit.o: clfit.f90 f2kcli.mod inout.mod plot.mod visibility.mod fit.mod model.mod
+clfit.o: clfit.f90 f2kcli.mod inout.mod model.mod fit.mod \
+  wrap.mod plot.mod postplot.mod
 	$(F90) -c $(FFLAGC) clfit.f90
 
 calc.o: calc.f90 maths.mod
@@ -83,10 +85,16 @@ calc.o: calc.f90 maths.mod
 f2kcli.o f2kcli.mod: $(f2kcli_src)
 	$(F90) -c $(FFLAGC) $< -o f2kcli.o
 
+wrap.o wrap.mod: wrap.f90
+	$(F90) -c $(FFLAGC) wrap.f90
+
+bayes.o bayes.mod: bayes.f90 maths.mod visibility.mod
+	$(F90) -c $(FFLAGC) bayes.f90
+
 maths.o maths.mod: maths.f90
 	$(F90) -c $(FFLAGC) maths.f90
 
-fit.o fit.mod: fit.f90 maths.mod visibility.mod model.mod
+fit.o fit.mod: fit.f90 maths.mod bayes.mod wrap.mod model.mod
 	$(F90) -c $(FFLAGC) fit.f90
 
 visibility.o visibility.mod: visibility.f90 maths.mod model.mod
@@ -95,13 +103,18 @@ visibility.o visibility.mod: visibility.f90 maths.mod model.mod
 inout.o inout.mod: inout.f90
 	$(F90) -c $(FFLAGC) inout.f90
 
-plot.o plot.mod: plot.f90 model.mod fit.mod marginalise.mod visibility.mod
+plot.o plot.mod: plot.f90 maths.mod visibility.mod bayes.mod
 	$(F90) -c $(FFLAGC) plot.f90
+
+postplot.o postplot.mod: postplot.f90 plot.mod bayes.mod wrap.mod \
+  model.mod marginalise.mod
+	$(F90) -c $(FFLAGC) postplot.f90
 
 model.o model.mod: model.f90 maths.mod
 	$(F90) -c $(FFLAGC) model.f90
 
-marginalise.o marginalise.mod: marginalise.f90 fit.mod model.mod
+marginalise.o marginalise.mod: marginalise.f90 maths.mod bayes.mod \
+  wrap.mod model.mod
 	$(F90) -c $(FFLAGC) marginalise.f90
 
 gamma.o: gamma.f

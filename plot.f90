@@ -1,13 +1,16 @@
-!$Id: plot.f90,v 1.20 2006/08/17 13:46:18 jsy1001 Exp $
+!$Id: plot.f90,v 1.21 2006/08/31 08:52:52 jsy1001 Exp $
 
 module Plot
   
-  use Model
-  use Fit
-  use Marginalise
+  use Maths
   use Visibility
+  use Bayes, only : vis_data, triple_data
 
-  !subroutines contained:
+  implicit none
+
+  public
+
+  !public subroutines contained:
   !
   !plot_pts - call PGPLOT to plot points; save points to file
   !
@@ -25,19 +28,11 @@ module Plot
   !
   !plot_uv - plot uv coverage
   !
-  !plot_post - plot 1d cut through -ln(posterior) or
-  !-ln(marginalised posterior)
-  !
-  !plot_post2d - plot 2d slice through -ln(posterior) or
-  !-ln(marginalised posterior)
-  !
   !plot_vis - plot squared visibility against specified data column
   !
   !plot_triple_phase - plot closure phase against specified data column
   !
   !plot_triple_amp - plot triple product amplitude specified data column
-
-  implicit none
 
 contains
 
@@ -179,8 +174,12 @@ contains
        bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
        bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
        bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
-       if (present(uxmin) .and. maxval(bas) .lt. uxmin) cycle!out of plot range
-       if (present(uxmax) .and. maxval(bas) .gt. uxmax) cycle!out of plot range
+       if (present(uxmin)) then
+          if (maxval(bas) < uxmin) cycle !out of plot range
+       end if
+       if (present(uxmax)) then
+          if (maxval(bas) > uxmax) cycle !out of plot range
+       end if
        phase = modulo(triple_data(i, 9), 360D0)
        if (phase > 180.) phase = phase - 360.
        phase_err = triple_data(i, 10)
@@ -308,8 +307,12 @@ contains
        bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
        bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
        bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
-       if (present(uxmin) .and. maxval(bas) .lt. uxmin) cycle!out of plot range
-       if (present(uxmax) .and. maxval(bas) .gt. uxmax) cycle!out of plot range
+       if (present(uxmin)) then
+          if (maxval(bas) < uxmin) cycle !out of plot range
+       end if
+       if (present(uxmax)) then
+          if (maxval(bas) > uxmax) cycle !out of plot range
+       end if
        amp = triple_data(i, 7)
        amp_err = triple_data(i, 8)
        vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
@@ -431,8 +434,12 @@ contains
        u = vis_data(i, 3)
        v = vis_data(i, 4)
        bas = 1000.*sqrt(u**2. + v**2.)/lambda
-       if (present(uxmin) .and. bas .lt. uxmin) cycle !out of plot range
-       if (present(uxmax) .and. bas .gt. uxmax) cycle !out of plot range
+       if (present(uxmin)) then
+          if (bas < uxmin) cycle !out of plot range
+       end if
+       if (present(uxmax)) then
+          if (bas > uxmax) cycle !out of plot range
+       end if
        vsq = vis_data(i, 5)
        err = vis_data(i, 6)
        if (err <= 0D0) then
@@ -612,298 +619,6 @@ contains
 
   !============================================================================
 
-  subroutine plot_post(plotmargd, nlevidence, indx, &
-       x_title, y_title, top_title, uxmin, uxmax, device)
-
-    !indx is into x_pos array of variable parameters
-    !x_pos, x_bound must be initialised on entry to this routine i.e. must have
-    !called minimiser() from Fit module
-
-    !subroutine arguments
-    logical, intent(in) :: plotmargd
-    double precision, intent(in) :: nlevidence
-    integer, intent(in) :: indx
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    double precision, intent(in) :: uxmin, uxmax
-    character(len=*), intent(in), optional :: device
-
-    !local variables
-    real, dimension(:, :), allocatable :: post_points, mpost_points
-    double precision :: val, lhd, pri, sav
-    integer :: nvar, num_points, i, istat
-    real :: xmin, xmax, ymin, ymax, pmin
-    character(len=128) :: info
-
-    !functions
-    integer :: pgopen
-
-    !return if nothing to plot
-    nvar = size(x_pos, 1)
-    if (indx < 1 .or. indx > nvar) return
-    if (uxmax < x_bound(indx, 1)) return
-    if (uxmin > x_bound(indx, 2)) return
-
-    !adjust x range if necessary - need to keep within x_bound limits
-    if (uxmin < x_bound(indx, 1)) then
-       xmin = x_bound(indx, 1)
-    else
-       xmin = uxmin
-    end if
-    if (uxmax > x_bound(indx, 2)) then
-       xmax = x_bound(indx, 2)
-    else
-       xmax = uxmax
-    end if
-
-    !copy model parameters
-    sav = fit_param(x_pos(indx, 1), x_pos(indx, 2))
-
-    !calculate grid of points
-    if (plotmargd) then
-       num_points = 20
-       allocate(mpost_points(num_points, 2))
-       mg_marg = .true.
-       mg_marg(indx) = .false.
-       mg_param = fit_param
-    else
-       num_points = 50
-    end if
-    allocate(post_points(num_points, 2))
-    do i = 1, num_points
-       val = xmin + ((i-1.)/(num_points-1.))*(xmax-xmin)
-       post_points(i, 1) = val
-       if (plotmargd) then
-          mpost_points(i, 1) = val
-          mg_param(x_pos(indx, 1), x_pos(indx, 2)) = val
-          mpost_points(i, 2) = marg_post(info)
-          if (info /= '') print *, trim(info)
-       end if
-       fit_param(x_pos(indx, 1), x_pos(indx, 2)) = val
-       lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
-       pri = prior(x_pos, fit_param, model_param, model_prior)
-       post_points(i, 2) = lhd + pri - nlevidence !fix normalisation later
-    end do
-    fit_param(x_pos(indx, 1), x_pos(indx, 2)) = sav
-
-    !calculate y range
-    if (plotmargd) then
-       ymin = minval(mpost_points(:, 2))
-       ymax = maxval(mpost_points(:, 2))
-       pmin = minval(post_points(:, 2))
-       post_points(:, 2) = post_points(:, 2) + (ymin - pmin)
-    else
-       ymin = minval(post_points(:, 2))
-       ymax = maxval(post_points(:, 2))
-    end if
-
-    !plot posterior
-    if (present(device)) then
-       istat = pgopen(device)
-       if (istat <= 0) return
-    end if
-    call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
-    call pglab(trim(x_title), trim(y_title), trim(top_title))
-    if (.not. plotmargd) then
-       call pgsci(1)
-    else
-       call pgsci(7)
-       call pgsls(2)
-    end if
-    call plot_pts(x_title, '-ln(postprob)', num_points, post_points, -1, &
-         'post1d.dat')
-    call pgsci(1)
-    call pgsls(1)
-    if (plotmargd) &
-         call plot_pts(x_title, y_title, num_points, mpost_points, -1, &
-         'mpost1d.dat')
-
-    if (allocated(post_points)) deallocate(post_points)
-    if (allocated(mpost_points)) deallocate(mpost_points)
-
-  end subroutine plot_post
-
-  !============================================================================
-
-  subroutine plot_post2d(plotmargd, nlposterior, indx, &
-       x_title, y_title, top_title, uxmin, uxmax, uymin, uymax, device)
-
-    !nlposterior is minimum of negative log posterior (in case this is not
-    ! sufficiently close to a grid point), needed to plot correct n-sigma
-    ! contours in unmarginalised case
-    !indx(i) is into x_pos array of variable parameters
-    !x_pos, x_bound must be initialised on entry to this routine i.e. must have
-    ! called minimiser() from Fit module
-
-    !subroutine arguments
-    logical, intent(in) :: plotmargd
-    double precision, intent(in) :: nlposterior
-    integer, intent(in), dimension(2) :: indx
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    double precision, intent(in) :: uxmin, uxmax
-    double precision, intent(in) :: uymin, uymax
-    character(len=*), intent(in), optional :: device
-
-    !local variables
-    integer, parameter :: iunit = 12
-    character(len=20) :: save_filename
-    real, dimension(:, :), allocatable :: post_points
-    double precision :: xval, yval, lhd, pri
-    double precision, dimension(2) :: sav
-    integer :: nvar, num_points, i, j, istat
-    real :: xmin, xmax, ymin, ymax
-    character(len=128) :: info
-    logical :: invgray
-    real, dimension(6) :: tr
-    real fg, bg
-    integer, parameter :: nlevs_max=3
-    !delta (chi^2)/2 values for 2-parameter 1-, 2-, 3-sigma confidence regions
-    real, dimension(nlevs_max) :: levs=(/1.15,3.08,5.90/)
-
-    !functions
-    integer :: pgopen
-
-    !return if nothing to plot
-    nvar = size(x_pos, 1)
-    if (indx(1) < 1 .or. indx(1) > nvar) return
-    if (indx(2) < 1 .or. indx(2) > nvar) return
-    if (uxmax < x_bound(indx(1), 1)) return
-    if (uxmin > x_bound(indx(1), 2)) return
-    if (uymax < x_bound(indx(2), 1)) return
-    if (uymin > x_bound(indx(2), 2)) return
-
-    !adjust ranges if necessary - need to keep within x_bound limits
-    if (uxmin < x_bound(indx(1), 1)) then
-       xmin = x_bound(indx(1), 1)
-    else
-       xmin = uxmin
-    end if
-    if (uxmax > x_bound(indx(1), 2)) then
-       xmax = x_bound(indx(1), 2)
-    else
-       xmax = uxmax
-    end if
-    if (uymin < x_bound(indx(2), 1)) then
-       ymin = x_bound(indx(2), 1)
-    else
-       ymin = uymin
-    end if
-    if (uymax > x_bound(indx(2), 2)) then
-       ymax = x_bound(indx(2), 2)
-    else
-       ymax = uymax
-    end if
-
-    !copy model parameters
-    sav(1) = fit_param(x_pos(indx(1), 1), x_pos(indx(1), 2))
-    sav(2) = fit_param(x_pos(indx(2), 1), x_pos(indx(2), 2))
-    if (plotmargd) then
-       mg_marg = .true.
-       mg_marg(indx(1)) = .false.
-       mg_marg(indx(2)) = .false.
-       mg_param = fit_param
-    end if
-
-    !calculate grid of points
-    if (plotmargd) then
-       num_points = 20
-       save_filename = 'mpost2d.dat'
-    else
-       num_points = 40
-       save_filename = 'post2d.dat'
-    end if
-    allocate(post_points(num_points, num_points))
-    do i = 1, num_points
-       xval = xmin + ((i-1.)/(num_points-1.))*(xmax-xmin)
-       do j = 1, num_points
-          yval = ymin + ((j-1.)/(num_points-1.))*(ymax-ymin)
-          if (plotmargd) then
-             mg_param(x_pos(indx(1), 1), x_pos(indx(1), 2)) = xval
-             mg_param(x_pos(indx(2), 1), x_pos(indx(2), 2)) = yval
-             post_points(i, j) = marg_post(info)
-             if (info /= '') print *, trim(info)
-          else
-             fit_param(x_pos(indx(1), 1), x_pos(indx(1), 2)) = xval
-             fit_param(x_pos(indx(2), 1), x_pos(indx(2), 2)) = yval
-             lhd = likelihood(vis_data, triple_data, model_spec, fit_param)
-             pri = prior(x_pos, fit_param, model_param, model_prior)
-             post_points(i, j) = lhd + pri - nlposterior
-          end if
-       end do
-    end do
-    fit_param(x_pos(indx(1), 1), x_pos(indx(1), 2)) = sav(1)
-    fit_param(x_pos(indx(2), 1), x_pos(indx(2), 2)) = sav(2)
-
-    !plot posterior
-    if (present(device)) then
-       istat = pgopen(device)
-       if (istat <= 0) return
-    end if
-    call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, -2)
-    call pglab(trim(x_title), trim(y_title), trim(top_title))
-    call pgsci(1)
-
-    !mapping from array elements to sky coordinates
-    tr(2) = (xmax-xmin)/real(num_points-1)
-    tr(6) = (ymax-ymin)/real(num_points-1)
-    tr(1) = xmin - tr(2)
-    tr(4) = ymin - tr(6)
-    tr(3) = 0.
-    tr(5) = 0.
-
-    print *, minval(post_points)
-    if (plotmargd) then
-       !(marginalisation can shift minimum)
-       post_points = post_points - minval(post_points)
-    end if
-
-    invgray = .true. !make minimum bright
-    if (invgray) then
-       fg = minval(post_points)
-       bg = 0.6*maxval(post_points)
-    else
-       fg = maxval(post_points)
-       bg = minval(post_points)
-    endif
-    call pggray(post_points, num_points, num_points, &
-         1, num_points, 1, num_points, fg, bg, tr)
-      
-    write (51, *) (levs(i), i=1, size(levs,1))
-    call pgsci(2)
-    call pgcont(post_points, num_points, num_points, &
-         1, num_points, 1, num_points, levs, size(levs,1), tr)
-    call pgsci(1)
-    call pgbox('ABCNST', 0., 0, 'ABCNST', 0., 0)
-    call pgsci(3)
-    call pgpt1(real(sav(1)), real(sav(2)), 12) !mark pos'n found by minimiser
-
-    !write plotted points to text file
-    open (unit=iunit, file=save_filename, status='replace', action='write', &
-         err=91)
-    write (iunit, '(a)') &
-         '# -ln(norm. posterior probability) points from last such mfit plot'
-    write (iunit, '(a, 3a25)') '# ', trim(x_title), trim(y_title), &
-         trim(top_title)
-    do j = 1, num_points
-       yval = ymin + ((j-1.)/(num_points-1.))*(ymax-ymin)
-       do i = 1, num_points
-          xval = xmin + ((i-1.)/(num_points-1.))*(xmax-xmin)
-          write (iunit, '(2x, 3f25.6)') xval, yval, post_points(i,j)
-       end do
-       write (iunit, *)
-    end do
-    close (iunit)
-
-    if (allocated(post_points)) deallocate(post_points)
-    return
-
-91  print *, 'Cannot open file '//trim(save_filename)
-
-  end subroutine plot_post2d
-
-  !============================================================================
-
   subroutine plot_vis(xindex, spec, param, x_title, y_title, top_title, &
        xzero, uxmin, uxmax, device)
 
@@ -938,8 +653,12 @@ contains
     num_flagged = 0
     do i = 1, size(vis_data, 1)
        !skip if x value outside plot range
-       if (present(uxmin) .and. vis_data(i, xindex) .lt. uxmin) cycle
-       if (present(uxmax) .and. vis_data(i, xindex) .gt. uxmax) cycle
+       if (present(uxmin)) then
+          if (vis_data(i, xindex) < uxmin) cycle
+       end if
+       if (present(uxmax)) then
+          if (vis_data(i, xindex) > uxmax) cycle
+       end if
        lambda = vis_data(i, 1)
        delta_lambda = vis_data(i, 2)
        u = vis_data(i, 3)
@@ -1075,8 +794,12 @@ contains
     num_flagged = 0
     do i = 1, size(triple_data, 1)
        !skip if x value outside plot range
-       if (present(uxmin) .and. triple_data(i, xindex) .lt. uxmin) cycle
-       if (present(uxmax) .and. triple_data(i, xindex) .gt. uxmax) cycle
+       if (present(uxmin)) then
+          if (triple_data(i, xindex) < uxmin) cycle
+       end if
+       if (present(uxmax)) then
+          if (triple_data(i, xindex) > uxmax) cycle
+       end if
        lambda = triple_data(i, 1)
        delta_lambda = triple_data(i, 2)
        phase = modulo(triple_data(i, 9), 360D0)
@@ -1209,8 +932,12 @@ contains
     num_flagged = 0
     do i = 1, size(triple_data, 1)
        !skip if x value outside plot range
-       if (present(uxmin) .and. triple_data(i, xindex) .lt. uxmin) cycle
-       if (present(uxmax) .and. triple_data(i, xindex) .gt. uxmax) cycle
+       if (present(uxmin)) then
+          if (triple_data(i, xindex) < uxmin) cycle
+       end if
+       if (present(uxmax)) then
+          if (triple_data(i, xindex) > uxmax) cycle
+       end if
        lambda = triple_data(i, 1)
        delta_lambda = triple_data(i, 2)
        amp = triple_data(i, 7)

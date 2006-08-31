@@ -1,12 +1,13 @@
-!$Id: main.f90,v 1.24 2006/08/16 09:20:22 jsy1001 Exp $
+!$Id: main.f90,v 1.25 2006/08/31 08:52:52 jsy1001 Exp $
 
 program Main
 
   use Inout
-  use Plot
-  use Visibility
-  use Fit
   use Model
+  use Fit
+  use Wrap
+  use Plot
+  use Postplot
 
   implicit none
 
@@ -19,23 +20,27 @@ program Main
   integer, parameter :: width = 78            !for spacer lines
   double precision, parameter :: sig = 0.1D0  !waveband must match to sig nm
 
-  !arrays for fit results
-  character(len=55), dimension(:), allocatable :: desc
-  double precision, dimension(:, :), allocatable :: sol, hes, cov, cor
+  !local variables to do with fit
+  type(allparam) :: allpar
+  integer, allocatable :: var_pos(:,:)
+  character(len=model_desc_len), allocatable :: var_desc(:)
+  double precision, allocatable :: sol(:), err(:)
+  double precision, allocatable :: hes(:,:), cov(:,:), cor(:,:)
 
   !other local variables
-  double precision, dimension(:, :), allocatable :: wavebands
-  double precision, dimension(2) :: wb, wave
+  double precision, allocatable :: wavebands(:, :)
+  double precision :: wb(2), wave(2)
   character(len=width) :: spacer_line
   character(len=128) :: info, file_name, ext, source
-  character(len=128) :: xlabel, ylabel, top_title, xrange, wavestr
-  integer :: i, length, flag
+  character(len=128) :: ylabel, top_title, xrange, wavestr
+  integer :: i, n
   integer :: degfreedom, useful_vis, useful_amp, useful_cp
-  integer, dimension(2) :: indx
+  integer :: indx(2)
   double precision :: nlposterior, nlevidence, nlnpost, chisqrd, normchisqrd
   double precision :: calib_error, uxmin, uxmax, uymin, uymax, temp
   double precision :: x0, y0, xsig, ysig
   logical :: force_symm, mod_line, marg
+  logical :: fit_ok, found_min, hes_valid
 
   integer :: pgopen, istat
 
@@ -269,8 +274,6 @@ program Main
      !Free parameters should be supplied with (non zero and positive) prior
      !widths which are the 1-sigma width of the gaussian prior
      !distributions as per DB thesis chapter 2.
-     !Checks are not made here as to the legality of the freedom in the model -
-     !refer to the fit module.
 
      do
         print *, ' '
@@ -309,29 +312,49 @@ program Main
 
      !-------------------------------------------------------------------------
      !fit model to the data by minimising negative log posterior
-     !
-     !Refer to fit module. the fit solution is returned along with various 
-     !diagnostic quantities.
 
      print *, ' '
      print *, 'fitting model by minimising negative log posterior...'
 
-     info = ''
-     ! minimiser allocates fit_param, x, x_pos, sol, desc, hes, cov, cor
-     call minimiser(info, force_symm, sol, flag, desc, &
-          hes, cov, cor, chisqrd, nlposterior, nlevidence)
+     !check model freedoms
+     if (.not. model_valid(info, force_symm)) then
+        print *, trim(info)
+        stop
+     end if
+
+     !allocate and initialise arrays related to variable model parameters
+     call model_nvar(n)
+     degfreedom = useful_vis + useful_amp + useful_cp - n
+     allocate(var_pos(n,2), var_desc(n))
+     call model_getvar(n, var_pos, var_desc)
+
+     !allocate arrays for fit results
+     allocate(sol(n), err(n), hes(n,n), cov(n,n), cor(n,n))
+
+     call allparam_init(allpar, model_param, model_limits, n, var_pos)
+
+     ! minimise
+     call minimiser(allpar, sol, chisqrd, nlposterior, fit_ok, info)
      if (info /= '') then
         print *,'*****'
         print *,trim(info)
         print *, '*****'
      end if
 
-     if (flag > -1 .and. flag < 4) then
-        degfreedom = useful_vis + useful_amp + useful_cp - size(sol,1)
+     if (fit_ok) then
+        call err_est(n, sol, &
+             found_min, hes_valid, hes, cov, cor, err, nlevidence, info)
+        if (info /= '') then
+           print *,'*****'
+           print *,trim(info)
+           print *, '*****'
+        end if
+     end if
 
+     if (found_min) then
         print *, ' '
         print *, 'negative log posterior =',real(nlposterior)
-        print *, 'negative log evidence  =',real(nlevidence)
+        if (hes_valid) print *, 'negative log evidence  =',real(nlevidence)
         print *, ' '
         print *, '           chi squared =',real(chisqrd) 
         print *, '    degrees of freedom =',degfreedom
@@ -345,81 +368,83 @@ program Main
         print '(1x, a, 49x, a)', '                   ', 'fitted      hessian'
         print '(1x, a, 49x, a)', 'num  parameter name', ' value        error'
         do i = 1, size(sol,1)
-           write(*,62) i, desc(i), sol(i,:)
+           write(*,62) i, var_desc(i), sol(i), err(i)
         end do
 62      format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6) 
 
-        ! Display alternative error bars for fitted parameters
-        ! Estimates assuming data errors scaled so chi sqrd/deg freedom = unity
-        print *, ' '
-        print '(1x, a, 49x, a)', 'SCALED DATA ERRORS ->', 'fitted      hessian'
-        print '(1x, a, 49x, a)', '  num  parameter name', ' value        error'
-        do i = 1, size(sol,1)
-           write(*,63) i, desc(i), sol(i,1), sqrt(normchisqrd)*sol(i,2)
-        end do
-63      format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*') 
+        if (hes_valid) then
+           ! Display alternative error bars for fitted parameters
+           ! Estimates assuming data errors scaled so chi sqrd/deg freedom = unity
+           print *, ' '
+           print '(1x, a, 49x, a)', 'SCALED DATA ERRORS ->', 'fitted      hessian'
+           print '(1x, a, 49x, a)', '  num  parameter name', ' value        error'
+           do i = 1, size(sol,1)
+              write(*,63) i, var_desc(i), sol(i), sqrt(normchisqrd)*err(i)
+           end do
+63         format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*') 
+           
+           print *, ' '
+           print *, 'hessian matrix'
+           do i = 1, n
+              write(*,64) hes(i,:)
+           end do
+        
+           print *, ' '
+           print *, 'covariance matrix'
+           do i = 1, n
+              write(*,64) cov(i,:)
+           end do
 
-        length = size(hes,1)
-        print *, ' '
-        print *, 'hessian matrix'
-        do i = 1, length
-           write(*,64) hes(i,:)
-        end do
+           print *, ' '
+           print *, 'correlation matrix'
+           do i = 1, n
+              write(*,64) cor(i,:)
+           end do
 
-        print *, ' '
-        print *, 'covariance matrix'
-        do i = 1, length
-           write(*,64) cov(i,:)
-        end do
-
-        print *, ' '
-        print *, 'correlation matrix'
-        do i = 1, length
-           write(*,64) cor(i,:)
-        end do
-
-64      format(1x, 10(e11.4,1x))
+64         format(1x, 10(e11.4,1x))
+        end if
 
         print *,' '
         print *,spacer_line
 
         !----------------------------------------------------------------------
         !plot
-
+        call allparam_setvar(allpar, sol)
         mod_line = (symm .and. size(sel_wavebands, 1) == 1)
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (useful_vis > 0) then
-           call plot_vis_bas(model_spec, fit_param, mod_line, 'Baseline /M\gl', &
-                'Squared Visibility', top_title)
+           call plot_vis_bas(model_spec, allpar%param, mod_line, &
+                'Baseline /M\gl', 'Squared Visibility', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_vis_bas(model_spec, fit_param, mod_line, 'Baseline /M\gl', &
-                   'Squared Visibility', top_title, uxmin, uxmax)
+              call plot_vis_bas(model_spec, allpar%param, mod_line, &
+                   'Baseline /M\gl', 'Squared Visibility', top_title, &
+                   uxmin, uxmax)
            end if
         end if
         if (useful_amp > 0) then 
-           call plot_triple_amp_bas(model_spec, fit_param, &
+           call plot_triple_amp_bas(model_spec, allpar%param, &
                 'Longest baseline /M\gl', 'Triple amplitude', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_triple_amp_bas(model_spec, fit_param, &
+              call plot_triple_amp_bas(model_spec, allpar%param, &
                    'Longest baseline /M\gl', 'Triple amplitude', top_title, &
                    uxmin, uxmax)
              end if
         end if
         if (useful_cp > 0) then
-           call plot_triple_phase_bas(model_spec, fit_param, &
+           call plot_triple_phase_bas(model_spec, allpar%param, &
                 'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                 top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_triple_phase_bas(model_spec, fit_param, &
+              call plot_triple_phase_bas(model_spec, allpar%param, &
                    'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                    top_title, uxmin, uxmax)
              end if
@@ -428,14 +453,14 @@ program Main
            do
               print *, 'enter variable number for x axis'
               read *, indx(1)
-              if (indx(1) <= length) exit
+              if (indx(1) <= n) exit
            end do
-           x0 = sol(indx(1), 1)
-           if (sol(indx(1), 2) == 0D0) then
+           x0 = sol(indx(1))
+           if (.not. hes_valid) then
               !was problem calculating errors from hessian
-              xsig = model_prior(x_pos(indx(1), 1), x_pos(indx(1), 2))
+              xsig = model_prior(var_pos(indx(1), 1), var_pos(indx(1), 2))
            else
-              xsig = sol(indx(1), 2)
+              xsig = err(indx(1))
            end if
            uxmin = x0 - 3*xsig
            uxmax = x0 + 3*xsig
@@ -449,66 +474,71 @@ program Main
                    0.5D0*log(hes(indx(1),indx(1)))
               ylabel = '-ln(postprob)'
            end if
-           call plot_post(marg, nlnpost, indx(1), desc(indx(1)), &
-                ylabel, top_title, uxmin, uxmax)
+           call plot_post1d(marg, nlnpost, allpar, indx(1), &
+                var_desc(indx(1)), ylabel, top_title, uxmin, uxmax)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_post(marg, nlnpost, indx(1), desc(indx(1)), &
-                   ylabel, top_title, uxmin, uxmax)
+              call plot_post1d(marg, nlnpost, allpar, indx(1), &
+                   var_desc(indx(1)), ylabel, top_title, uxmin, uxmax)
            end if
         end if
         if (yesno('Plot 2d cut through -ln(postprob)', 'no')) then
            do
               print *, 'enter variable numbers for x and y axes'
               read *, indx
-              if (indx(1) <= length .and. indx(2) <= length) exit
+              if (indx(1) <= n .and. indx(2) <= n) exit
            end do
-           x0 = sol(indx(1), 1)
-           if (sol(indx(1), 2) == 0D0) then
+           x0 = sol(indx(1))
+           if (.not. hes_valid) then
               !was problem calculating errors from hessian
-              xsig = model_prior(x_pos(indx(1), 1), x_pos(indx(1), 2))
+              xsig = model_prior(var_pos(indx(1), 1), var_pos(indx(1), 2))
            else
-              xsig = sol(indx(1), 2)
+              xsig = err(indx(1))
            end if
            uxmin = x0 - 3*xsig
            uxmax = x0 + 3*xsig
-           y0 = sol(indx(2), 1)
-           if (sol(indx(2), 2) == 0D0) then
+           y0 = sol(indx(2))
+           if (.not. hes_valid) then
               !was problem calculating errors from hessian
-              ysig = model_prior(x_pos(indx(2), 1), x_pos(indx(2), 2))
+              ysig = model_prior(var_pos(indx(2), 1), var_pos(indx(2), 2))
            else
-              ysig = sol(indx(2), 2)
+              ysig = err(indx(2))
            end if
            uymin = y0 - 3*ysig
            uymax = y0 + 3*ysig
            if (yesno('Marginalise over other variables', 'no')) then
               marg = .true.
-              top_title = trim(top_title)//': -ln(MARG. postprob)'
+              top_title = '-ln(MARG. postprob) - '//trim(top_title)
            else
               marg = .false.
-              top_title = trim(top_title)//': -ln(postprob)'
+              top_title = '-ln(postprob) - '//trim(top_title)
            end if
-           call plot_post2d(marg, nlposterior, indx, desc(indx(1)), &
-                desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
+           call plot_post2d(marg, nlposterior, allpar, indx, &
+                var_desc(indx(1)), var_desc(indx(2)), top_title, &
+                uxmin, uxmax, uymin, uymax)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
            if (len_trim(xrange) .gt. 0) then
               print *, 'enter y-axis range for replot'
               read *, uymin, uymax
-              call plot_post2d(marg, nlposterior, indx, desc(indx(1)), &
-                   desc(indx(2)), top_title, uxmin, uxmax, uymin, uymax)
+              call plot_post2d(marg, nlposterior, allpar, indx, &
+                   var_desc(indx(1)), var_desc(indx(2)), top_title, &
+                   uxmin, uxmax, uymin, uymax)
            end if
         end if
      end if
 
      !-------------------------------------------------------------------------
      !Deallocate model/fitting storage
+     call allparam_free(allpar)
      call free_model() !model_*
-     call free_fit() !fit_param, x_pos, x_bound
-     if (allocated(desc)) deallocate(desc)
+     call free_fit()
+     if (allocated(var_pos)) deallocate(var_pos)
+     if (allocated(var_desc)) deallocate(var_desc)
      if (allocated(sol)) deallocate(sol)
+     if (allocated(err)) deallocate(err)
      if (allocated(hes)) deallocate(hes)
      if (allocated(cov)) deallocate(cov)
      if (allocated(cor)) deallocate(cor)
@@ -522,6 +552,7 @@ program Main
   if (allocated(vis_data)) deallocate(vis_data)
   if (allocated(triple_data)) deallocate(triple_data)
   if (allocated(wavebands)) deallocate(wavebands)
+  if (allocated(sel_wavebands)) deallocate(sel_wavebands)
 
 contains
 
@@ -532,15 +563,15 @@ contains
     !Filter 2d double precision data array by 1st two columns
     !Rows are kept if 1st two columns match wb to precision sig
     !Reallocates data array
-    double precision, dimension(:, :), allocatable :: data
-    double precision, dimension(2) :: wb
+    double precision, allocatable :: data(:, :)
+    double precision :: wb(2)
     double precision :: sig
     integer dim2
 
     !local variables
     integer nfilt
-    logical, dimension(:), allocatable :: mask
-    double precision, dimension(:, :), allocatable :: filt_data
+    logical, allocatable :: mask(:)
+    double precision, allocatable :: filt_data(:, :)
 
     dim2 = size(data,2)
     allocate(mask(size(data,1)))
@@ -564,14 +595,14 @@ contains
     !Filter 2d double precision data array by 1st column
     !Rows are kept if 1st column between wlmin and wlmax
     !Reallocates data array
-    double precision, dimension(:, :), allocatable :: data
+    double precision, allocatable :: data(:, :)
     double precision :: wlmin, wlmax
     integer dim2
 
     !local variables
     integer nfilt
-    logical, dimension(:), allocatable :: mask
-    double precision, dimension(:, :), allocatable :: filt_data
+    logical, allocatable :: mask(:)
+    double precision, allocatable :: filt_data(:, :)
 
     dim2 = size(data,2)
     allocate(mask(size(data,1)))

@@ -1,10 +1,9 @@
-!$Id: marginalise.f90,v 1.4 2006/08/16 09:20:22 jsy1001 Exp $
+!$Id: marginalise.f90,v 1.5 2006/08/31 08:52:52 jsy1001 Exp $
 
 module Marginalise
 
-  !callable subroutines contained:
+  !public subroutines contained:
   !
-  ! alloc_mg, free_mg -- allocate/free module storage
   ! marg_post - return marginalised -ln(posterior)
   ! marg_err  - determine parameter error bars from marginalised -ln(posterior)
   !
@@ -14,67 +13,65 @@ module Marginalise
   !                used in marg_post
   ! ferr - function marg_err finds roots of
 
-  use Fit
+  use Maths
+  use Bayes
+  use Wrap
   use Model
+  use Fit, only: minimiser
 
   implicit none
 
   private
 
-  public :: mg_param, mg_marg
-
-  public :: alloc_mg, free_mg, marg_post, marg_err
+  public :: marg_post, marg_err
 
   !module variables contained:
 
-  !values of both variable and non-variable model parameters
-  double precision, dimension(:, :), allocatable :: mg_param
+  !! Model parameters for prob()
+  type(allparam), save :: mg_par
 
-  !if mg_marg(i) true, marginalise over parameter Fit::x_pos(i)
-  logical, dimension(:), allocatable :: mg_marg
+  !! Used to normalise values calculated by prob, to avoid overflow
+  double precision :: mg_nlnorm
 
-  !used to normalise values calculated by prob, to avoid overflow
-  double precision :: post
 
-  !used by marg_err/ferr
-  integer :: ivar
-  double precision :: minpost
+  !used by marg_err/ferr:
+
+  type(allparam), save :: mgerr_par
+  !! Variable to estimate error bar for
+  integer :: mgerr_ivar
+  !! Variables to marginalise over (all but mgerr_ivar)
+  logical, allocatable :: mgerr_marg_var(:)
+  double precision :: mgerr_minpost
 
 contains
 
-!==============================================================================
+  !============================================================================
 
-  subroutine alloc_mg
+  !! Evaluate negative log of (posterior probability marginalised over
+  !! specified variables)
+  function marg_post(info, inpar, marg_var)
 
-    allocate(mg_param(size(fit_param, 1), size(fit_param, 2)))
-    allocate(mg_marg(size(x_pos, 1)))
-
-  end subroutine alloc_mg
-
-!==============================================================================
-
-  subroutine free_mg
-
-    if (allocated(mg_param)) deallocate(mg_param)
-    if (allocated(mg_marg)) deallocate(mg_marg)
-
-  end subroutine free_mg
-
-!==============================================================================
-
-  function marg_post(info)
+    double precision :: marg_post
 
     !function arguments
-    double precision :: marg_post
-    character(len=128), intent(out) :: info
+    character(len=*), intent(out) :: info !! Error/warning message
+    type(allparam) :: inpar !! Point at which to evaluate -ln(marg. post.)
+    !! If marg_var(i) true, marginalise over variable i in inpar
+    logical, intent(in) :: marg_var(:)
 
     !local variables
     integer :: iv, iwave, idim, ndim, minpts, maxpts, lenwrk, leniwrk
-    integer :: ifail, alpha
+    integer :: ifail, alpha, indx1, indx2
     double precision :: epsabs, epsrel, acc, abserr, finval, sol0, sig
-    double precision :: lhd, pri, delt, peak
-    double precision, dimension(:), allocatable :: alim, blim, wrk
-    integer, dimension(:), allocatable :: iwrk
+    double precision :: lhd, pri, delt, lbound, ubound, chisqrd, unmg_post
+    double precision, dimension(:), allocatable :: sol(:), alim(:), blim(:)
+    double precision, dimension(:), allocatable :: wrk(:)
+    integer, allocatable :: iwrk(:)
+    type(allparam) :: fitpar
+    logical :: fit_ok
+
+    integer :: num_points, i
+    double precision :: val
 
     interface
        subroutine D01FCF(ndim, alim, blim, minpts, maxpts, functn, epsrel, &
@@ -102,30 +99,28 @@ contains
          integer, intent(inout) :: ifail
        end subroutine D01AJF
     end interface
-    
-    !count dimensions to marginalise over
-    ndim = 0
-    do iv = 1, size(x_pos, 1)
-       if (mg_marg(iv)) then
-          ndim = ndim + 1
-          !set to best-fit (when varying all params) value,
-          !to estimate minimum -ln(postprob) given unmarg. params
-          mg_param(x_pos(iv,1),x_pos(iv,2)) = &
-               fit_param(x_pos(iv,1),x_pos(iv,2))
+
+    !evaluate unmarginalised -ln(postprob) (used for scaling)
+    !at minimum found by varying to-marginalise parameters only
+    call allparam_copy(inpar, fitpar, (.not. marg_var))
+    ndim = fitpar%nvar !no. of dimensions to marginalise over
+    if (ndim > 0) then
+       allocate(sol(ndim))
+       !minimiser sets parameter scaling using model_prior
+       call minimiser(fitpar, sol, chisqrd, unmg_post, fit_ok, info)
+       if (.not. fit_ok) then
+          info = 'Fit failed in marg_post'
+          return
        end if
-    end do
-
-    !evaluate unmarginalised -ln(postprob): used for scaling
-    !neg log post = neg log likelihood + neg log prior - neg log evidence
-    lhd = likelihood(vis_data, triple_data, model_spec, mg_param)
-    pri = prior(x_pos, mg_param, model_param, model_prior)
-    post = lhd + pri
-    !BUT, if model very improbable, a small *fractional* reduction in
-    !chi-squared from varying marginalised parameters can still cause overflow
-
+    else
+       lhd = likelihood(vis_data, triple_data, model_spec, fitpar%param)
+       pri = prior(fitpar%var_pos, fitpar%param, model_param, model_prior)
+       unmg_post = lhd + pri
+    end if
+    
     !special case - no marginalisation to do
     if (ndim == 0) then
-       marg_post = post
+       marg_post = unmg_post
        info = ''
        return
     end if
@@ -133,28 +128,32 @@ contains
     !choose integration limits
     allocate(alim(ndim))
     allocate(blim(ndim))
-    idim = 1
-    do iv = 1, size(x_pos, 1)
-       if (mg_marg(iv)) then
-          sol0 = fit_param(x_pos(iv,1), x_pos(iv,2))
-          sig = model_prior(x_pos(iv,1), x_pos(iv,2))
-          alim(idim) = sol0 - sig !XXX
-          blim(idim) = sol0 + sig
-          !ensure limits in bounds
-          if (alim(idim) < x_bound(iv, 1)) alim(idim) = x_bound(iv, 1)
-          if (blim(idim) > x_bound(iv, 2)) blim(idim) = x_bound(iv, 2)
-          !beware periodicities in theta
-          !!CAUSES PROBS for relto theta
-          !do iwave = 1, nwave
-          !   if (x_pos(iv, 2) == 3+4*model_wldep(1)*(iwave-1)) then
-          !      alim(idim) = modulo(alim(idim), 360D0)
-          !      blim(idim) = modulo(blim(idim), 360D0)
-          !      if (alim(idim) >= blim(idim)) alim(idim) = alim(idim) - 360D0
-          !   end if
-          !end do
-          idim = idim + 1
-       end if
+    do idim = 1, ndim
+       indx1 = fitpar%var_pos(idim,1)
+       indx2 = fitpar%var_pos(idim,2)
+       sol0 = sol(idim) !centre integration range on peak
+       sig = model_prior(indx1, indx2)
+       alim(idim) = sol0 - sig
+       blim(idim) = sol0 + sig
+       !ensure limits in bounds
+       lbound = model_limits(indx1, indx2, 1)
+       ubound = model_limits(indx1, indx2, 2)
+       if (alim(idim) < lbound) alim(idim) = lbound
+       if (blim(idim) > ubound) blim(idim) = ubound
+       !beware periodicities in theta
+       !!CAUSES PROBS for relto theta
+       !do iwave = 1, nwave
+       !   if (indx2 == 3+4*model_wldep(1)*(iwave-1)) then
+       !      alim(idim) = modulo(alim(idim), 360D0)
+       !      blim(idim) = modulo(blim(idim), 360D0)
+       !      if (alim(idim) >= blim(idim)) alim(idim) = alim(idim) - 360D0
+       !   end if
+       !end do
     end do
+
+    !set up mg_par module variable, used by prob()
+    call allparam_copy(inpar, mg_par, (.not. marg_var))
+    call allparam_setnoscale(mg_par)
 
     !call appropriate NAg routine to perform integral
     if (ndim >= 2) then
@@ -164,7 +163,10 @@ contains
        lenwrk = (ndim+2)*(1+maxpts/alpha)
        if (lenwrk < (2*ndim + 4)) lenwrk = 2*ndim + 4
        allocate(wrk(lenwrk))
-       epsrel = 5D-2
+       !need to overspecify epsrel to get sensible results
+       !epsrel = 5D-2
+       epsrel = 1D-3
+       mg_nlnorm = unmg_post + 0.5D0*log(machine_max())
        ifail = -1
        call D01FCF(ndim, alim, blim, minpts, maxpts, prob, epsrel, acc, &
             lenwrk, wrk, finval, ifail)
@@ -183,24 +185,23 @@ contains
        if (finval == 0D0) then
           info = 'Integration result zero - try narrowing prior'
           !return unmarginalised -ln(postprob)
-          marg_post = post
+          marg_post = unmg_post
        else
-          marg_post = -log(finval)+post !useful even if ifail = 2 or 3
+          marg_post = -log(finval)+mg_nlnorm !useful even if ifail = 2 or 3
+          print '(a,f15.3,a,f8.4)', 'marg_post =', -log(finval)+mg_nlnorm, &
+               ' +/-', acc
+          print *, '  in', minpts, 'function evalutions'
        end if
     else
        !special case of 1d integral
-       epsabs = -1D0
-       epsrel = 5D-2
        lenwrk = 2000
        leniwrk = lenwrk/4
        allocate(wrk(lenwrk))
        allocate(iwrk(leniwrk))
+       epsabs = -1D0
+       epsrel = 5D-2
+       mg_nlnorm = unmg_post + 0.5D0*log(machine_max())
        ifail = -1
-       !finval = 0D0
-       !delt = (blim(1) - alim(1))/100D0
-       !do iv = 1, 100
-       !   finval = finval + prob1d(alim(1)+iv*delt)*delt
-       !end do
        call D01AJF(prob1d, alim(1), blim(1), epsabs, epsrel, finval, abserr, &
             wrk, lenwrk, iwrk, leniwrk, ifail)
        !set return message
@@ -224,13 +225,29 @@ contains
        if (finval == 0D0) then
           info = 'Integration result zero - try narrowing prior'
           !return unmarginalised -ln(postprob)
-          marg_post = post
+          marg_post = unmg_post
        else
-          marg_post = -log(finval)+post
+          marg_post = -log(finval)+mg_nlnorm
+          print '(a,f15.4,a,f8.4)', 'marg_post =', marg_post, &
+               ' +/-', abserr/finval
+       end if
+       if (.false.) then
+          !save integrand values to text file
+          write (33, *) '# ', marg_post
+          write (33, *) '# '//trim(info)
+          write (33, *) '# ', mg_par%param
+          num_points = 20
+          do i = 1, num_points
+             val = alim(1) + ((i-1.)/(num_points-1.))*(blim(1)-alim(1))
+             write (33,*) val, prob1d(val)
+          end do
        end if
     end if
 
     !free storage
+    call allparam_free(fitpar)
+    call allparam_free(mg_par)
+    if (allocated(sol)) deallocate(sol)
     if (allocated(alim)) deallocate(alim)
     if (allocated(blim)) deallocate(blim)
     if (allocated(wrk)) deallocate(wrk)
@@ -238,79 +255,92 @@ contains
 
   end function marg_post
 
-!==============================================================================
+  !============================================================================
 
+  !! Return posterior of model and data, called by the integrators
+  !! used in marg_post
+  !!
+  !! Uses mg_par, mg_nlnorm from this module
+  !! Uses vis_data, triple_data from Fit module
+  !! Uses model_spec, model_param, model_prior from Model module
   function prob(ndim, z)
 
-    !uses vis_data, triple_data, x_pos from Fit module
-    !uses model_spec, model_param, model_prior from Model module
+    double precision :: prob
 
     !function arguments
-    double precision :: prob
-    integer, intent(in) :: ndim !no. of dimensions being integrated over
-    double precision, dimension(ndim), intent(in) :: z !param values for these
+    integer, intent(in) :: ndim !! No. of dimensions being integrated over
+    double precision, dimension(ndim), intent(in) :: z !!Param values for these
 
     !local variables
-    integer :: iv, iz
+    logical, save :: set_max_min = .false.
+    double precision, save :: log_max
+    double precision, save :: log_min
     double precision :: lhd, pri, lprob
 
-    !copy subset of variable parameters in z to mg_param,
-    !otherwise use fit_param values (should be copied by caller of marg_post)
-    iz = 1
-    do iv = 1, size(x_pos, 1)
-       if (mg_marg(iv)) then
-          mg_param(x_pos(iv, 1), x_pos(iv, 2)) = z(iz)
-          iz = iz + 1
-       end if
-    end do
+    !set log_max and log_min if unset
+    if (.not. set_max_min) then
+       set_max_min = .true.
+       log_max = floor(log(machine_max()))
+       log_min = -floor(-log(machine_min()))
+    end if
+
+    !copy variable parameters from z
+    call allparam_setvar(mg_par, z)
 
     !neg log posterior = neg log likelihood + neg log prior - neg log evidence
-    lhd = likelihood(vis_data, triple_data, model_spec, mg_param)
-    pri = prior(x_pos, mg_param, model_param, model_prior) !initial guesses in model_param
-    lprob = -(lhd + pri - post)
+    lhd = likelihood(vis_data, triple_data, model_spec, mg_par%param)
+    pri = prior(mg_par%var_pos, mg_par%param, model_param, model_prior)
+    lprob = -(lhd + pri - mg_nlnorm)
     !As above, if model very improbable, a small *fractional* reduction in
     !chi-squared from varying marginalised parameters can cause overflow
-    if (lprob > 500D0) then
-       prob = exp(500D0)
-    else if (lprob < -500D0) then
-       prob = exp(-500D0)
+    if (lprob > log_max) then
+       prob = exp(log_max)
+       print *, 'Trapped overflow in prob()'
+    else if (lprob < log_min) then
+       prob = exp(log_min)
+       !underflow is nothing to worry about
+       !print *, 'Trapped underflow in prob()'
     else
        prob = exp(lprob)
     end if
-    !!print '(f9.4, 4f9.1,g11.3)', z(1), lhd, pri, post, lprob, prob
 
   end function prob
 
-!==============================================================================
+  !============================================================================
 
+  !! Wrapper for prob(), for use by 1d integrator
   function prob1d(val)
 
-    !wrapper for prob(), for use by 1d integrator
-
     double precision :: prob1d
+
+    !function arguments
     double precision, intent(in) :: val
 
-    double precision, dimension(1) :: val1
+    !local variables
+    double precision :: val1(1)
 
     val1(1) = val
     prob1d = prob(1, val1)
 
   end function prob1d
 
-!==============================================================================
+  !============================================================================
 
-  subroutine marg_err(sol, errguess, index, err)
+  subroutine marg_err(inpar, errguess, index, err)
 
     !subroutine arguments
-    double precision, dimension(:), intent(in) :: sol !best fit parameters
-    double precision, dimension(:), intent(in) :: errguess !initial guess errs
-    integer, intent(in) :: index !index into sol
-    !final +/- 1-sigma errors:
-    double precision, dimension(2), intent(out) :: err
+    type(allparam) :: inpar !! Model parameters (variable and non-variable)
+    !! Initial guess errors for variable parameters
+    double precision, intent(in) :: errguess(:)
+    !! Variable parameter to estimate error for
+    integer, intent(in) :: index
+    !! Final +/- 1-sigma errors:
+    double precision, intent(out) :: err(2)
 
     !local variables
     double precision x0, x1, sigma, rtb
     double precision dx, xmid, fmid
+    double precision :: err_quad(2) !! Estimate of errors by quadratic interp.
     integer nb, i, j, ifail
     integer, parameter :: max_iter = 20
     real, parameter :: tol = 0.1
@@ -327,20 +357,21 @@ contains
     end interface
 
     !assign to module variables needed by ferr
-    ivar = index
-    mg_marg = .true.
+    call allparam_copy(inpar, mgerr_par)
+    mgerr_ivar = index
+    allocate(mgerr_marg_var(inpar%nvar))
+    mgerr_marg_var = .true.
     !marginalise over all variables except one we want error bar for:
-    mg_marg(index) = .false.
-    mg_param = fit_param
+    mgerr_marg_var(mgerr_ivar) = .false.
 
     !find 2 roots of f = nlmpost - min(nlmpost) - 0.5 = 0
     !(where nlmpost is negative log of marginalised posterior probability)
 
     !find value at minimum
-    x0 = sol(index)
+    x0 = inpar%param(inpar%var_pos(index,1), inpar%var_pos(index,2))
     sigma = errguess(index)
-    minpost = 0D0 !so we can use ferr() for next line
-    minpost = ferr(x0) + 0.5D0
+    mgerr_minpost = 0D0 !so we can use ferr() for next line
+    mgerr_minpost = ferr(x0) + 0.5D0
     do j = 1, 2
        !find bracketing point other side of root
        do nb = 1, 10
@@ -350,12 +381,11 @@ contains
        end do
        if (fmid <= 0D0) stop 'marg_err: cannot find bracketing point'
        !find root by quadratic interpolation
-       err(j) = sign(j)*(x1-x0)/sqrt(2D0*fmid+1D0)
+       err_quad(j) = sign(j)*(x1-x0)/sqrt(2D0*fmid+1D0)
        !find root by bisection
        if (usenag) then
           ifail = 0
           call C05ADF(x0, x1, tol*sigma, 0D0, ferr, rtb, ifail)
-          print *, err(j), sign(j)*(rtb-x0)
           err(j) = sign(j)*(rtb-x0)
        else
           dx = x1 - x0
@@ -371,11 +401,16 @@ contains
              end if
           end do bisect
        end if
+       !compare estimates
+       print *, err(j), err_quad(j), (err(j)-err_quad(j))/err(j)
     end do
+
+    !clean up
+    if (allocated(mgerr_marg_var)) deallocate(mgerr_marg_var)
 
   end subroutine marg_err
 
-!==============================================================================
+  !============================================================================
 
   function ferr(val)
 
@@ -386,12 +421,13 @@ contains
     character(len=128) :: info
 
     !assign value for unmarginalised variable:
-    mg_param(x_pos(ivar, 1),x_pos(ivar, 2)) = val
-    ferr = marg_post(info) - minpost - 0.5D0
+    call allparam_setone(mgerr_par, mgerr_ivar, val)
+
+    ferr = marg_post(info, mgerr_par, mgerr_marg_var) - mgerr_minpost - 0.5D0
     if (info /= '') print *, trim(info)
     
   end function ferr
 
-!==============================================================================
+  !============================================================================
 
 end module Marginalise

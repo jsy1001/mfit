@@ -1,4 +1,4 @@
-!$Id: modelplot.f90,v 1.2 2005/06/28 16:13:27 jsy1001 Exp $
+!$Id: modelplot.f90,v 1.3 2006/08/31 08:52:52 jsy1001 Exp $
 
 ! Plot sky brightness distribution for mfit-format model
 !
@@ -9,7 +9,7 @@ program Modelplot
   use Model
   use Maths
   use Fitsimage
-  use Inout !just for revision no.
+  use Inout, only: release, yesno
 
   implicit none
 
@@ -43,7 +43,7 @@ program Modelplot
   !functions
   integer pgopen
 
-  cvs_rev = '$Revision: 1.2 $'
+  cvs_rev = '$Revision: 1.3 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,'  mplot - greyscale/contour plot of mfit-format model'
