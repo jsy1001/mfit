@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.13 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: model.f90,v 1.14 2007/08/16 16:40:33 jsy1001 Exp $
 
 module Model
 
@@ -321,19 +321,16 @@ contains
 
     !read source name
     open (unit=11, action='read', file=file_name)
-    open (unit=12, action='read', file=file_name)
     do i = 1, nlines
        read (11, *, err=94) dummy
        if (dummy == 'source') then
-          read (12, *, err=94) dummy, source1, source2
+          backspace(11)
+          read (11, *, err=94) dummy, source1, source2
           model_name = trim(source1) // ' ' // trim(source2)
           exit
-       else
-          read (12, *, err=94) dummy
        end if
     end do
     close (11)
-    close (12)
 
     !read spec and param info for components
     open (unit=11, action='read', file=file_name)
@@ -982,7 +979,7 @@ contains
 
     !local variables
     integer, parameter :: iunit = 12, iunit2 = 13
-    integer iclv, iwl, nwl, iwb, istart, iend
+    integer iclv, iwl, nline, iline, nwl, iwb, istart, iend
     character(len=256) :: line, ext
     real dummy1, dummy2
     real, allocatable :: wl(:)
@@ -1034,12 +1031,10 @@ contains
        end if
 
        open (unit=iunit, file=file_name, status='old', action='read', err=91)
-       open (unit=iunit2, file=file_name, action='read')
 
        !1st non-comment line gives no. of mu values
        do while(.true.)
           read(iunit,'(a)',end=90) line
-          read(iunit2,'(a)') line
           if (line(1:1) /= '#' .and. len_trim(line) > 0) exit
        end do
        read (line,*) nclv
@@ -1047,8 +1042,7 @@ contains
        allocate(clv_rad(nclv))
        allocate(clv_inten(nclv, size(wavebands, 1)))
        allocate(clv_mvis(nxsiz+1, size(wavebands, 1)))
-       read (iunit,'(a)') line
-       read (iunit2,*) clv_rad(2:nclv)
+       read (iunit,*) clv_rad(2:nclv)
        !convert from mu to r
        do iclv = 2, nclv
           clv_rad(iclv) = sqrt(1. - clv_rad(iclv)**2)
@@ -1057,27 +1051,31 @@ contains
 
        !subsequent lines give Temp(K) logg wavelength(nm) I(mu=0) ... I(mu=1)
        !count number of data lines, allocate local storage
+       nline = 0 !number of reads to EOF
        nwl = 0
        do while(.true.)
           read(iunit,'(a)',end=40) line
+          nline = nline + 1
           !don't count comments or blank lines
           if (line(1:1) /= '#' .and. len_trim(line) > 0) nwl = nwl + 1
        end do
-40     close (iunit)
+40     do iline = 1, nline
+          backspace(iunit)
+       end do
        allocate(wl(nwl))
        allocate(inten(nclv, nwl))
 
        !read CLV data (typically on fine wavelength grid)
        iwl = 0
        do while(.true.)
-          read(iunit2,'(a)',end=50) line
+          read(iunit,'(a)',end=50) line
           if (line(1:1) /= '#' .and. len_trim(line) > 0) then
              iwl = iwl + 1
              inten(1, iwl) = 0.0
              read(line,*) dummy1, dummy2, wl(iwl), inten(2:nclv, iwl)
           end if
        end do
-50     close (iunit2)
+50     close (iunit)
 
        !integrate to get required (top-hat) bandpasses
        do iwb = 1, size(wavebands, 1)

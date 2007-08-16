@@ -1,4 +1,4 @@
-!$Id: marginalise.f90,v 1.5 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: marginalise.F90,v 1.1 2007/08/16 16:40:32 jsy1001 Exp $
 
 module Marginalise
 
@@ -156,6 +156,7 @@ contains
     call allparam_setnoscale(mg_par)
 
     !call appropriate NAg routine to perform integral
+#ifdef HAVE_NAG
     if (ndim >= 2) then
        minpts = 1
        alpha = 2**ndim + 2*ndim**2 + 2*ndim + 1
@@ -243,6 +244,7 @@ contains
           end do
        end if
     end if
+#endif
 
     !free storage
     call allparam_free(fitpar)
@@ -383,24 +385,24 @@ contains
        !find root by quadratic interpolation
        err_quad(j) = sign(j)*(x1-x0)/sqrt(2D0*fmid+1D0)
        !find root by bisection
-       if (usenag) then
-          ifail = 0
-          call C05ADF(x0, x1, tol*sigma, 0D0, ferr, rtb, ifail)
-          err(j) = sign(j)*(rtb-x0)
-       else
-          dx = x1 - x0
-          rtb = x0
-          bisect: do i = 1, max_iter
-             dx = dx/2D0
-             xmid = rtb + dx
-             fmid = ferr(xmid)
-             if (fmid <= 0D0) rtb = xmid
-             if (abs(dx) < tol*sigma .or. fmid == 0D0) then
-                err(j) = sign(j)*(rtb-x0)
-                exit bisect
-             end if
-          end do bisect
-       end if
+#ifdef HAVE_NAG
+       ifail = 0
+       call C05ADF(x0, x1, tol*sigma, 0D0, ferr, rtb, ifail)
+       err(j) = sign(j)*(rtb-x0)
+#else
+       dx = x1 - x0
+       rtb = x0
+       bisect: do i = 1, max_iter
+          dx = dx/2D0
+          xmid = rtb + dx
+          fmid = ferr(xmid)
+          if (fmid <= 0D0) rtb = xmid
+          if (abs(dx) < tol*sigma .or. fmid == 0D0) then
+             err(j) = sign(j)*(rtb-x0)
+             exit bisect
+          end if
+       end do bisect
+#endif
        !compare estimates
        print *, err(j), err_quad(j), (err(j)-err_quad(j))/err(j)
     end do

@@ -1,8 +1,11 @@
-# $Id: makefile,v 1.21 2006/08/31 08:52:52 jsy1001 Exp $
+# $Id: makefile,v 1.22 2007/08/16 16:40:32 jsy1001 Exp $
 #
 # Makefile for building mfit
 
 SHELL = /bin/sh
+
+# Uncomment the following line if you have the NAg library
+HAVE_NAG = true
 
 ifeq ($(OSTYPE),solaris)
   # Sun Workshop Fortran 95
@@ -27,7 +30,23 @@ ifeq ($(OSTYPE),solaris)
   pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
   nag_libs = -lnag
   fftw_libs = -lfftw3 -lm
-else
+endif
+ifeq ($(OSTYPE),darwin8.0)
+  # G95 on Mac OS X 10.4
+  F90 = g95
+  FLINK = g95
+  FFLAGC = -g -fno-second-underscore
+  FFLAGL = -lM77
+  f2kcli_src = f2kcli.f90
+
+  # Libraries needed on Mac OS X
+  pgplot_libs = -lpgplot -lX11
+  fitsio_libs = -lfitsio
+  pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+  nag_libs = -lnag
+  fftw_libs = -lfftw3 -lm
+endif
+ifeq ($(OSTYPE),linux)
   # NAGWare Fortran 95 on Linux
   F90 = /usr/local/bin/f95
   FLINK = /usr/local/bin/f95
@@ -39,8 +58,8 @@ else
 
   # Libraries needed on Linux
   pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
-  fitsio_libs = -L/star/lib -lfitsio
-  pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+  fitsio_libs = -L/usr/lib -lcfitsio
+  pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf -lstarmem
   nag_libs = -lnag
   fftw_libs = -L/usr/local/lib -lfftw3 -lm
 endif
@@ -52,20 +71,36 @@ OBJECTS = maths.o fit.o visibility.o inout.o plot.o postplot.o model.o \
 MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod postplot.mod \
   model.mod marginalise.mod wrap.mod bayes.mod
 
+# Rule to make .o file from .f90 file
+%.o %.mod : %.f90
+	$(F90) -c $(FFLAGC) $<
+
+# Rule to make .o file from .F90 file (uses preprocessor)
+%.o %.mod : %.F90
+	$(F90) -fpp -c $(FFLAGC) $(DEFS) $<
+
 
 all: mfit clfit calc mplot ;
 
+ifeq ($(HAVE_NAG),true)
+ mfit_libs = $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs) $(nag_libs)
+ DEFS += -DHAVE_NAG
+else
+ mfit_libs = $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+endif
+
 mfit: main.o $(OBJECTS)
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs)  $(nag_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(mfit_libs)
 
 clfit: clfit.o f2kcli.o $(OBJECTS)
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs)  $(nag_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(mfit_libs)
 
 calc: calc.o maths.o gamma.o rjbesl.o
 	$(FLINK) $(FFLAGL) $^ -o $@ $(pda_libs)
 
 mplot: modelplot.f90 model.o maths.o fitsimage.o gamma.o rjbesl.o inout.o
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ \
+ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
 
 clean:
 	rm -f *.o *.mod *.lst
@@ -73,58 +108,35 @@ clean:
 # source files containing module definitions must be compiled before source
 # files that USE those modules
 main.o: main.f90 inout.mod model.mod fit.mod plot.mod postplot.mod wrap.mod
-	$(F90) -c $(FFLAGC) main.f90
 
 clfit.o: clfit.f90 f2kcli.mod inout.mod model.mod fit.mod \
   wrap.mod plot.mod postplot.mod
-	$(F90) -c $(FFLAGC) clfit.f90
 
 calc.o: calc.f90 maths.mod
-	$(F90) -c $(FFLAGC) calc.f90
 
 f2kcli.o f2kcli.mod: $(f2kcli_src)
 	$(F90) -c $(FFLAGC) $< -o f2kcli.o
 
 wrap.o wrap.mod: wrap.f90
-	$(F90) -c $(FFLAGC) wrap.f90
 
 bayes.o bayes.mod: bayes.f90 maths.mod visibility.mod
-	$(F90) -c $(FFLAGC) bayes.f90
 
 maths.o maths.mod: maths.f90
-	$(F90) -c $(FFLAGC) maths.f90
 
 fit.o fit.mod: fit.f90 maths.mod bayes.mod wrap.mod model.mod
-	$(F90) -c $(FFLAGC) fit.f90
 
 visibility.o visibility.mod: visibility.f90 maths.mod model.mod
-	$(F90) -c $(FFLAGC) visibility.f90
 
 inout.o inout.mod: inout.f90
-	$(F90) -c $(FFLAGC) inout.f90
 
 plot.o plot.mod: plot.f90 maths.mod visibility.mod bayes.mod
-	$(F90) -c $(FFLAGC) plot.f90
 
 postplot.o postplot.mod: postplot.f90 plot.mod bayes.mod wrap.mod \
   model.mod marginalise.mod
-	$(F90) -c $(FFLAGC) postplot.f90
 
 model.o model.mod: model.f90 maths.mod
-	$(F90) -c $(FFLAGC) model.f90
 
-marginalise.o marginalise.mod: marginalise.f90 maths.mod bayes.mod \
+marginalise.o marginalise.mod: marginalise.F90 maths.mod bayes.mod \
   wrap.mod model.mod
-	$(F90) -c $(FFLAGC) marginalise.f90
-
-gamma.o: gamma.f
-	$(F90) -c $(FFLAGC) gamma.f
-
-rjbesl.o: rjbesl.f
-	$(F90) -c $(FFLAGC) rjbesl.f
 
 modelplot.o: modelplot.f90 model.mod maths.mod fitsimage.mod inout.mod 
-	$(F90) -c $(FFLAGC) modelplot.f90
-
-fitsimage.o: fitsimage.f90
-	$(F90) -c $(FFLAGC) fitsimage.f90

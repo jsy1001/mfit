@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.22 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: fit.f90,v 1.23 2007/08/16 16:40:32 jsy1001 Exp $
 
 module Fit
 
@@ -24,7 +24,6 @@ module Fit
   !private module variables contained:
   
   type(allparam), save :: fitpar !! Used by minimiser, err_est, posterior
-  type(allparam), save :: objpar !! Used by objfun (called by E04XAF)
 
   double precision, allocatable :: work(:) !! Workspace
   integer :: lwork = 0 !! Size of work array
@@ -178,36 +177,6 @@ contains
     double precision :: nlposterior
     double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det
     double precision :: x_scale(n), x(n), temp_x(n), grad(n)
-    !for E04XAF
-    logical :: hes_fail
-    integer :: iwarn, ifail
-    integer :: pinf(n)
-    integer :: iuser(1)
-    double precision :: objf
-    double precision :: hforw(n), hcntrl(n)
-    double precision :: hes_nag(n,n)
-    double precision :: user(1)
-
-    interface
-       subroutine E04XAF(msglvl, n, epsrf, x, mode, objfun, lhes, hforw, &
-            objf, objgrd, hcntrl, hesian, &
-            iwarn, work, iuser, user, pinf, ifail)
-         integer, intent(in) :: msglvl, n, mode, lhes
-         integer, intent(inout) :: ifail
-         integer, intent(out) :: iwarn
-         integer, intent(out) :: pinf(n)
-         integer, intent(in) :: iuser(*)
-         double precision, intent(in) :: epsrf
-         double precision, intent(in) :: x(n)
-         double precision, intent(inout) :: hforw(n)
-         double precision, intent(out) :: objf
-         double precision, intent(out) :: objgrd(n), hcntrl(n)
-         double precision, intent(out) :: hesian(lhes, *)
-         double precision, intent(out) :: work(*)
-         double precision, intent(in) :: user(*)
-         external objfun
-       end subroutine E04XAF
-    end interface
 
     !set default values for intent(out) arguments
     info = ''
@@ -293,38 +262,6 @@ contains
     end do
     found_min = .true.
 
-    !calculate Hessian using NAg routine
-    !work with unscaled parameters, so we calculate true Hessian
-    call allparam_copy(fitpar, objpar)
-    call allparam_setnoscale(objpar)
-    hforw = x_scale
-    ifail = 1 !silent
-    call alloc_work(n*(n+1))
-    call E04XAF(1, n, 1D-9, sol, 2, objfun, size(hes_nag,1), hforw, &
-         objf, grad, hcntrl, hes_nag, &
-         iwarn, work, iuser, user, pinf, ifail)
-    if (ifail == 1) then
-       stop 'E04XAF returned with ifail=1, indicates programming error'
-    else if (ifail == 2) then
-       print *, 'E04XAF had a problem with parameter(s):'
-       hes_fail = .false.
-       do i = 1, n
-          if (pinf(i) /= 0) then
-             print *, 'Parameter', i, ': diagnostic code = ', pinf(i)
-             if (pinf(i) < 4) hes_fail = .true.
-          end if
-       end do
-       if (hes_fail) then
-          info = 'Problem(s) calculating Hessian using E04XAF'
-          return
-       end if
-    end if
-    do i = 1, n
-       print *, hcntrl(i), hcntrl(i)/x_scale(i)
-    end do
-    call allparam_free(objpar) !finished with this
-    !hes = hes_nag
-
     !calculate covariance matrix (is inverse of the hessian)
     cov = hes
     call invdet_mat(cov, det) !inversion - also calculate determinant
@@ -365,43 +302,6 @@ contains
     end if
 
   end subroutine err_est
-
-  !============================================================================
-
-  !! Calculate -ln(posterior), given arguments supplied by E04XAF
-  !!
-  !! Other quantities are obtained from module variables:
-  !! - objpar from this module
-  !! - vis_data, triple_data from Bayes
-  !! - model_spec, model_param, model_prior from Model
-  subroutine objfun(mode, n, var, objf, objgrd, nstate, iuser, user)
-
-    !subroutine arguments - as specified by E04XAF
-    integer, intent(in) :: mode, n, nstate
-    double precision, intent(in) :: var(n)
-    double precision, intent(out) :: objf
-    double precision, intent(out) :: objgrd(n) !not used if mode /= 1
-    !we don't use iuser or user
-    integer, intent(in) :: iuser(*)
-    double precision, intent(in) :: user(*)
-
-    !local variables
-    double precision :: lhd, pri
-
-    !check for range violations in current position
-    !if position is out of range then return very large energy
-    if (.not. allparam_inlimit(objpar, var)) then
-       objf = 1.0d10
-       return
-    end if
-
-    !form E = neg log posterior = neg log likelihood + neg log prior
-    call allparam_setvar(objpar, var)
-    lhd = likelihood(vis_data, triple_data, model_spec, objpar%param)
-    pri = prior(objpar%var_pos, objpar%param, model_param, model_prior)
-    objf = lhd + pri
-
-  end subroutine objfun
 
   !============================================================================
 
