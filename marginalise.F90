@@ -1,4 +1,4 @@
-!$Id: marginalise.F90,v 1.1 2007/08/16 16:40:32 jsy1001 Exp $
+!$Id: marginalise.F90,v 1.2 2007/08/17 17:50:27 jsy1001 Exp $
 
 module Marginalise
 
@@ -21,11 +21,12 @@ module Marginalise
 
   implicit none
 
-  private
+  public
+  private :: prob, prob1d, ferr
 
-  public :: marg_post, marg_err
-
-  !module variables contained:
+  !private module variables contained:
+  private :: mg_par, mg_nlnorm, &
+       mgerr_par, mgerr_ivar, mgerr_marg_var, mgerr_minpost
 
   !! Model parameters for prob()
   type(allparam), save :: mg_par

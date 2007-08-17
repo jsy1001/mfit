@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.23 2007/08/16 16:40:32 jsy1001 Exp $
+!$Id: fit.f90,v 1.24 2007/08/17 17:50:27 jsy1001 Exp $
 
 module Fit
 
@@ -9,7 +9,8 @@ module Fit
 
   implicit none
 
-  private
+  !Compilation using g95 fails if default is "private"
+  public
 
   !public subroutines contained
   !
@@ -17,12 +18,11 @@ module Fit
   !            implement a minimisation strategy)
   !err_est - check for minimum, estimate parameter error bars at solution point
   !free_fit - frees storage allocated by minimiser
-
-  public :: minimiser, err_est, free_fit
-
+  private :: alloc_work, posterior, post2
 
   !private module variables contained:
-  
+  private :: fitpar, work, lwork, post2_nlnorm
+
   type(allparam), save :: fitpar !! Used by minimiser, err_est, posterior
 
   double precision, allocatable :: work(:) !! Workspace

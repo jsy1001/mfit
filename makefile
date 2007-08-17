@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.22 2007/08/16 16:40:32 jsy1001 Exp $
+# $Id: makefile,v 1.23 2007/08/17 17:50:27 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -47,14 +47,12 @@ ifeq ($(OSTYPE),darwin8.0)
   fftw_libs = -lfftw3 -lm
 endif
 ifeq ($(OSTYPE),linux)
-  # NAGWare Fortran 95 on Linux
-  F90 = /usr/local/bin/f95
-  FLINK = /usr/local/bin/f95
-  FFLAGC = -C -g -mismatch -I/usr/local/include
-  #FFLAGL = -lg2c -lm
-  # uncomment next line to build semi-static binary (for systems without f95):
-  FFLAGL = -unsharedf95 -lg2c -lm
-  f2kcli_src = f2kcli_nagw.f90
+  # G95 on Linux
+  F90 = g95
+  FLINK = g95
+  FFLAGC = -g -fno-second-underscore
+  FFLAGL =
+  f2kcli_src = f2kcli.f90
 
   # Libraries needed on Linux
   pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
@@ -75,9 +73,13 @@ MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod postplot.mod \
 %.o %.mod : %.f90
 	$(F90) -c $(FFLAGC) $<
 
-# Rule to make .o file from .F90 file (uses preprocessor)
+# Rule to make .o file from .F90 file (uses preprocessor automatically)
 %.o %.mod : %.F90
-	$(F90) -fpp -c $(FFLAGC) $(DEFS) $<
+	$(F90) -c $(FFLAGC) $(DEFS) $<
+
+# Rule to make .o file from .f file
+%.o : %.f
+	$(F90) -c $(FFLAGC) $<
 
 
 all: mfit clfit calc mplot ;
