@@ -4,8 +4,8 @@
 debug = 1
 release = 0
 
-includePath = Split('/opt/local/include /star/include /sw/include')
-libPath = Split('/opt/local/lib /star/lib /sw/lib')
+includePath = Split('/opt/local/include /star/include /sw/include /usr/include')
+libPath = Split('/opt/local/lib /star/lib /sw/lib /usr/lib')
 
 # Path to Sun F95 (if installed); used to auto-set compiler switches
 sun_f95 = '/opt/SUNWspro/bin/f95'
@@ -18,19 +18,14 @@ f95List = ['g95', sun_f95, nagw_f95, 'f95', 'f90']
 ####### End of editable section #######
 
 
-env = Environment()
+# Inherit complete environment, including PATH
+import os
+env = Environment(ENV = os.environ)
 
 # Parse "debug=" and "release=" command-line arguments (defaults used if not
 # specified are in configuration section above)
 debug = int(ARGUMENTS.get('debug', debug))
 release = int(ARGUMENTS.get('release', release))
-
-# If SunOS, modify PATH so Sun compilers are found
-# Not necessary if full f95 path supplied above
-if Platform() == 'sunos':
-    path = ['/opt/SUNWspro/bin', '/usr/local/bin',
-            '/bin', '/usr/bin', '/usr/ccs/bin']
-    env.Append(ENV={'PATH' : path})
 
 # Find fortran compiler and set command-line switches to use for it
 f95 = env.Detect(f95List)
@@ -67,9 +62,9 @@ elif f95 == nagw_f95:
     f2kcli = 'f2kcli_nagw.f90'
 else:
     f2kcli = 'f2kcli.f90'
-    
+
 # Prepend to include/library paths from variables above
-env.Append(FORTRANPATH=includePath)
+env.Prepend(FORTRANPATH=includePath)
 # FORTRANPATH seems not to be used for .f90
 env.Prepend(F90PATH=includePath)
 env.Prepend(LIBPATH=libPath)
