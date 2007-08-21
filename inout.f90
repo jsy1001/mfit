@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.21 2007/08/16 16:40:32 jsy1001 Exp $
+!$Id: inout.f90,v 1.22 2007/08/21 09:53:59 jsy1001 Exp $
 
 module Inout
 
@@ -1013,16 +1013,20 @@ contains
     integer, intent(inout) :: status
 
     !local variables
+    integer, dimension(1) :: target_id_array
+    double precision, dimension(1) :: mjd_array, uv_array
     integer colnum, nullint
     double precision nullval
     logical anyf
 
     call ftgcno(unit, .false., 'TARGET_ID', colnum, status)
     call ftgcvj(unit, colnum, row, 1, 1, nullint, &
-         target_id, anyf, status)
+         target_id_array, anyf, status)
+    target_id = target_id_array(1)
     call ftgcno(unit, .false., 'MJD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         mjd, anyf, status)
+         mjd_array, anyf, status)
+    mjd = mjd_array(1)
     call ftgcno(unit, .false., 'VIS2DATA', colnum, status)
     call ftgcvd(unit, colnum, row, 1, nwave, nullval, &
          vis2data, anyf, status)
@@ -1031,10 +1035,12 @@ contains
          vis2err, anyf, status)
     call ftgcno(unit, .false., 'UCOORD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         ucoord, anyf, status)
+         uv_array, anyf, status)
+    ucoord = uv_array(1)
     call ftgcno(unit, .false., 'VCOORD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         vcoord, anyf, status)
+         uv_array, anyf, status)
+    vcoord = uv_array(1)
     call ftgcno(unit, .false., 'STA_INDEX', colnum, status)
     call ftgcvj(unit, colnum, row, 1, 2, nullint, &
          sta_index, anyf, status)
@@ -1062,6 +1068,8 @@ contains
     integer, intent(inout) :: status
 
     !local variables
+    integer, dimension(1) :: target_id_array
+    double precision, dimension(1) :: mjd_array, uv_array
     integer colnum, iwave, nullint
     double precision nullval
     logical anyf, anynullamp
@@ -1069,10 +1077,12 @@ contains
 
     call ftgcno(unit, .false., 'TARGET_ID', colnum, status)
     call ftgcvj(unit, colnum, row, 1, 1, nullint, &
-         target_id, anyf, status)
+         target_id_array, anyf, status)
+    target_id = target_id_array(1)
     call ftgcno(unit, .false., 'MJD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         mjd, anyf, status)
+         mjd_array, anyf, status)
+    mjd = mjd_array(1)
     allocate(isnull(nwave))
     call ftgcno(unit, .false., 'T3AMP', colnum, status)
     call ftgcfd(unit, colnum, row, 1, nwave, &
@@ -1097,19 +1107,23 @@ contains
          t3phierr, anyf, status)
     call ftgcno(unit, .false., 'U1COORD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         u1coord, anyf, status)
+         uv_array, anyf, status)
+    u1coord = uv_array(1)
     call ftgcno(unit, .false., 'V1COORD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         v1coord, anyf, status)
+         uv_array, anyf, status)
+    v1coord = uv_array(1)
     call ftgcno(unit, .false., 'U2COORD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         u2coord, anyf, status)
+         uv_array, anyf, status)
+    u2coord = uv_array(1)
     call ftgcno(unit, .false., 'V2COORD', colnum, status)
     call ftgcvd(unit, colnum, row, 1, 1, nullval, &
-         v2coord, anyf, status)
+         uv_array, anyf, status)
+    v2coord = uv_array(1)
     call ftgcno(unit, .false., 'STA_INDEX', colnum, status)
     call ftgcvj(unit, colnum, row, 1, 3, nullint, &
-         sta_index, anyf, status)
+        sta_index, anyf, status)
     call ftgcno(unit, .false., 'FLAG', colnum, status)
     call ftgcl(unit, colnum, row, 1, nwave, flag, status)
     deallocate(isnull)
