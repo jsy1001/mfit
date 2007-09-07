@@ -12,7 +12,8 @@ New in mfit release 1.5.1
 * Support for wavelength-dependent models (specified model parameters
   can take different values for different wavebands)
 
-* Support for rotating model components
+* Support for rotating model components (i.e. polar angle theta varies
+  linearly with time)
 
 * '#relto' option for model component positions - specifies position
   of model component w.r.t. position of another component
