@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.22 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: clfit.f90,v 1.23 2007/09/07 17:04:45 jsy1001 Exp $
 
 program Main
 
@@ -55,7 +55,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.22 $'
+  cvs_rev = '$Revision: 1.23 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -893,9 +893,11 @@ contains
     print *, '-r|--waverange WL1 WL2  select all wavebands in this range'
     print *, '-t|--target_id ID       select this target (default is 1st in OI_TARGET table)'
     print *, '-c|--calerr FRAC        add calibration error (frac. err. in system visib.)'
-    print *, '-p|--plot      uv|post N|mpost N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd'
+    print *, '-p|--plot      uv|post N|mpost N|post2d M N|mpost2d M N|vis2|t3amp|t3phi'
+    print *, '                |vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd'
     print *, '                        make specified plot'
-    print *, '-z|--zoomplot  uv|post N|mpost N|vis2|t3amp|t3phi|vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd XMIN XMAX'
+    print *, '-z|--zoomplot  uv|post N|mpost N|post2d M N|mpost2d M N|vis2|t3amp|t3phi'
+    print *, '                |vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd XMIN XMAX'
     print *, '                        plot with specified x-axis range'
     print *, '-d|--device DEV         PGPLOT device to use'
     print *, '-m|--margerr N          alternate error bar N by brute-force marginalisation'

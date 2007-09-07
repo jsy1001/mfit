@@ -74,9 +74,13 @@ elif f95 == nagw_f95:
     # Sun fortran compiler
     env.Append(LIBPATH=['/opt/SUNWspro/lib'])
     if conf.CheckLib('F77'):
-        env.Append(LIBS=['F77', 'M77'])
+        # NB CheckLib() appends to env['LIBS'] if found
+        env.Append(LIBS=['M77']) # need both F77 and M77
     # need different f2kcli for this compiler
     f2kcli = 'f2kcli_nagw.f90'
+    # Ignores LD_RUN_PATH, so pass "-rpath <path>" to ld
+    env.Append(LINKFLAGS=['-Wl,-Xlinker', '-Wl,-rpath',
+                          '-Wl,-Xlinker', '-Wl,%s' % ':'.join(libPath)])
 else:
     print "Configuring for generic Fortran 9x compiler"
     f2kcli = 'f2kcli.f90'
@@ -142,7 +146,19 @@ for key in sources.keys():
 
 # ...executables
 for key in objects.keys():
-    env.Program(key, objects[key], LIBS=libs[key])
+    prog = env.Program(key, objects[key], LIBS=libs[key])
+    Default(prog)
+
+# ...targets for distribution of mfit
+# :TODO: exclude from default targets
+import glob
+env.Replace(TARFLAGS = '-c -z')
+distFiles = Split('README NEWS TODO documentation f2kcli.txt readme.specfun')
+distFiles += Split('SConstruct fitgui fitgui_dev')
+# don't distribute makefile.coast
+for pattern in ['*.f90', '*.F90', '*.f', '*.py']:
+    distFiles += glob.glob(pattern)
+env.Tar('mfit.tar.gz', distFiles)
 
 # Local Variables:
 # mode: python

@@ -1,6 +1,6 @@
        mfit: Model Fitting Software for Optical Interferometry
 
-                       package release 1.4.1
+                       package release 1.5.1
 
 
                            Release notes
@@ -22,8 +22,12 @@ Features of mfit include:
 * Four limb-darkening parametrizations (Taylor and Gauss-Hermite
   expansions, Hestroffer and square-root models), plus support for arbitrary
   limb-darkening profiles specified numerically (may be wavelength-dependent)
+* Support for wavelength-dependent models  (specified model parameters
+  can take different values for different wavebands)
 * Interactive, command-line, and GUI interfaces 
 * Plots of data and model
+* Optional marginalisation by numerical integration of the
+  posterior probability (requires commercial NAG library)
 
 The graphical interface, fitgui, can straightforwardly be integrated
 into other applications written in python.
@@ -34,18 +38,35 @@ release.
 
 REQUIREMENTS
 
-You will need a Fortran 90 compiler to build mfit.
+mfit should work on any unix-like operating system (see below for those it has
+been tested on). You will need a Fortran 90 or 95 compiler to build mfit.
 
 mfit must be linked with the following libraries (not supplied, but free
 software):
 
 * PGPLOT - http://www.astro.caltech.edu/~tjp/pgplot/
 
-* FITSIO - http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html
+* CFITSIO - http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html
 
-* Starlink PDA - http://star-www.rl.ac.uk/cgi-store/storeform1?PDA
+* Starlink PDA - http://www.starlink.ac.uk/star/docs/sun194.htx/sun194.html
 
-* FFTW (v2) - http://www.fftw.org/
+* FFTW (v3) - http://www.fftw.org/
+
+Note that PGPLOT, CFITSIO, and PDA are all included in the Starlink Software
+Collection distributed by the Joint Astronomy Centre, which is available from
+http://starlink.jach.hawaii.edu/
+mfit has been tested with the 'Hokulei' release of this collection.
+
+If you have it, mfit can make use of the commercial Numerical Algorithms Group
+Fortran Library (Mark 19 recommended) - see
+http://www.nag.co.uk/numeric/fl/FLdescription.asp
+
+If the NAG library is not available, the marginalisation-by-integration
+features of mfit ('--margerr', '--plot mpost', '--plot mpost2d' in clfit) will
+not work.
+
+To build mfit, you will need scons - see http://www.scons.org - and a working
+installation of Python (1.5.2 or later).
 
 To run the fitgui graphical interface, you will need a working
 installation of Python 2.2 or above and Tkinter (see
@@ -67,6 +88,7 @@ ChangeLog       Package ChangeLog (automatically generated from CVS
 README	        This file
 NEWS            Outline of new features in this and previous releases
 documentation   Instructions for using mfit
+SConstruct      scons configuration file, used to build mfit (see below)
 maths.f90, fit.f90, visibility.f90, inout.f90, plot.f90, model.f90
 		Routines used by mfit and clfit
 main.f90	mfit main function
@@ -75,6 +97,8 @@ calc.f90	Test code for maths module
 fitgui.py	GUI interface to clfit
 fitgui		Wrapper script for fitgui.py - put this in PATH
 fitgui_dev      Alt. wrapper script for fitgui.py - used for development
+test.oifits     Test dataset (COAST data on Capella)
+test.model      Binary model that fits test.oifits
 
 The following files, authored by third parties, are distributed with mfit for
 your convenience:
@@ -84,25 +108,40 @@ rjbesl.f        Bessel function from SPECFUN 2.5 - see readme.specfun
 readme.specfun	Readme for SPECFUN 2.5 routines
 f2kcli.f90	Fortran 200x Command Line Interface, (c) Interactive
 		Software Services Ltd. - see f2kcli.txt
+f2kcli_nagw.f90	Fortran 200x Command Line Interface - version for NAGWare f95
 f2kcli.txt	manual.txt from f2kcli distribution
 
 
 BUILDING MFIT
 
-Use the supplied 'makefile' (makefile.coast is probably not
-useful). Edit the lines above the comment
-'# *** Modify above this line for your system ***'.
+scons is now used to build mfit. If the 'scons' command is not available on
+your system, retrieve scons from http://www.scons.org and install it.
 
-Various example configurations are included; comment out the most
-appropriate one as a starting point. If any of the external libraries
-PGPLOT, FITSIO, or PDA were compiled with a Fortran 77 compiler
-(likely, unless you compile them yourself) you will have to add the
-Fortran 77 standard libraries to FFLAGL.
+If your combination of operating system and Fortran 90/95 compiler is not one
+of those listed below, you *may* need to edit the section labelled
+'#### May need to edit this section ####' at the top of the SConstruct file.
 
-mfit has been tested using Sun Workshop Fortran 95 and NAGWare Fortran
-95 on Solaris, but should work on any other Unix-like system with a
-Fortran 90 compiler. Please report successes or failures with other
-compilers/operating systems.
+Note that the SConstruct file is a Python script. Please contact the author if
+the distributed SConstruct file does not work for you and you are not sure how
+to edit it.
+
+Build mfit by typing 'scons' at the shell prompt (from the directory containing
+the source code). The following command-line options are supported:
+'debug=1': compile with debugging flags (-g etc.) - this is the default
+'debug=0': compile without debugging flags
+'release=0': compile without optimization flags - this is the default
+'release=1': compile with  optimization flags (-O etc.)
+'f95=/path/to/f95': use specified compiler, rather than auto-detected one
+
+
+mfit has been tested using:
+- Sun Workshop Fortran 95 on Solaris
+- NAGWare Fortran 95 on Solaris
+- NAGWare Fortran 95 on Linux
+- G95 on Linux
+- G95 on MacOS X (thanks to Ettore Pedretti)
+
+Please report successes or failures with other compilers/operating systems.
 
 
 INSTALLING MFIT
@@ -140,7 +179,7 @@ Please report the inevitable bugs to jsy1001 (at) cam.ac.uk. Various
 missing features are listed in 'documentation'.
 
 
-$Id: README,v 1.3 2005/01/07 14:02:02 jsy1001 Exp $
+$Id: README,v 1.4 2007/09/07 17:04:45 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

@@ -1,0 +1,39 @@
+Real Space Model file
+
+source                  Alp Aur
+
+component
+name		Ab
+shape_type	disc
+ld_type                  uniform
+ld_order		
+position 		0 0
+position_prior  	0 0 
+flux		0.89
+flux_prior		0.1
+shape_param         6.9
+shape_param_prior 0
+ld_param
+ld_param_prior
+
+component
+name                     Aa
+shape_type            disc
+ld_type                  uniform
+ld_order		
+position	               54.9 26.6
+position_prior           5    30
+flux		 1.0
+flux_prior		 0
+shape_param          8.5
+shape_param_prior  0
+ld_param		
+ld_param_prior		
+
+
+
+
+
+
+
+

@@ -1,4 +1,32 @@
 
+New in mfit release 1.5.1
+=========================
+
+* Now built using scons (more portable) rather than make
+
+* Use of NAG library optional (detected by scons)
+
+* Support for brute-force marginalisation - integrates posterior
+  probability in multiple dimensions (slow, requires NAG library)
+
+* Support for wavelength-dependent models (specified model parameters
+  can take different values for different wavebands)
+
+* Support for rotating model components
+
+* '#relto' option for model component positions - specifies position
+  of model component w.r.t. position of another component
+
+* Added plots versus Modified Julian Day
+
+* Plotted points are also saved to text files, for re-plotting in
+  other applications
+
+* Added 'mplot' application to plot intensity distribution of model
+
+* Minimiser now works with scaled model parameters, hence performs better
+
+
 New in mfit release 1.4.1
 =========================
 

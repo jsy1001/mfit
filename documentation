@@ -226,6 +226,19 @@ The wavelength-dependent format is derived from that used for the Kurucz models
 supplied to Chris Haniff by Bill Tango in 2001 (I think).
 
 
+Model Files: Advanced Features
+=============================
+:TODO: document the following advanced features:
+
+* Support for wavelength-dependent models (specified model parameters
+  can take different values for different wavebands)
+
+* Support for rotating model components
+
+* '#relto' option for model component positions - specifies position
+  of model component w.r.t. position of another component
+
+
 Illegal minimisations
 =====================
 
@@ -366,7 +379,7 @@ phases are (perhaps) incorrectly counted as independent data points when
 evaluating the number of degrees of freedom.
 
 
-$Id: documentation,v 1.12 2006/08/16 09:20:22 jsy1001 Exp $
+$Id: documentation,v 1.13 2007/09/07 17:04:45 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
