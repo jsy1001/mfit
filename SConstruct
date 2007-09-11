@@ -155,6 +155,7 @@ import glob
 env.Replace(TARFLAGS = '-c -z')
 distFiles = Split('README NEWS TODO documentation f2kcli.txt readme.specfun')
 distFiles += Split('SConstruct fitgui fitgui_dev')
+distFiles += Split('test.oifits test.model')
 # don't distribute makefile.coast
 for pattern in ['*.f90', '*.F90', '*.f', '*.py']:
     distFiles += glob.glob(pattern)
