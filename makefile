@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.15 2005/05/24 12:53:06 jsy1001 Exp $
+# $Id: makefile,v 1.15.2.1 2007/09/11 11:09:28 jsy1001 Exp $
 #
 # Makefile for building mfit
 
@@ -12,6 +12,7 @@ FFLAGL = -dalign -lf77compat
 pgplot_libs = -lpgplot -lX11
 fitsio_libs = -lfitsio
 pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+nag_libs = -lnag
 fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Solaris
@@ -22,6 +23,7 @@ fftw_libs = -lrfftw -lfftw -lm
 #pgplot_libs = -lpgplot -lX11
 #fitsio_libs = -lfitsio
 #pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+#nag_libs = -lnag
 #fftw_libs = -lrfftw -lfftw -lm
 
 # NAGWare Fortran 95 on Linux
@@ -33,6 +35,7 @@ fftw_libs = -lrfftw -lfftw -lm
 #pgplot_libs = -L/usr/X11R6/lib -L/usr/local/lib -lpgplot -lX11
 #fitsio_libs = -lfitsio
 #pda_libs = -L/star/lib -lpda -lemsf -lems -lcnf
+#nag_libs = -lnag
 #fftw_libs = -L/usr/local/lib -lrfftw -lfftw -lm
 
 # *** Modify above this line for your system ***
@@ -45,10 +48,10 @@ MODULES = maths.mod fit.mod visibility.mod inout.mod plot.mod model.mod
 all: mfit clfit calc mplot ;
 
 mfit: main.o $(OBJECTS)
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(nag_libs) $(pda_libs) $(fftw_libs)
 
 clfit: clfit.o f2kcli.o $(OBJECTS)
-	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(pda_libs) $(fftw_libs)
+	$(FLINK) $(FFLAGL) $^ -o $@ $(pgplot_libs) $(fitsio_libs) $(nag_libs) $(pda_libs) $(fftw_libs)
 
 calc: calc.o maths.o gamma.o rjbesl.o
 	$(FLINK) $(FFLAGL) $^ -o $@ $(pda_libs)

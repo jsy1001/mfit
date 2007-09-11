@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.17 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: fit.f90,v 1.17.2.1 2007/09/11 11:09:28 jsy1001 Exp $
 
 module Fit
 
@@ -44,20 +44,16 @@ contains
 
 !==============================================================================
   
-  subroutine minimiser(info, force_symm, sol, flag, desc, &
+  subroutine minimiser(info, force_symm, sol, ifail, desc, &
        hes, cov, cor, chisqrd, nlposterior, nlevidence)
 
-    !On exit, flag holds success state of the minimisation:
-    ! flag =  0:  Optimal solution found
-    ! flag =  1:  Terminated with gradient small,
-    !             parameter values probably optimal
-    ! flag =  2:  Terminated with step size small,
-    !             parameter values probably optimal
-    ! flag =  3:  Lower point cannot be found,
-    !             parameter values probably optimal
-    ! flag =  4:  Iteration limit (150) exceeded
-    ! flag =  5:  Too many large steps,
-    !             function may be unbounded
+    !On exit, ifail holds success state:
+    ! ifail = -3 : vis/nvis format data & model not guaranteed symmetric
+    ! ifail = -2 : illegal freedom(s) in model
+    ! ifail = -1 : problem with Hessian calculation
+    ! ifail =  0 : success
+    !Other positive values indicate minimiser failure -
+    !refer to E04JYF NAg documentation
     !
     !Corresponding message text will be in info,
     !parameter values will be in fit_param
@@ -70,25 +66,32 @@ contains
     double precision, dimension(:,:), allocatable, intent(out) :: sol, hes, &
          cov, cor
     double precision, intent(out) :: chisqrd, nlposterior, nlevidence
-    integer, intent(out) :: flag
+    integer, intent(out) :: ifail
     logical, intent(in) :: force_symm
 
     !local variables
-    integer :: i, j, k, iwave, ipar, n, lwork
+    integer :: i, j, k, iwave, ipar, n, liwork, lwork
     character(len=128) :: name, comp
     double precision :: P, P_l, P_u, P_i, P_j, deltai, deltaj, diff, det
     double precision, dimension(:), allocatable ::  x, temp_x, work
+    integer, dimension(:), allocatable :: iwork
     logical :: illegal
+    integer, dimension(1) :: iuser !dummy
+    double precision, dimension(1) :: user !dummy
 
     interface
-       subroutine PDA_UNCMND(n, x0, fcn, x, f, info, w, lw)
-         integer, intent(in) :: n, lw
-         double precision, dimension(n) :: x0, x
-         external fcn
+       subroutine E04JYF(n, ibound, funct1, bl, bu, x, f, iw, liw, w, lw, &
+            iuser, user, ifail)
+         integer, intent(in) :: n, ibound, liw, lw
+         integer, dimension(liw), intent(out) :: iw
+         integer, dimension(1), intent(in) :: iuser
+         integer, intent(inout) :: ifail
+         external funct1
+         double precision, dimension(n), intent(inout) :: bl, bu, x
          double precision, intent(out) :: f
-         integer, intent(out) :: info
          double precision, dimension(lw), intent(out) :: w
-       end subroutine PDA_UNCMND
+         double precision, dimension(1), intent(in) :: user
+       end subroutine E04JYF
     end interface
 
     !go through model arrays and count number of variable parameters
@@ -220,35 +223,41 @@ contains
 
     !call minimising algorithm
     info = ''
-    lwork = n*(n+10)
+    lwork = n*(n-1)/2+12*n
+    if (lwork < 13) lwork = 13
     allocate(work(lwork))
-    temp_x = x !starting point
-    call PDA_UNCMND(n, temp_x, posterior, x, nlposterior, flag, work, lwork)
+    liwork = n+2
+    allocate(iwork(liwork))
+    ifail = -1
+    call E04JYF(n, 0, posterior, x_info(:,2), x_info(:,3), x, nlposterior, &
+         iwork, liwork, work, lwork, iuser, user, ifail)
     deallocate(work)
-    ! solution is in x
+    deallocate(iwork)
+    !solution is in x
     sol(:,1) = x
 
     !set return message
-    select case(flag)
-    case(-1)
-       stop 'Insufficient workspace for PDA_UNCMND'
+    select case(ifail)
+    case(1)
+       stop 'E04JYF returned with ifail=1, indicates programming error'
     case(0)
        info = 'Optimal solution found'
-    case(1)
-       info = 'Terminated with gradient small, parameter values probably optimal'
     case(2)
-       info = 'Terminated with step size small, parameter values probably optimal'
+       info = 'Failed - iteration limit exceeded'
     case(3)
-       info = 'Lower point cannot be found, parameter values probably optimal'
+       info = 'Lower point cannot be found, but some condition(s) for minimum not met'
     case(4)
-       info = 'Iteration limit exceeded'
-    case(5)
-       info = 'Too many large steps, likelihood function may be unbounded'
+       info = 'Failed - overflow occurred'
+    case(9)
+       info = 'Failed - modulus of a model parameter has become large'
+    case(10)
+       info = 'Failed with ifail=10 - try again with different initial model'
     case default
-       stop 'Unexpected status value from PDA_UNCMND'
+       if (ifail >= 5 .and. ifail <= 8) &
+            write (info, *) 'Possible minimum found - ifail=', ifail
     end select
 
-    if (flag < 0 .or. flag > 3) return ! not a minimum, so skip hessian calc.
+    if (ifail /= 0 .and. ifail /= 3) return ! not a minimum, so skip hessian calc.
     
     !find error in x position more rigorously by considering hessian
     !hessian matrix Aij has components (d2/(dyi*dyj))P({y}) where yi and yj
@@ -269,13 +278,13 @@ contains
           temp_x = sol(:,1)
           if (j == i) then
              !P(i)
-             call posterior(n, temp_x, P)
+             call posterior(n, temp_x, P, iuser, user)
              !P(i-di)
              temp_x(i) = sol(i,1)-deltai
-             call posterior(n, temp_x, P_l)
+             call posterior(n, temp_x, P_l, iuser, user)
              !P(i+di)
              temp_x(i) = sol(i,1)+deltai
-             call posterior(n, temp_x, P_u) 
+             call posterior(n, temp_x, P_u, iuser, user) 
              !hessian by numeric method
              diff = P_u + P_l - (2D0*P)
              if (diff/=0D0) hes(i,i) = diff/(deltai**2)
@@ -283,16 +292,16 @@ contains
              !P(i+di,j+dj)
              temp_x(i) = sol(i,1)+deltai
              temp_x(j) = sol(j,1)+deltaj
-             call posterior(n, temp_x, P_u)
+             call posterior(n, temp_x, P_u, iuser, user)
              !P(i+di,j-dj)
              temp_x(j) = sol(j,1)-deltaj
-             call posterior(n, temp_x, P_i)   
+             call posterior(n, temp_x, P_i, iuser, user)   
              !P(i-di,j-dj)
              temp_x(i) = sol(i,1)-deltai
-             call posterior(n, temp_x, P_l)
+             call posterior(n, temp_x, P_l, iuser, user)
              !P(i-di,j+dj)
              temp_x(j) = sol(j,1)+deltaj
-             call posterior(n, temp_x, P_j)  
+             call posterior(n, temp_x, P_j, iuser, user)  
              !hessian by numeric method
              diff = P_u + P_l - P_i - P_j
              if (diff/=0D0) hes(i,j) = diff/(4D0*deltai*deltaj)
@@ -313,7 +322,7 @@ contains
           if (cov(i,i)*cov(j,j)>0D0) then
              cor(i,j) = cov(i,j)/sqrt(cov(i,i)*cov(j,j))
           else
-             flag = 1
+             ifail = -1
           end if
           cor(j,i) = cor(i,j)
        end do
@@ -354,10 +363,10 @@ contains
 
     !error trapping 
 90  info = 'illegal freedom(s) in model'
-    flag = -2
+    ifail = -2
     goto 200
 92  info = 'for vis/nvis data must have guaranteed symmetric model'
-    flag = -3
+    ifail = -3
     goto 200
 
   end subroutine minimiser
@@ -459,7 +468,7 @@ contains
 
 !==============================================================================
 
-subroutine posterior(n, x, post)
+subroutine posterior(n, x, post, iuser, user)
 
 ! Black box minimisers require this function have specific arguments
 ! Everything else needed comes from module variables
@@ -468,6 +477,8 @@ subroutine posterior(n, x, post)
 integer, intent(in) :: n
 double precision, dimension(n), intent(in) :: x
 double precision, intent(out) :: post
+integer, dimension(*) :: iuser !required by E04JYF, not used
+double precision, dimension(*) :: user !required by E04JYF, not used
 
 !local variables
 double precision :: lhd, pri
@@ -475,16 +486,17 @@ integer :: i
 logical :: violation
 
 !check for range violations in current position
-!if position is out of range then return very large energy 
-violation = .false.
-do i = 1, n !over variable parameters
-   if (x(i) < x_info(i,2)) violation = .true.
-   if (x(i) > x_info(i,3)) violation = .true.
-end do
-if (violation) then
-   post = 1.0d10
-   return
-end if 
+!if position is out of range then return very large energy
+!** not needed as NAg minimiser handles constraints
+!violation = .false.
+!do i = 1, n !over variable parameters
+!   if (x(i) < x_info(i,2)) violation = .true.
+!   if (x(i) > x_info(i,3)) violation = .true.
+!end do
+!if (violation) then
+!   post = 1.0d10
+!   return
+!end if 
 
 !update fit_param with current position x
 do i = 1, n
