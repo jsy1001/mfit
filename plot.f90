@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.23 2008/04/22 11:42:08 jsy1001 Exp $
+!$Id: plot.f90,v 1.24 2008/04/22 12:35:12 jsy1001 Exp $
 
 module Plot
   
@@ -96,7 +96,7 @@ contains
 
     !local variables
     integer :: i
-    real :: xmin, x
+    real :: xmin, x, xspan
     double precision :: lambda, delta_lambda, u, v, vsq, err
 
     !choose xzero
@@ -147,20 +147,23 @@ contains
     else
        if (num_data > 0) then
           !exclude flagged extrema by default
-          xrange(1) = 0.9*minval(data_points(:num_data, 1))
+          xrange(1) = minval(data_points(:num_data, 1))
        else
-          xrange(1) = 0.9*minval(flagged_points(:num_flagged, 1))
+          xrange(1) = minval(flagged_points(:num_flagged, 1))
        end if
     end if
     if (present(uxmax)) then
        xrange(2) = uxmax
     else
        if (num_data > 0) then
-          xrange(2) = 1.1*maxval(data_points(:num_data, 1))
+          xrange(2) = maxval(data_points(:num_data, 1))
        else
-          xrange(2) = 1.1*maxval(flagged_points(:num_flagged, 1))
+          xrange(2) = maxval(flagged_points(:num_flagged, 1))
        end if
     end if
+    xspan = xrange(2) - xrange(1)
+    xrange(1) = xrange(1) - 0.05*xspan
+    xrange(2) = xrange(2) + 0.05*xspan
 
     !calculate y range
     if (num_data > 0) then
@@ -246,7 +249,7 @@ contains
 
     !local variables
     integer :: i
-    real :: xmin, xmax, x, y, y_err
+    real :: xmin, x, y, y_err, xspan
 
     !choose xzero
     xzero = 0.
@@ -298,20 +301,23 @@ contains
     else
        if (num_data > 0) then
           !exclude flagged extrema by default
-          xrange(1) = 0.9*minval(data_points(:num_data, 1))
+          xrange(1) = minval(data_points(:num_data, 1))
        else
-          xrange(1) = 0.9*minval(flagged_points(:num_flagged, 1))
+          xrange(1) = minval(flagged_points(:num_flagged, 1))
        end if
     end if
     if (present(uxmax)) then
        xrange(2) = uxmax
     else
        if (num_data > 0) then
-          xrange(2) = 1.1*maxval(data_points(:num_data, 1))
+          xrange(2) = maxval(data_points(:num_data, 1))
        else
-          xrange(2) = 1.1*maxval(flagged_points(:num_flagged, 1))
+          xrange(2) = maxval(flagged_points(:num_flagged, 1))
        end if
     end if
+    xspan = xrange(2) - xrange(1)
+    xrange(1) = xrange(1) - 0.05*xspan
+    xrange(2) = xrange(2) + 0.05*xspan
 
     !calculate y range
     if (num_data > 0) then
