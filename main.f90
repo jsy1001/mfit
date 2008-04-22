@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.26 2008/04/22 09:51:19 jsy1001 Exp $
+!$Id: main.f90,v 1.27 2008/04/22 11:42:07 jsy1001 Exp $
 
 program Main
 
@@ -113,7 +113,8 @@ program Main
 
         !read_mapdat allocates vis_data, triple_data, and wavebands
         call read_mapdat(info, file_name, source, max_lines, &
-             vis_data, triple_data, wavebands, calib_error)
+             vis_data, num_vis, triple_data, num_triple, &
+             wavebands, calib_error)
         force_symm = .false.
 
      else if (ext == 'vis') then
@@ -122,9 +123,10 @@ program Main
         !projected baselines sqrt(u**2 + v**2), stored in u column
 
         !read_vis allocates vis_data
-        call read_vis(info, file_name, source, max_lines, vis_data, wb, &
-             calib_error)
+        call read_vis(info, file_name, source, max_lines, vis_data, num_vis, &
+             wb, calib_error)
         allocate(triple_data(0, 0))
+        num_triple = 0
         force_symm = .true.
 
      else if (ext == 'nvis') then
@@ -133,15 +135,17 @@ program Main
         !projected baselines sqrt(u**2 + v**2), stored in u column
 
         !read_nvis allocates vis_data
-        call read_nvis(info, file_name, source, max_lines, vis_data, wb, &
-             calib_error)
+        call read_nvis(info, file_name, source, max_lines, vis_data, num_vis, &
+             wb, calib_error)
         allocate(triple_data(0, 0))
+        num_triple = 0
         force_symm = .true.
 
      else if (ext(len_trim(ext)-3:len_trim(ext)) == 'fits') then
         !read_oi_fits allocates vis_data, triple_data, and wavebands
         call read_oi_fits(info, file_name, -1, source, &
-             vis_data, triple_data, wavebands, calib_error)
+             vis_data, num_vis, triple_data, num_triple, &
+             wavebands, calib_error)
         force_symm = .false.
 
      else
@@ -207,10 +211,10 @@ program Main
   useful_vis = 0
   useful_amp = 0
   useful_cp = 0
-  do i = 1, size(vis_data,1)
+  do i = 1, num_vis
      if (vis_data(i,6) > 0D0) useful_vis = useful_vis + 1
   end do
-  do i = 1, size(triple_data,1)
+  do i = 1, num_triple
      if (triple_data(i,8) > 0D0) useful_amp = useful_amp + 1
      if (triple_data(i,10) > 0D0) useful_cp = useful_cp + 1
   end do
@@ -223,7 +227,7 @@ program Main
   print *, '    MJD   wave   band   baseline coords       sqrd      abs'
   print *, '        length  width         u         v      vis    error'
   print *, '          (nm)   (nm)       (m)       (m)'  
-  do i = 1, size(vis_data,1)
+  do i = 1, num_vis
      write(*,60) vis_data(i,7), vis_data(i,:6)
   end do
 60 format(f8.2, f7.1, 1x, f6.1, 1x, f9.4, 1x, f9.4, 1x, f8.5, 1x, f8.5)
@@ -238,21 +242,19 @@ program Main
        '        length width        u1        v1        u2        v2', &
        '  amplitude     error   phase    err'
   print *, '          (nm)  (nm)       (m)       (m)       (m)       (m)'
-  do i = 1, size(triple_data,1)
+  do i = 1, num_triple
      write(*,61) triple_data(i,11), triple_data(i,:10)
   end do
 61 format(f8.2, f7.1, 1x, f5.1, 1x, f9.4, 1x, f9.4, 1x, f9.4, 1x, f9.4, 1x, &
        e10.3, 1x, e9.3, 1x, f7.2, 1x, f6.2, 1x)
 
   print *, ' '
-  print *, useful_vis, 'unflagged visibility data points out of', &
-       size(vis_data,1)
-  print *, useful_amp, 'unflagged triple product amplitudes out of', &
-       size(triple_data,1)
-  print *, useful_cp, 'unflagged closure phases out of', size(triple_data,1)
+  print *, useful_vis, 'unflagged visibility data points out of', num_vis
+  print *, useful_amp, 'unflagged triple product amplitudes out of', num_triple
+  print *, useful_cp, 'unflagged closure phases out of', num_triple
   print *, ' '
   print *, 'total of', useful_vis+useful_amp+useful_cp, &
-       'unflagged data points out of', size(vis_data,1)+(2*size(triple_data,1))
+       'unflagged data points out of', num_vis+2*num_triple
   print *, ' '
   print *, spacer_line
   if (ext /= 'vis' .and. ext /= 'nvis' .and. useful_vis > 0) then

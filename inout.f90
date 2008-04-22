@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.22 2007/08/21 09:53:59 jsy1001 Exp $
+!$Id: inout.f90,v 1.23 2008/04/22 11:42:07 jsy1001 Exp $
 
 module Inout
 
@@ -33,8 +33,8 @@ contains
   
   !============================================================================
   
-  subroutine read_vis(info, file_name, source, max_lines, vis_data, &
-       waveband, calib_error)
+  subroutine read_vis(info, file_name, source, max_lines, &
+       vis_data, num_vis, waveband, calib_error)
 
     !Reads vis file with up to max_lines (excluding blanks)
     !(Re)Allocates and fills in vis_data array. Note projected
@@ -46,13 +46,14 @@ contains
     character(len=*), intent(out) :: info, source
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: max_lines
+    integer, intent(out) :: num_vis
     double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, intent(in) :: calib_error
     double precision, dimension(2), intent(in) :: waveband
 
     !local variables
     character(len=32) :: dummy
-    integer :: i, data_items
+    integer :: i
     double precision :: vis, baseline, default_error, frac_error
 
     !default absolute error on the visibility data points
@@ -67,7 +68,7 @@ contains
 
     !read file header
     open (unit=11, err=91, status='old', action='read', file=file_name)
-    read (11, *, err=92, end=92) source, data_items
+    read (11, *, err=92, end=92) source, num_vis
     source = trim(source(1:index(source,'~')-1))
     close (11)
 
@@ -83,13 +84,13 @@ contains
 
     !allocate array size
     if(allocated(vis_data)) deallocate(vis_data)
-    allocate(vis_data(data_items,7))
+    allocate(vis_data(num_vis,7))
 
     !read vis data properly and close
     !vis_data: lambda, delta_lambda, u, v, (vis^2), err
     open (unit=11, action='read', file=file_name)
     read (11, *, err=94) dummy, dummy !skip header
-    do i = 1, data_items
+    do i = 1, num_vis
        read (11, *, err=94) vis, baseline
        vis_data(i,1:2) = waveband
        vis_data(i,3) = abs(baseline)/1D+3
@@ -119,8 +120,8 @@ contains
 
   !============================================================================
 
-  subroutine read_nvis(info, file_name, source, max_lines, vis_data, &
-       waveband, calib_error)
+  subroutine read_nvis(info, file_name, source, max_lines, &
+       vis_data, num_vis, waveband, calib_error)
 
     !Reads nvis file with up to max_lines (excluding comments)
     !(Re)Allocates and fills in vis_data array. Note projected
@@ -132,6 +133,7 @@ contains
     character(len=*), intent(in) :: file_name
     character(len=*), intent(out) :: info, source
     integer, intent(in) :: max_lines
+    integer, intent(out) :: num_vis
     double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, dimension(2), intent(in) :: waveband
     double precision, intent(in) :: calib_error
@@ -213,7 +215,7 @@ contains
 
   !============================================================================
 
-  subroutine read_calib(info, file_name, source, max_lines, vis_data, &
+  subroutine read_calib(info, file_name, source, max_lines, vis_data, num_vis,&
        waveband, wavebands, calib_error)
 
     !Reads ouput produced by the MSC V2 calibration applications
@@ -226,6 +228,7 @@ contains
     character(len=*), intent(in) :: file_name
     character(len=*), intent(out) :: info, source
     integer, intent(in) :: max_lines
+    integer, intent(out) :: num_vis
     double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, intent (in) :: waveband
     double precision, dimension(:,:), allocatable, intent(out) :: wavebands
@@ -233,7 +236,7 @@ contains
 
     !local variables
     character(len=1024) :: line, dummy
-    integer :: i, j, k, data_items, loc, channels, bands
+    integer :: i, j, k, loc, channels, bands
     logical :: newband
     double precision, dimension (:), allocatable :: data
     double precision :: frac_error
@@ -246,7 +249,7 @@ contains
 
     !count number of data lines
     !if nbCalib data increment data lines by NChannels
-    data_items = 0
+    num_vis = 0
     open (unit=11, status='old', action='read', err=92, file=file_name)
     do i = 1, max_lines+1
        read (11, '(a)', err=94, end=1) line
@@ -261,10 +264,10 @@ contains
           !determine if wbCalib or nbCalib and read data from line
           read (line, *, err=94) source, dummy, dummy, dummy, dummy, dummy, dummy
           if (index (dummy, '.') /= 0) then
-             data_items = data_items + 1
+             num_vis = num_vis + 1
           else
              read (dummy, *, err=94) channels
-             data_items = data_items + channels
+             num_vis = num_vis + channels
           end if
        end if
     end do
@@ -276,7 +279,7 @@ contains
 
     !allocate array size
     if(allocated(vis_data)) deallocate(vis_data)
-    allocate(vis_data(data_items,7))
+    allocate(vis_data(num_vis,7))
 
     !read *Calib data and close
     i = 1
@@ -299,13 +302,13 @@ contains
           if (index (dummy, '.') /= 0) then
              !we have wbCalib data
              channels = 1
-             allocate (data (7))
+             allocate(data (7))
              read (line, *, err=94) dummy, dummy, dummy, dummy, dummy, dummy, &
                   data(1:7), dummy, vis_data(i,3:4)
           else
              !we have nbCalib data
              read (dummy, *, err=94) channels
-             allocate (data (channels*7))
+             allocate(data (channels*7))
              read (line, *, err=94) dummy, dummy, dummy, dummy, dummy, dummy, dummy, &
                   data(1:channels*7), dummy, vis_data(i,3:4)
           end if
@@ -329,7 +332,7 @@ contains
           end do
 
           !deallocate arrays
-          deallocate (data)
+          deallocate(data)
 
           !increment i
           i = i + channels
@@ -339,9 +342,9 @@ contains
 2   close(11)
 
     !set waveband data
-    allocate (wavebands(bands,2))
+    allocate(wavebands(bands,2))
     do i = 1, bands
-       do j = 1, data_items
+       do j = 1, num_vis
           newband = .true.
           do k = 1, i
              if (vis_data(j,1) == wavebands(k,1)) newband = .false.
@@ -369,7 +372,7 @@ contains
   !============================================================================
 
   subroutine read_mapdat(info, file_name, source, max_lines, &
-       vis_data, triple_data, wavebands, calib_error)
+       vis_data, num_vis, triple_data, num_triple, wavebands, calib_error)
 
     !Reads mapdat file with up to max_lines (excluding blanks)
     !
@@ -388,6 +391,7 @@ contains
     character(len=*), intent(out) :: info, source
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: max_lines
+    integer, intent(out) :: num_vis, num_triple
     double precision, intent(in) :: calib_error
     double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, dimension(:,:), allocatable, intent(out) :: triple_data
@@ -427,6 +431,8 @@ contains
     if(allocated(triple_data)) deallocate(triple_data)
     allocate(vis_data(i1,7))
     allocate(triple_data(i2,11))
+    num_vis = i1
+    num_triple = i2
 
     !read data properly and close
     open (unit=11, action='read', file=file_name)
@@ -504,9 +510,9 @@ contains
 
     !make array of wavebands detected:
     !collate all (wavelength, bandwidth) pairs
-    allocate(all_wb(size(vis_data,1)+size(triple_data,1), 2))
-    all_wb(:size(vis_data,1), :) = vis_data(:, 1:2)
-    all_wb(size(vis_data,1)+1:, :) = triple_data(:, 1:2)
+    allocate(all_wb(num_vis+num_triple, 2))
+    all_wb(:num_vis, :) = vis_data(:, 1:2)
+    all_wb(num_vis+1:, :) = triple_data(:, 1:2)
     !mark duplicates
     num = 0
     do i = 1, size(all_wb,1)
@@ -567,7 +573,7 @@ contains
   !============================================================================
 
   subroutine read_oi_fits(info, file_name, user_target_id, source, &
-       vis_data, triple_data, wavebands, calib_error)
+       vis_data, num_vis, triple_data, num_triple, wavebands, calib_error)
 
     !Reads OIFITS format
     !
@@ -595,6 +601,7 @@ contains
     character(len=*), intent(out) :: info, source
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: user_target_id
+    integer, intent(out) :: num_vis, num_triple
     double precision, intent(in) :: calib_error
     double precision, dimension(:, :), allocatable, intent(out) :: vis_data
     double precision, dimension(:, :), allocatable, intent(out) :: triple_data
@@ -607,7 +614,7 @@ contains
     character(len=80), dimension(maxhdu) :: vis2_insname, t3_insname, wl_insname
     integer :: status, unit, blocksize, hdutype, nhdu, maxwave, ntarget
     integer :: nvis2, nt3, nwl, iwl, irow, ntot, nwave, iwave, itab, i, j
-    integer :: vis_rows, triple_rows, colnum, naxis, count, num_wb
+    integer :: colnum, naxis, count, num_wb
     integer :: target_id, sel_target_id
     integer, dimension(2) :: vis2sta
     integer, dimension(3) :: naxes, t3sta
@@ -764,16 +771,16 @@ contains
     !Allocate storage
     if(allocated(vis_data)) deallocate(vis_data)
     if(allocated(triple_data)) deallocate(triple_data)
-    vis_rows = 0
+    num_vis = 0
     do itab = 1, nvis2
-       vis_rows = vis_rows + vis2_rows(itab)*vis2_nwave(itab)
+       num_vis = num_vis + vis2_rows(itab)*vis2_nwave(itab)
     end do
-    triple_rows = 0
+    num_triple = 0
     do itab = 1, nt3
-       triple_rows = triple_rows + t3_rows(itab)*t3_nwave(itab)
+       num_triple = num_triple + t3_rows(itab)*t3_nwave(itab)
     end do
-    allocate(vis_data(vis_rows, 7))
-    allocate(triple_data(triple_rows, 11))
+    allocate(vis_data(num_vis, 7))
+    allocate(triple_data(num_triple, 11))
     allocate(all_wb(maxwave, 2))
     num_wb = 0
 

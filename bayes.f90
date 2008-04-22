@@ -1,4 +1,4 @@
-! $Id: bayes.f90,v 1.1 2006/08/31 08:52:52 jsy1001 Exp $
+! $Id: bayes.f90,v 1.2 2008/04/22 11:42:07 jsy1001 Exp $
 
 module Bayes
 
@@ -17,9 +17,11 @@ module Bayes
   !public module variables contained:
 
   public :: vis_data, triple_data, sel_wavebands
+  public :: num_vis, num_triple
 
   !! Data arrays
   double precision, allocatable :: vis_data(:,:), triple_data(:,:)
+  integer :: num_vis, num_triple
   
   !! Wavebands included in data (for wavelength-dependent models).
   !! Not used in this module, but should go with data
@@ -54,7 +56,7 @@ contains
     likelihood = 0D0
 
     !sum over the visibility data points
-    do i = 1, size(vis_data,1)
+    do i = 1, num_vis
        
        !extract points
        lambda = vis_data(i,1)
@@ -80,7 +82,7 @@ contains
     end do
 
     !sum over triple product amplitude and phase data points
-    do i = 1, size(triple_data,1)
+    do i = 1, num_triple
 
        !extract points
        lambda = triple_data(i,1)
@@ -186,7 +188,7 @@ contains
     chisqrd = 0D0
 
     !sum over the visibility data points
-    do i = 1, size(vis_data,1)
+    do i = 1, num_vis
        
        !extract points
        lambda = vis_data(i,1)
@@ -213,7 +215,7 @@ contains
     end do
 
     !sum over triple product amplitude and phase data points
-    do i = 1, size(triple_data,1)
+    do i = 1, num_triple
 
        !extract points
        lambda = triple_data(i,1)

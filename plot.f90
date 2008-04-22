@@ -1,10 +1,10 @@
-!$Id: plot.f90,v 1.22 2008/04/22 09:51:19 jsy1001 Exp $
+!$Id: plot.f90,v 1.23 2008/04/22 11:42:08 jsy1001 Exp $
 
 module Plot
   
   use Maths
   use Visibility
-  use Bayes, only : vis_data, triple_data
+  use Bayes, only : vis_data, triple_data, num_vis, num_triple
 
   implicit none
 
@@ -110,7 +110,7 @@ contains
     !make up data arrays
     num_data = 0
     num_flagged = 0
-    do i = 1, size(vis_data, 1)
+    do i = 1, num_vis
        x = plot_vis_xval(i, xindex)
        !skip if x value outside plot range
        if (present(uxmin)) then
@@ -259,7 +259,7 @@ contains
     !make up data arrays
     num_data = 0
     num_flagged = 0
-    do i = 1, size(triple_data, 1)
+    do i = 1, num_triple
        x = plot_triple_xval(i, xindex)
        !skip if x value outside plot range
        if (present(uxmin)) then
@@ -451,7 +451,7 @@ contains
     !local variables
     character(len=128) :: x_title
     ! columns are x, y, y+delta, y-delta:
-    real, dimension(size(vis_data, 1), 4) :: data_points, flagged_points
+    real, dimension(num_vis, 4) :: data_points, flagged_points
     real, dimension(:, :), allocatable :: model_points
     integer :: num_data, num_flagged, num_model, i, istat
     double precision :: u, v, lambda, delta_lambda, mjd
@@ -488,9 +488,9 @@ contains
        end do
     else
        !calculate model points corresponding to plotted data points
-       allocate(model_points(size(vis_data, 1), 2))
+       allocate(model_points(num_vis, 2))
        num_model = 0
-       do i = 1, size(vis_data, 1)
+       do i = 1, num_vis
           bas = plot_vis_xval(i, -1)
           if (bas >= xrange(1) .and. bas <= xrange(2)) then
              num_model = num_model + 1
@@ -545,7 +545,7 @@ contains
     character(len=*), intent(in), optional :: device
 
     !local variables
-    real, dimension(size(vis_data, 1), 2) :: data_points, flagged_points
+    real, dimension(num_vis, 2) :: data_points, flagged_points
     real :: u, v, lambda, delta_lambda, bas, max
     integer :: num_data, num_flagged, i, istat
 
@@ -556,7 +556,7 @@ contains
     num_data = 0
     num_flagged = 0
     max = 0.
-    do i = 1, size(vis_data, 1)
+    do i = 1, num_vis
        lambda = vis_data(i, 1)
        delta_lambda = vis_data(i, 2)
        u = 1000.*vis_data(i, 3)/lambda
@@ -615,8 +615,8 @@ contains
     !local variables
     character(len=128) :: x_title
     ! columns are x, y, y+delta, y-delta:
-    real, dimension(size(vis_data, 1), 4) :: data_points, flagged_points
-    real, dimension(size(vis_data, 1), 2) :: model_points
+    real, dimension(num_vis, 4) :: data_points, flagged_points
+    real, dimension(num_vis, 2) :: model_points
     double precision :: x, lambda, delta_lambda, u, v, mjd
     integer :: num_data, num_flagged, num_model, i, istat
     real, dimension(2) :: xrange, yrange
@@ -637,7 +637,7 @@ contains
 
     !calculate model points corresponding to plotted data points
     num_model = 0
-    do i = 1, size(vis_data, 1)
+    do i = 1, num_vis
        x = plot_vis_xval(i, xindex)
        if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
@@ -695,8 +695,8 @@ contains
     !local variables
     character(len=128) :: x_title
     ! columns are x, y, y+delta, y-delta:
-    real, dimension(size(triple_data, 1), 4) :: data_points, flagged_points
-    real, dimension(size(triple_data, 1), 2) :: model_points
+    real, dimension(num_triple, 4) :: data_points, flagged_points
+    real, dimension(num_triple, 2) :: model_points
     integer :: num_data, num_flagged, num_model, i, istat
     double precision :: x, lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
@@ -718,7 +718,7 @@ contains
 
     !calculate model points corresponding to plotted data points
     num_model = 0
-    do i = 1, size(triple_data, 1)
+    do i = 1, num_triple
        x = plot_triple_xval(i, xindex)
        if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
@@ -783,8 +783,8 @@ contains
     !local variables
     character(len=128) :: x_title
     ! columns are x, y, y+delta, y-delta:
-    real, dimension(size(triple_data, 1), 4) :: data_points, flagged_points
-    real, dimension(size(triple_data, 1), 2) :: model_points
+    real, dimension(num_triple, 4) :: data_points, flagged_points
+    real, dimension(num_triple, 2) :: model_points
     integer :: num_data, num_flagged, num_model, i, istat
     double precision :: x, lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
@@ -806,7 +806,7 @@ contains
 
     !calculate model points corresponding to plotted data points
     num_model = 0
-    do i = 1, size(triple_data, 1)
+    do i = 1, num_triple
        x = plot_triple_xval(i, xindex)
        if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
