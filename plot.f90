@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.21 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: plot.f90,v 1.22 2008/04/22 09:51:19 jsy1001 Exp $
 
 module Plot
   
@@ -8,6 +8,8 @@ module Plot
 
   implicit none
 
+  private :: plot_vis_xval, get_plot_vis_data, &
+       plot_triple_xval, get_plot_triple_data
   public
 
   !public subroutines contained:
@@ -18,23 +20,325 @@ module Plot
   !
   !plot_data_pts - call PGPLOT to plot data points; optionally save to file
   !
-  !plot_triple_phase_bas - plot closure phase against longest proj. baseline
-  !in triangle
-  !
-  !plot_triple_amp_bas - plot triple product amplitude against longest proj.
-  !baseline in triangle
-  !
   !plot_vis_bas - plot squared visibility against projected baseline
   !
   !plot_uv - plot uv coverage
   !
-  !plot_vis - plot squared visibility against specified data column
+  !plot_vis - plot squared visibility against specified quantity
   !
-  !plot_triple_phase - plot closure phase against specified data column
+  !plot_triple_phase - plot closure phase against specified quantity
   !
-  !plot_triple_amp - plot triple product amplitude specified data column
+  !plot_triple_amp - plot triple product amplitude specified quantity
 
 contains
+
+  !============================================================================
+
+  function plot_vis_xval(i, j)
+
+    !returns x-axis value for plot
+    !
+    !i is index into 1st axis of vis_data
+    !If positive, j is index into 2nd axis of vis_data, otherwise:
+    !j=-1: return projected baseline length /mega-lambda
+    !j=-2: return GMST /h
+    !j=-3: return baseline position angle /deg
+
+    !function arguments
+    integer, intent(in) :: i, j
+    double precision :: plot_vis_xval
+
+    !local variables
+    double precision :: u, v, lambda, mjd
+
+    !functions
+    double precision :: sla_gmst
+
+    if (j>=1 .and. j<=size(vis_data, 2)) then
+       plot_vis_xval = vis_data(i, j)
+    else if (j == -1) then
+       lambda = vis_data(i, 1)
+       u = vis_data(i, 3)
+       v = vis_data(i, 4)
+       plot_vis_xval = 1000.*sqrt(u**2. + v**2.)/lambda
+    else if (j == -2) then
+       mjd = vis_data(i, 7)
+       !note sla_gmsta would give better precision
+       plot_vis_xval = rad2deg/15D0*sla_gmst(mjd) !convert to hours
+    else if (j == -3) then
+       u = vis_data(i, 3)
+       v = vis_data(i, 4)
+       plot_vis_xval = rad2deg*atan2(u, v)
+    else
+       stop 'Illegal value for j in plot_vis_xval()'
+    end if
+
+  end function plot_vis_xval
+
+  !============================================================================
+
+  subroutine get_plot_vis_data(xindex, xzero, &
+       data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
+       uxmin, uxmax)
+
+    !If positive, xindex is index into 2nd axis of vis_data, otherwise:
+    !-1: projected baseline length /mega-lambda
+    !-2: GMST /h
+    !-3: baseline position angle /deg
+
+    !subroutine arguments
+    integer, intent(in) :: xindex
+    double precision, intent(in), optional :: uxmin, uxmax
+    real, intent(out) :: xzero
+    real, dimension(:, :), intent(out) :: data_points, flagged_points
+    integer, intent(out) :: num_data, num_flagged
+    real, dimension(2), intent(out) :: xrange, yrange
+
+    !local variables
+    integer :: i
+    real :: xmin, x
+    double precision :: lambda, delta_lambda, u, v, vsq, err
+
+    !choose xzero
+    xzero = 0.
+    if(xindex >= 1 .and. xindex <= size(vis_data, 2)) then
+       xmin = minval(vis_data(:, xindex))
+       if(abs(xmin) > 100.*(maxval(vis_data(:, xindex)) - xmin)) &
+            xzero = xmin
+    end if
+
+    !make up data arrays
+    num_data = 0
+    num_flagged = 0
+    do i = 1, size(vis_data, 1)
+       x = plot_vis_xval(i, xindex)
+       !skip if x value outside plot range
+       if (present(uxmin)) then
+          if ((x-xzero) < uxmin) cycle
+       end if
+       if (present(uxmax)) then
+          if ((x-xzero) > uxmax) cycle
+       end if
+       lambda = vis_data(i, 1)
+       delta_lambda = vis_data(i, 2)
+       u = vis_data(i, 3)
+       v = vis_data(i, 4)
+       vsq = vis_data(i, 5)
+       err = vis_data(i, 6)
+       if (err <= 0D0) then
+          num_flagged = num_flagged + 1
+          flagged_points(num_flagged, 1) = x - xzero
+          flagged_points(num_flagged, 2) = vsq
+          flagged_points(num_flagged, 3) = vsq - err
+          flagged_points(num_flagged, 4) = vsq + err
+       else
+          num_data = num_data + 1
+          data_points(num_data, 1) = x - xzero
+          data_points(num_data, 2) = vsq
+          data_points(num_data, 3) = vsq + err
+          data_points(num_data, 4) = vsq - err
+       end if
+    end do
+    if(num_data + num_flagged == 0) return
+
+    !calculate x range required
+    if (present(uxmin)) then
+       xrange(1) = uxmin
+    else
+       if (num_data > 0) then
+          !exclude flagged extrema by default
+          xrange(1) = 0.9*minval(data_points(:num_data, 1))
+       else
+          xrange(1) = 0.9*minval(flagged_points(:num_flagged, 1))
+       end if
+    end if
+    if (present(uxmax)) then
+       xrange(2) = uxmax
+    else
+       if (num_data > 0) then
+          xrange(2) = 1.1*maxval(data_points(:num_data, 1))
+       else
+          xrange(2) = 1.1*maxval(flagged_points(:num_flagged, 1))
+       end if
+    end if
+
+    !calculate y range
+    if (num_data > 0) then
+       yrange(1) = minval(data_points(:num_data, 4))
+       yrange(2) = maxval(data_points(:num_data, 3))
+    else
+       yrange(1) = minval(flagged_points(:num_flagged, 4))
+       yrange(2) = maxval(flagged_points(:num_flagged, 3))
+    end if
+
+    !expand y range
+    if (yrange(1) > 0) then
+       yrange(1) = yrange(1)*0.9
+    else if (yrange(1) < 0) then !yes, may be -ve
+       yrange(1) = yrange(1)*1.2
+    end if
+    yrange(2) = yrange(2)*1.1
+
+  end subroutine get_plot_vis_data
+
+  !============================================================================
+
+  function plot_triple_xval(i, j)
+
+    !returns x-axis value for plot
+    !
+    !i is index into 1st axis of triple_data
+    !If positive, j is index into 2nd axis of triple_data, otherwise:
+    !j=-1: return longest projected baseline /mega-lambda
+    !j=-2: return GMST /h
+
+    !function arguments
+    integer, intent(in) :: i, j
+    double precision :: plot_triple_xval
+
+    !local variables
+    double precision :: u1, v1, u2, v2, lambda, mjd
+    double precision, dimension(3) :: bas
+
+    !functions
+    double precision :: sla_gmst
+
+    if (j>=1 .and. j<=size(triple_data, 2)) then
+       plot_triple_xval = triple_data(i, j)
+    else if (j == -1) then
+       u1 = triple_data(i, 3)
+       v1 = triple_data(i, 4)
+       u2 = triple_data(i, 5)
+       v2 = triple_data(i, 6)
+       lambda = triple_data(i, 1)
+       bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
+       bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
+       bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
+       plot_triple_xval = maxval(bas)
+    else if (j == -2) then
+       mjd = triple_data(i, 11)
+       !note sla_gmsta would give better precision
+       plot_triple_xval = rad2deg/15D0*sla_gmst(mjd) !convert to hours
+    else
+       stop 'Illegal value for j in plot_triple_xval()'
+    end if
+
+  end function plot_triple_xval
+
+  !============================================================================
+
+  subroutine get_plot_triple_data(xindex, xzero, get_amp, &
+       data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
+       uxmin, uxmax)
+
+    !If positive, xindex is index into 2nd axis of triple_data, otherwise:
+    !-1: projected baseline length /mega-lambda
+    !-2: GMST /h
+
+    !subroutine arguments
+    integer, intent(in) :: xindex
+    real, intent(out) :: xzero
+    logical, intent(in) :: get_amp
+    double precision, intent(in), optional :: uxmin, uxmax
+    real, dimension(:, :), intent(out) :: data_points, flagged_points
+    integer, intent(out) :: num_data, num_flagged
+    real, dimension(2), intent(out) :: xrange, yrange
+
+    !local variables
+    integer :: i
+    real :: xmin, xmax, x, y, y_err
+
+    !choose xzero
+    xzero = 0.
+    if(xindex >= 1 .and. xindex <= size(triple_data, 2)) then
+       xmin = minval(triple_data(:, xindex))
+       if(abs(xmin) > 100.*(maxval(triple_data(:, xindex)) - xmin)) &
+            xzero = xmin
+    end if
+
+    !make up data arrays
+    num_data = 0
+    num_flagged = 0
+    do i = 1, size(triple_data, 1)
+       x = plot_triple_xval(i, xindex)
+       !skip if x value outside plot range
+       if (present(uxmin)) then
+          if ((x-xzero) < uxmin) cycle
+       end if
+       if (present(uxmax)) then
+          if ((x-xzero) > uxmax) cycle
+       end if
+       if (get_amp) then
+          y = triple_data(i, 7)
+          y_err = triple_data(i, 8)
+       else
+          y = modulo(triple_data(i, 9), 360D0)
+          if (y > 180.) y = y - 360.
+          y_err = triple_data(i, 10)
+       end if
+       if (y_err <= 0D0) then
+          num_flagged = num_flagged + 1
+          flagged_points(num_flagged, 1) = x - xzero
+          flagged_points(num_flagged, 2) = y
+          flagged_points(num_flagged, 3) = y - y_err
+          flagged_points(num_flagged, 4) = y + y_err
+       else
+          num_data = num_data + 1
+          data_points(num_data, 1) = x - xzero
+          data_points(num_data, 2) = y
+          data_points(num_data, 3) = y + y_err
+          data_points(num_data, 4) = y - y_err
+       end if
+    end do
+    if(num_data + num_flagged == 0) return
+
+    !calculate x range required
+    if (present(uxmin)) then
+       xrange(1) = uxmin
+    else
+       if (num_data > 0) then
+          !exclude flagged extrema by default
+          xrange(1) = 0.9*minval(data_points(:num_data, 1))
+       else
+          xrange(1) = 0.9*minval(flagged_points(:num_flagged, 1))
+       end if
+    end if
+    if (present(uxmax)) then
+       xrange(2) = uxmax
+    else
+       if (num_data > 0) then
+          xrange(2) = 1.1*maxval(data_points(:num_data, 1))
+       else
+          xrange(2) = 1.1*maxval(flagged_points(:num_flagged, 1))
+       end if
+    end if
+
+    !calculate y range
+    if (num_data > 0) then
+       yrange(1) = minval(data_points(:num_data, 4))
+       yrange(2) = maxval(data_points(:num_data, 3))
+    else
+       yrange(1) = minval(flagged_points(:num_flagged, 4))
+       yrange(2) = maxval(flagged_points(:num_flagged, 3))
+    end if
+
+    !expand y range
+    if(get_amp) then
+       if (yrange(1) > 0) then
+          yrange(1) = yrange(1)*0.9
+       else if (yrange(1) < 0) then !yes, may be -ve
+          yrange(1) = yrange(1)*1.2
+       end if
+       yrange(2) = yrange(2)*1.1
+    else
+       if (yrange(1) > 180.) then
+          yrange(1) = 180.
+       else if (yrange(1) < -180.) then
+          yrange(1) = -180.
+       end if
+    end if
+
+  end subroutine get_plot_triple_data
 
   !============================================================================
 
@@ -133,340 +437,39 @@ contains
 
   !============================================================================
 
-  subroutine plot_triple_phase_bas(spec, param, x_title, y_title, top_title, &
-       uxmin, uxmax, device)
-
-    !subroutine arguments
-    character(len=128), dimension(:,:), intent(in) :: spec
-    double precision, dimension(:,:), intent(in) :: param
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    double precision, intent(in), optional :: uxmin, uxmax
-    character(len=*), intent(in), optional :: device
-
-    !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
-    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
-    double complex :: vis1, vis2, vis3
-    real :: phase, phase_err, model_phase
-    real, dimension(3) :: bas
-    integer :: num_data, num_flagged, num_model, i, istat
-
-    !functions
-    integer :: pgopen
-
-    ! make up real arrays for unflagged & flagged data points plus model points
-    ! columns are x, y, (y+delta, y-delta)
-    allocate(data_points(size(triple_data, 1), 4))
-    allocate(flagged_points(size(triple_data, 1), 4))
-    allocate(model_points(size(triple_data, 1), 2))
-    num_model = 0
-    num_data = 0
-    num_flagged = 0
-    do i = 1, size(triple_data, 1)
-       lambda = triple_data(i, 1)
-       delta_lambda = triple_data(i, 2)
-       u1 = triple_data(i, 3)
-       v1 = triple_data(i, 4)
-       u2 = triple_data(i, 5)
-       v2 = triple_data(i, 6)
-       mjd = triple_data(i, 11)
-       bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
-       bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
-       bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
-       if (present(uxmin)) then
-          if (maxval(bas) < uxmin) cycle !out of plot range
-       end if
-       if (present(uxmax)) then
-          if (maxval(bas) > uxmax) cycle !out of plot range
-       end if
-       phase = modulo(triple_data(i, 9), 360D0)
-       if (phase > 180.) phase = phase - 360.
-       phase_err = triple_data(i, 10)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
-            -(u1+u2), -(v1+v2), mjd)
-       num_model = num_model + 1
-       model_points(num_model, 1) = maxval(bas)
-       model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
-       if (model_phase > 180.) model_phase = model_phase - 360.
-       model_points(num_model, 2) = model_phase
-       if (phase_err <= 0D0) then
-          num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = maxval(bas)
-          flagged_points(num_flagged, 2) = phase
-          flagged_points(num_flagged, 3) = phase - phase_err
-          flagged_points(num_flagged, 4) = phase + phase_err
-       else
-          num_data = num_data + 1
-          data_points(num_data, 1) = maxval(bas)
-          data_points(num_data, 2) = phase
-          data_points(num_data, 3) = phase + phase_err
-          data_points(num_data, 4) = phase - phase_err
-       end if
-    end do
-
-    !calculate y range required
-    dymin = minval(data_points(:num_data, 4))
-    dymax = maxval(data_points(:num_data, 3))
-    fymin = minval(flagged_points(:num_flagged, 4))
-    fymax = maxval(flagged_points(:num_flagged, 3))
-    mymin = minval(model_points(:num_model, 2))
-    mymax = maxval(model_points(:num_model, 2))
-    if (num_data > 0) then
-       !exclude flagged extrema by default
-       ymin = min(dymin, mymin)
-       ymax = max(dymax, mymax)
-    else if (num_flagged > 0) then
-       ymin = min(fymin, mymin)
-       ymax = max(fymax, mymax)
-    else
-       !nothing to plot
-       return
-    end if
-    !change y range
-    if (ymax > 180.) then
-       ymax = 180.
-    else if (ymax < -180.) then
-       ymax = -180.
-    end if
-
-    !calculate x range required
-    if (present(uxmin)) then
-       xmin = uxmin
-    else
-       xmin = 0.9*minval(model_points(:num_model, 1))
-    end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = 1.1*maxval(model_points(:num_model, 1))
-    end if
-
-    !plot data
-    if (present(device)) then
-       istat = pgopen(device)
-       if (istat <= 0) return
-    end if
-    call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
-    call pglab(trim(x_title), trim(y_title), trim(top_title))
-    call pgsci(2)
-    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
-         9, .false.)
-    call pgsci(1)
-    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
-    call pgsci(3)
-    call plot_model_pts(x_title, y_title, num_model, model_points, 13)
-
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
-    if (allocated(model_points)) deallocate(model_points)
-
-  end subroutine plot_triple_phase_bas
-  !============================================================================
-
-  subroutine plot_triple_amp_bas(spec, param, x_title, y_title, top_title, &
-       uxmin, uxmax, device)
-
-    !subroutine arguments
-    character(len=128), dimension(:,:), intent(in) :: spec
-    double precision, dimension(:,:), intent(in) :: param
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    double precision, intent(in), optional :: uxmin, uxmax
-    character(len=*), intent(in), optional :: device
-
-    !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points, model_points
-    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
-    double complex :: vis1, vis2, vis3
-    real :: amp, amp_err
-    real, dimension(3) :: bas
-    integer :: num_data, num_flagged, num_model, i, istat
-
-    !functions
-    integer :: pgopen
-    ! make up real arrays for unflagged & flagged data points plus model points
-    ! columns are x, y, (y+delta, y-delta)
-    allocate(data_points(size(triple_data, 1), 4))
-    allocate(flagged_points(size(triple_data, 1), 4))
-    allocate(model_points(size(triple_data, 1), 2))
-    num_model = 0
-    num_data = 0
-    num_flagged = 0
-    do i = 1, size(triple_data, 1)
-       lambda = triple_data(i, 1)
-       delta_lambda = triple_data(i, 2)
-       u1 = triple_data(i, 3)
-       v1 = triple_data(i, 4)
-       u2 = triple_data(i, 5)
-       v2 = triple_data(i, 6)
-       mjd = triple_data(i, 11)
-       bas(1) = 1000.*sqrt(u1**2. + v1**2.)/lambda
-       bas(2) = 1000.*sqrt(u2**2. + v2**2.)/lambda
-       bas(3) = 1000.*sqrt((u1+u2)**2. + (v1+v2)**2.)/lambda
-       if (present(uxmin)) then
-          if (maxval(bas) < uxmin) cycle !out of plot range
-       end if
-       if (present(uxmax)) then
-          if (maxval(bas) > uxmax) cycle !out of plot range
-       end if
-       amp = triple_data(i, 7)
-       amp_err = triple_data(i, 8)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
-            -(u1+u2), -(v1+v2), mjd)
-       num_model = num_model + 1
-       model_points(num_model, 1) = maxval(bas)
-       model_points(num_model, 2) = modulus(vis1*vis2*vis3)
-       if (amp_err <= 0D0) then
-          num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = maxval(bas)
-          flagged_points(num_flagged, 2) = amp
-          flagged_points(num_flagged, 3) = amp - amp_err
-          flagged_points(num_flagged, 4) = amp + amp_err
-       else
-          num_data = num_data + 1
-          data_points(num_data, 1) = maxval(bas)
-          data_points(num_data, 2) = amp
-          data_points(num_data, 3) = amp + amp_err
-          data_points(num_data, 4) = amp - amp_err
-       end if
-    end do
-
-    !calculate y range required
-    dymin = minval(data_points(:num_data, 4))
-    dymax = maxval(data_points(:num_data, 3))
-    fymin = minval(flagged_points(:num_flagged, 4))
-    fymax = maxval(flagged_points(:num_flagged, 3))
-    mymin = minval(model_points(:num_model, 2))
-    mymax = maxval(model_points(:num_model, 2))
-    if (num_data > 0) then
-       !exclude flagged extrema by default
-       ymin = min(dymin, mymin)
-       ymax = max(dymax, mymax)
-    else if (num_flagged > 0) then
-       ymin = min(fymin, mymin)
-       ymax = max(fymax, mymax)
-    else
-       !nothing to plot
-       return
-    end if
-    !change y range
-    if (ymin > 0) then
-       ymin = ymin*0.9
-    else if (ymin < 0) then !yes, may be -ve
-       ymin = ymin*1.2
-    end if
-    ymax = ymax*1.1
-
-    !calculate x range required
-    if (present(uxmin)) then
-       xmin = uxmin
-    else
-       xmin = 0.9*minval(data_points(:num_data, 1))
-    end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = 1.1*maxval(data_points(:num_data, 1))
-    end if
-
-    !plot data
-    if (present(device)) then
-       istat = pgopen(device)
-       if (istat <= 0) return
-    end if
-    call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
-    call pglab(trim(x_title), trim(y_title), trim(top_title))
-    call pgsci(2)
-    call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
-         9, .false.)
-    call pgsci(1)
-    call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
-    call pgsci(3)
-    call plot_model_pts(x_title, y_title, num_model, model_points, 7)
-
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
-    if (allocated(model_points)) deallocate(model_points)
-
-  end subroutine plot_triple_amp_bas
-
-  !============================================================================
-
-  subroutine plot_vis_bas(spec, param, mod_line, x_title, y_title, top_title, &
+  subroutine plot_vis_bas(spec, param, mod_line, xlabel, y_title, top_title, &
        uxmin, uxmax, device)
 
     !subroutine arguments
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
     logical, intent(in) :: mod_line !plot continuous line for model?
-    character(len=*), intent(in) :: x_title, y_title, top_title
+    character(len=*), intent(in) :: xlabel, y_title, top_title
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
     !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points, &
-         model_points
-    double precision :: u, v, lambda, delta_lambda, mjd
+    character(len=128) :: x_title
+    ! columns are x, y, y+delta, y-delta:
+    real, dimension(size(vis_data, 1), 4) :: data_points, flagged_points
+    real, dimension(:, :), allocatable :: model_points
     integer :: num_data, num_flagged, num_model, i, istat
-    real :: bas, vsq, err, xmin, xmax
-    real :: ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
+    double precision :: u, v, lambda, delta_lambda, mjd
+    real, dimension(2) :: xrange, yrange
+    real :: xzero, bas, mymin, mymax
     integer, parameter :: grid_size = 200
 
     !functions
     integer :: pgopen
 
-    ! make up real arrays for unflagged & flagged data points
-    ! columns are x, y, y+delta, y-delta
-    allocate(data_points(size(vis_data, 1), 4))
-    allocate(flagged_points(size(vis_data, 1), 4))
-    num_data = 0
-    num_flagged = 0
-    do i = 1, size(vis_data, 1)
-       lambda = vis_data(i, 1)
-       delta_lambda = vis_data(i, 2)
-       u = vis_data(i, 3)
-       v = vis_data(i, 4)
-       bas = 1000.*sqrt(u**2. + v**2.)/lambda
-       if (present(uxmin)) then
-          if (bas < uxmin) cycle !out of plot range
-       end if
-       if (present(uxmax)) then
-          if (bas > uxmax) cycle !out of plot range
-       end if
-       vsq = vis_data(i, 5)
-       err = vis_data(i, 6)
-       if (err <= 0D0) then
-          num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = bas
-          flagged_points(num_flagged, 2) = vsq
-          flagged_points(num_flagged, 3) = vsq - err
-          flagged_points(num_flagged, 4) = vsq + err
-       else
-          num_data = num_data + 1
-          data_points(num_data, 1) = bas
-          data_points(num_data, 2) = vsq
-          data_points(num_data, 3) = vsq + err
-          data_points(num_data, 4) = vsq - err
-       end if
-    end do
-
-    !calculate x range required
-    if (present(uxmin)) then
-       xmin = uxmin
+    call get_plot_vis_data(-1, xzero, & 
+         data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
+         uxmin, uxmax)
+    if(num_data + num_flagged == 0) return
+    if(abs(xzero) > 1E-6) then
+       write (x_title, '(a, a, f9.1)') trim(xlabel), ' - ', xzero
     else
-       xmin = 0.9*minval(data_points(:num_data, 1))
-    end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = 1.1*maxval(data_points(:num_data, 1))
+       x_title = xlabel
     end if
 
     if (mod_line) then
@@ -477,58 +480,37 @@ contains
        lambda = vis_data(1, 1)
        delta_lambda = vis_data(1, 2)
        do i = 1, num_model
-          u = xmin*lambda/1000. + ((i-1.)/(num_model-1.))*(xmax-xmin)*lambda/1000.
+          u = xrange(1)*lambda/1000. &
+               + ((i-1.)/(num_model-1.))*(xrange(2)-xrange(1))*lambda/1000.
           model_points(i, 1) = 1000.*u/lambda
-          model_points(i, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, 0D0, mjd))**2.
+          model_points(i, 2) = modulus( &
+               cmplx_vis(spec, param, lambda, delta_lambda, u, 0D0, mjd))**2.
        end do
     else
        !calculate model points corresponding to plotted data points
        allocate(model_points(size(vis_data, 1), 2))
        num_model = 0
        do i = 1, size(vis_data, 1)
-          lambda = vis_data(i, 1)
-          delta_lambda = vis_data(i, 2)
-          u = vis_data(i, 3)
-          v = vis_data(i, 4)
-          mjd = vis_data(i, 7)
-          bas = 1000.*sqrt(u**2. + v**2.)/lambda
-          if (bas .ge. xmin .and. bas .le. xmax) then
+          bas = plot_vis_xval(i, -1)
+          if (bas >= xrange(1) .and. bas <= xrange(2)) then
              num_model = num_model + 1
              model_points(num_model, 1) = bas
-             model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd))**2.
+             lambda = vis_data(i, 1)
+             delta_lambda = vis_data(i, 2)
+             u = vis_data(i, 3)
+             v = vis_data(i, 4)
+             mjd = vis_data(i, 7)
+             model_points(num_model, 2) = modulus( &
+                  cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd))**2.
           end if
        end do
     end if
 
-    !calculate y range
-    dymin = minval(data_points(:num_data, 4))
-    dymax = maxval(data_points(:num_data, 3))
-    fymin = minval(flagged_points(:num_flagged, 4))
-    fymax = maxval(flagged_points(:num_flagged, 3))
+    !expand y range so model points visible
     mymin = minval(model_points(:num_model, 2))
     mymax = maxval(model_points(:num_model, 2))
-    if (num_data > 0) then
-       !exclude flagged extrema by default
-       ymin = min(dymin, mymin)
-       ymax = max(dymax, mymax)
-    else if (num_flagged > 0) then
-       ymin = min(fymin, mymin)
-       ymax = max(fymax, mymax)
-    else if (num_model > 0) then
-       !user x range excludes all data, ensure model points in range
-       ymin = mymin
-       ymax = mymax
-    else
-       !nothing to plot
-       return
-    end if
-    !change y range
-    if (ymin > 0) then
-       ymin = ymin*0.9
-    else if (ymin < 0) then !yes, may be -ve
-       ymin = ymin*1.2
-    end if
-    ymax = ymax*1.1
+    if(mymin < yrange(1)) yrange(1) = mymin
+    if(mymax > yrange(2)) yrange(2) = mymax
 
     !plot data
     if (present(device)) then
@@ -536,7 +518,7 @@ contains
        if (istat <= 0) return
     end if
     call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
+    call pgenv(xrange(1), xrange(2), yrange(1), yrange(2), 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
     call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
@@ -550,8 +532,6 @@ contains
        call plot_model_pts(x_title, y_title, num_model, model_points, 13)
     end if
 
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
     if (allocated(model_points)) deallocate(model_points)
 
   end subroutine plot_vis_bas
@@ -565,7 +545,7 @@ contains
     character(len=*), intent(in), optional :: device
 
     !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points
+    real, dimension(size(vis_data, 1), 2) :: data_points, flagged_points
     real :: u, v, lambda, delta_lambda, bas, max
     integer :: num_data, num_flagged, i, istat
 
@@ -573,9 +553,6 @@ contains
     integer :: pgopen
 
     ! make up real arrays for unflagged & flagged data points
-    ! columns are x, y
-    allocate(data_points(size(vis_data, 1), 2))
-    allocate(flagged_points(size(vis_data, 1), 2))
     num_data = 0
     num_flagged = 0
     max = 0.
@@ -612,126 +589,74 @@ contains
     call pgpt(num_data, data_points(:, 1), data_points(:, 2), 17)
     call pgpt(num_data, -data_points(:, 1), -data_points(:, 2), 22)
 
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
-
   end subroutine plot_uv
 
   !============================================================================
 
-  subroutine plot_vis(xindex, spec, param, x_title, y_title, top_title, &
-       xzero, uxmin, uxmax, device)
+  subroutine plot_vis(xindex, spec, param, &
+       xlabel, y_title, top_title, uxmin, uxmax, device)
 
-    !plot squared visibility against specified data column
-    !xindex gives index into 2nd axis of vis_data for independent variable
+    !plot squared visibility against specified quanity
+    !
+    !xindex gives index into 2nd axis of vis_data for independent
+    !variable, or indicates derived quantity :
+    !-1: projected baseline length /mega-lambda
+    !-2: GMST /h
+    !-3: baseline position angle /deg
 
     !subroutine arguments
     integer :: xindex
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    real, intent(in) :: xzero
+    character(len=*), intent(in) :: xlabel, y_title, top_title
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
     !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points, &
-         model_points
-    double precision :: u, v, lambda, delta_lambda, mjd
+    character(len=128) :: x_title
+    ! columns are x, y, y+delta, y-delta:
+    real, dimension(size(vis_data, 1), 4) :: data_points, flagged_points
+    real, dimension(size(vis_data, 1), 2) :: model_points
+    double precision :: x, lambda, delta_lambda, u, v, mjd
     integer :: num_data, num_flagged, num_model, i, istat
-    real :: vsq, err, xmin, xmax
-    real :: ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
+    real, dimension(2) :: xrange, yrange
+    real :: xzero, mymin, mymax
 
     !functions
     integer :: pgopen
 
-    ! make up real arrays for unflagged & flagged data points
-    ! columns are x, y, y+delta, y-delta
-    allocate(data_points(size(vis_data, 1), 4))
-    allocate(flagged_points(size(vis_data, 1), 4))
-    num_data = 0
-    num_flagged = 0
-    do i = 1, size(vis_data, 1)
-       !skip if x value outside plot range
-       if (present(uxmin)) then
-          if (vis_data(i, xindex) < uxmin) cycle
-       end if
-       if (present(uxmax)) then
-          if (vis_data(i, xindex) > uxmax) cycle
-       end if
-       lambda = vis_data(i, 1)
-       delta_lambda = vis_data(i, 2)
-       u = vis_data(i, 3)
-       v = vis_data(i, 4)
-       vsq = vis_data(i, 5)
-       err = vis_data(i, 6)
-       if (err <= 0D0) then
-          num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = vis_data(i, xindex) - xzero
-          flagged_points(num_flagged, 2) = vsq
-          flagged_points(num_flagged, 3) = vsq - err
-          flagged_points(num_flagged, 4) = vsq + err
-       else
-          num_data = num_data + 1
-          data_points(num_data, 1) = vis_data(i, xindex) - xzero
-          data_points(num_data, 2) = vsq
-          data_points(num_data, 3) = vsq + err
-          data_points(num_data, 4) = vsq - err
-       end if
-    end do
-
-    !calculate x range required
-    if (present(uxmin)) then
-       xmin = uxmin
+    call get_plot_vis_data(xindex, xzero, & 
+         data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
+         uxmin, uxmax)
+    if(num_data + num_flagged == 0) return
+    if(abs(xzero) > 1E-6) then
+       write (x_title, '(a, a, f9.1)') trim(xlabel), ' - ', xzero
     else
-       xmin = minval(data_points(:num_data, 1))
-    end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = maxval(data_points(:num_data, 1))
+       x_title = xlabel
     end if
 
     !calculate model points corresponding to plotted data points
-    allocate(model_points(size(vis_data, 1), 2))
     num_model = 0
     do i = 1, size(vis_data, 1)
-       lambda = vis_data(i, 1)
-       delta_lambda = vis_data(i, 2)
-       u = vis_data(i, 3)
-       v = vis_data(i, 4)
-       if ((vis_data(i, xindex)-xzero) .ge. xmin .and. (vis_data(i, xindex)-xzero) .le. xmax) then
+       x = plot_vis_xval(i, xindex)
+       if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
-          model_points(num_model, 1) = vis_data(i, xindex) - xzero
-          model_points(num_model, 2) = modulus(cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd))**2.
+          model_points(num_model, 1) = x - xzero
+          lambda = vis_data(i, 1)
+          delta_lambda = vis_data(i, 2)
+          u = vis_data(i, 3)
+          v = vis_data(i, 4)
+          mjd = vis_data(i, 7)
+          model_points(num_model, 2) = modulus( &
+               cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd))**2.
        end if
     end do
 
-    !calculate y range
-    dymin = minval(data_points(:num_data, 4))
-    dymax = maxval(data_points(:num_data, 3))
-    fymin = minval(flagged_points(:num_flagged, 4))
-    fymax = maxval(flagged_points(:num_flagged, 3))
+    !expand y range so model points visible
     mymin = minval(model_points(:num_model, 2))
     mymax = maxval(model_points(:num_model, 2))
-    if (num_data > 0) then
-       !exclude flagged extrema by default
-       ymin = min(dymin, mymin)
-       ymax = max(dymax, mymax)
-    else if (num_flagged > 0) then
-       ymin = min(fymin, mymin)
-       ymax = max(fymax, mymax)
-    else
-       !nothing to plot
-       return
-    end if
-    !change y range
-    if (ymin > 0) then
-       ymin = ymin*0.9
-    else if (ymin < 0) then !yes, may be -ve
-       ymin = ymin*1.2
-    end if
-    ymax = ymax*1.1
+    if(mymin < yrange(1)) yrange(1) = mymin
+    if(mymax > yrange(2)) yrange(2) = mymax
 
     !plot data
     if (present(device)) then
@@ -739,7 +664,7 @@ contains
        if (istat <= 0) return
     end if
     call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
+    call pgenv(xrange(1), xrange(2), yrange(1), yrange(2), 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
     call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
@@ -747,18 +672,14 @@ contains
     call pgsci(1)
     call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
-    call plot_model_pts(x_title, y_title, num_model, model_points, 7)
-
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
-    if (allocated(model_points)) deallocate(model_points)
+    call plot_model_pts(x_title, y_title, num_model, model_points, 13)
 
   end subroutine plot_vis
 
   !============================================================================
 
-  subroutine plot_triple_phase(xindex, spec, param, x_title, y_title, &
-       top_title, xzero, uxmin, uxmax, device)
+  subroutine plot_triple_phase(xindex, spec, param, xlabel, y_title, &
+       top_title, uxmin, uxmax, device)
 
     !plot triple product phase against specified data column
     !xindex gives index into 2nd axis of triple_data for independent variable
@@ -767,109 +688,63 @@ contains
     integer :: xindex
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    real, intent(in) :: xzero
+    character(len=*), intent(in) :: xlabel, y_title, top_title
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
     !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points, &
-         model_points
-    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
-    double complex :: vis1, vis2, vis3
-    real :: phase, phase_err, model_phase
+    character(len=128) :: x_title
+    ! columns are x, y, y+delta, y-delta:
+    real, dimension(size(triple_data, 1), 4) :: data_points, flagged_points
+    real, dimension(size(triple_data, 1), 2) :: model_points
     integer :: num_data, num_flagged, num_model, i, istat
+    double precision :: x, lambda, delta_lambda, u1, v1, u2, v2, mjd
+    double complex :: vis1, vis2, vis3
+    real, dimension(2) :: xrange, yrange
+    real :: xzero, model_phase, mymin, mymax
 
     !functions
     integer :: pgopen
 
-    ! make up real arrays for unflagged & flagged data points plus model points
-    ! columns are x, y, y+delta, y-delta
-    allocate(data_points(size(triple_data, 1), 4))
-    allocate(flagged_points(size(triple_data, 1), 4))
-    allocate(model_points(size(triple_data, 1), 2))
+    call get_plot_triple_data(xindex, xzero, .false., & 
+         data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
+         uxmin, uxmax)
+    if(num_data + num_flagged == 0) return
+    if(xzero > 1E-6) then
+       write (x_title, '(a, a, f9.1)') trim(xlabel), ' - ', xzero
+    else
+       x_title = xlabel
+    end if
+
+    !calculate model points corresponding to plotted data points
     num_model = 0
-    num_data = 0
-    num_flagged = 0
     do i = 1, size(triple_data, 1)
-       !skip if x value outside plot range
-       if (present(uxmin)) then
-          if (triple_data(i, xindex) < uxmin) cycle
-       end if
-       if (present(uxmax)) then
-          if (triple_data(i, xindex) > uxmax) cycle
-       end if
-       lambda = triple_data(i, 1)
-       delta_lambda = triple_data(i, 2)
-       phase = modulo(triple_data(i, 9), 360D0)
-       if (phase > 180.) phase = phase - 360.
-       phase_err = triple_data(i, 10)
-       u1 = triple_data(i, 3)
-       v1 = triple_data(i, 4)
-       u2 = triple_data(i, 5)
-       v2 = triple_data(i, 6)
-       mjd = triple_data(i, 11)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
-            -(u1+u2), -(v1+v2), mjd)
-       num_model = num_model + 1
-       model_points(num_model, 1) = triple_data(i, xindex) - xzero
-       model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
-       if (model_phase > 180.) model_phase = model_phase - 360.
-       model_points(num_model, 2) = model_phase
-       if (phase_err <= 0D0) then
-          num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = triple_data(i, xindex) - xzero
-          flagged_points(num_flagged, 2) = phase
-          flagged_points(num_flagged, 3) = phase - phase_err
-          flagged_points(num_flagged, 4) = phase + phase_err
-       else
-          num_data = num_data + 1
-          data_points(num_data, 1) = triple_data(i, xindex) - xzero
-          data_points(num_data, 2) = phase
-          data_points(num_data, 3) = phase + phase_err
-          data_points(num_data, 4) = phase - phase_err
+       x = plot_triple_xval(i, xindex)
+       if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
+          num_model = num_model + 1
+          model_points(num_model, 1) = x - xzero
+          lambda = triple_data(i, 1)
+          delta_lambda = triple_data(i, 2)
+          u1 = triple_data(i, 3)
+          v1 = triple_data(i, 4)
+          u2 = triple_data(i, 5)
+          v2 = triple_data(i, 6)
+          mjd = triple_data(i, 11)
+          vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
+          vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
+          vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
+               -(u1+u2), -(v1+v2), mjd)
+          model_phase = modulo(rad2deg*argument(vis1*vis2*vis3), 360D0)
+          if (model_phase > 180.) model_phase = model_phase - 360.
+          model_points(num_model, 2) = model_phase
        end if
     end do
 
-    !calculate y range required
-    dymin = minval(data_points(:num_data, 4))
-    dymax = maxval(data_points(:num_data, 3))
-    fymin = minval(flagged_points(:num_flagged, 4))
-    fymax = maxval(flagged_points(:num_flagged, 3))
+    !expand y range so model points visible
     mymin = minval(model_points(:num_model, 2))
     mymax = maxval(model_points(:num_model, 2))
-    if (num_data > 0) then
-       !exclude flagged extrema by default
-       ymin = min(dymin, mymin)
-       ymax = max(dymax, mymax)
-    else if (num_flagged > 0) then
-       ymin = min(fymin, mymin)
-       ymax = max(fymax, mymax)
-    else
-       !nothing to plot
-       return
-    end if
-    !change y range
-    if (ymax > 180.) then
-       ymax = 180.
-    else if (ymax < -180.) then
-       ymax = -180.
-    end if
-
-    !calculate x range required
-    if (present(uxmin)) then
-       xmin = uxmin
-    else
-       xmin = minval(data_points(:num_data, 1))
-    end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = maxval(data_points(:num_data, 1))
-    end if
+    if(mymin < yrange(1)) yrange(1) = mymin
+    if(mymax > yrange(2)) yrange(2) = mymax
 
     !plot data
     if (present(device)) then
@@ -877,7 +752,7 @@ contains
        if (istat <= 0) return
     end if
     call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
+    call pgenv(xrange(1), xrange(2), yrange(1), yrange(2), 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
     call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
@@ -886,17 +761,13 @@ contains
     call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 7)
-
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
-    if (allocated(model_points)) deallocate(model_points)
 
   end subroutine plot_triple_phase
 
   !============================================================================
 
-  subroutine plot_triple_amp(xindex, spec, param, x_title, y_title, &
-       top_title, xzero, uxmin, uxmax, device)
+  subroutine plot_triple_amp(xindex, spec, param, xlabel, y_title, &
+       top_title, uxmin, uxmax, device)
 
     !plot triple product phase against specified data column
     !xindex gives index into 2nd axis of triple_data for independent variable
@@ -905,107 +776,61 @@ contains
     integer :: xindex
     character(len=128), dimension(:,:), intent(in) :: spec
     double precision, dimension(:,:), intent(in) :: param
-    character(len=*), intent(in) :: x_title, y_title, top_title
-    real, intent(in) :: xzero
+    character(len=*), intent(in) :: xlabel, y_title, top_title
     double precision, intent(in), optional :: uxmin, uxmax
     character(len=*), intent(in), optional :: device
 
     !local variables
-    real, dimension(:, :), allocatable :: data_points, flagged_points, &
-         model_points
-    real :: xmin, xmax, ymin, ymax, dymin, dymax, fymin, fymax, mymin, mymax
-    double precision :: lambda, delta_lambda, u1, v1, u2, v2, mjd
-    double complex :: vis1, vis2, vis3
-    real :: amp, amp_err
+    character(len=128) :: x_title
+    ! columns are x, y, y+delta, y-delta:
+    real, dimension(size(triple_data, 1), 4) :: data_points, flagged_points
+    real, dimension(size(triple_data, 1), 2) :: model_points
     integer :: num_data, num_flagged, num_model, i, istat
+    double precision :: x, lambda, delta_lambda, u1, v1, u2, v2, mjd
+    double complex :: vis1, vis2, vis3
+    real, dimension(2) :: xrange, yrange
+    real :: xzero, mymin, mymax
 
     !functions
     integer :: pgopen
 
-    ! make up real arrays for unflagged & flagged data points plus model points
-    ! columns are x, y, y+delta, y-delta
-    allocate(data_points(size(triple_data, 1), 4))
-    allocate(flagged_points(size(triple_data, 1), 4))
-    allocate(model_points(size(triple_data, 1), 2))
+    call get_plot_triple_data(xindex, xzero, .true., & 
+         data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
+         uxmin, uxmax)
+    if(num_data + num_flagged == 0) return
+    if(xzero > 1E-6) then
+       write (x_title, '(a, a, f9.1)') trim(xlabel), ' - ', xzero
+    else
+       x_title = xlabel
+    end if
+
+    !calculate model points corresponding to plotted data points
     num_model = 0
-    num_data = 0
-    num_flagged = 0
     do i = 1, size(triple_data, 1)
-       !skip if x value outside plot range
-       if (present(uxmin)) then
-          if (triple_data(i, xindex) < uxmin) cycle
-       end if
-       if (present(uxmax)) then
-          if (triple_data(i, xindex) > uxmax) cycle
-       end if
-       lambda = triple_data(i, 1)
-       delta_lambda = triple_data(i, 2)
-       amp = triple_data(i, 7)
-       amp_err = triple_data(i, 8)
-       u1 = triple_data(i, 3)
-       v1 = triple_data(i, 4)
-       u2 = triple_data(i, 5)
-       v2 = triple_data(i, 6)
-       mjd = triple_data(i, 11)
-       vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
-       vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
-       vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
-            -(u1+u2), -(v1+v2), mjd)
-       num_model = num_model + 1
-       model_points(num_model, 1) = triple_data(i, xindex) - xzero
-       model_points(num_model, 2) = modulus(vis1*vis2*vis3)
-       if (amp_err <= 0D0) then
-          num_flagged = num_flagged + 1
-          flagged_points(num_flagged, 1) = triple_data(i, xindex) - xzero
-          flagged_points(num_flagged, 2) = amp
-          flagged_points(num_flagged, 3) = amp - amp_err
-          flagged_points(num_flagged, 4) = amp + amp_err
-       else
-          num_data = num_data + 1
-          data_points(num_data, 1) = triple_data(i, xindex) - xzero
-          data_points(num_data, 2) = amp
-          data_points(num_data, 3) = amp + amp_err
-          data_points(num_data, 4) = amp - amp_err
+       x = plot_triple_xval(i, xindex)
+       if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
+          num_model = num_model + 1
+          model_points(num_model, 1) = x - xzero
+          lambda = triple_data(i, 1)
+          delta_lambda = triple_data(i, 2)
+          u1 = triple_data(i, 3)
+          v1 = triple_data(i, 4)
+          u2 = triple_data(i, 5)
+          v2 = triple_data(i, 6)
+          mjd = triple_data(i, 11)
+          vis1 = cmplx_vis(spec, param, lambda, delta_lambda, u1, v1, mjd)
+          vis2 = cmplx_vis(spec, param, lambda, delta_lambda, u2, v2, mjd)
+          vis3 = cmplx_vis(spec, param, lambda, delta_lambda, &
+               -(u1+u2), -(v1+v2), mjd)
+          model_points(num_model, 2) = modulus(vis1*vis2*vis3)
        end if
     end do
 
-    !calculate y range required
-    dymin = minval(data_points(:num_data, 4))
-    dymax = maxval(data_points(:num_data, 3))
-    fymin = minval(flagged_points(:num_flagged, 4))
-    fymax = maxval(flagged_points(:num_flagged, 3))
+    !expand y range so model points visible
     mymin = minval(model_points(:num_model, 2))
     mymax = maxval(model_points(:num_model, 2))
-    if (num_data > 0) then
-       !exclude flagged extrema by default
-       ymin = min(dymin, mymin)
-       ymax = max(dymax, mymax)
-    else if (num_flagged > 0) then
-       ymin = min(fymin, mymin)
-       ymax = max(fymax, mymax)
-    else
-       !nothing to plot
-       return
-    end if
-    !change y range
-    if (ymin > 0) then
-       ymin = ymin*0.9
-    else if (ymin < 0) then !yes, may be -ve
-       ymin = ymin*1.2
-    end if
-    ymax = ymax*1.1
-
-    !calculate x range required
-    if (present(uxmin)) then
-       xmin = uxmin
-    else
-       xmin = minval(data_points(:num_data, 1))
-    end if
-    if (present(uxmax)) then
-       xmax = uxmax
-    else
-       xmax = maxval(data_points(:num_data, 1))
-    end if
+    if(mymin < yrange(1)) yrange(1) = mymin
+    if(mymax > yrange(2)) yrange(2) = mymax
 
     !plot data
     if (present(device)) then
@@ -1013,7 +838,7 @@ contains
        if (istat <= 0) return
     end if
     call pgsci(1)
-    call pgenv(xmin, xmax, ymin, ymax, 0, 1)
+    call pgenv(xrange(1), xrange(2), yrange(1), yrange(2), 0, 1)
     call pglab(trim(x_title), trim(y_title), trim(top_title))
     call pgsci(2)
     call plot_data_pts(x_title, y_title, num_flagged, flagged_points, &
@@ -1022,10 +847,6 @@ contains
     call plot_data_pts(x_title, y_title, num_data, data_points, 2, .true.)
     call pgsci(3)
     call plot_model_pts(x_title, y_title, num_model, model_points, 7)
-
-    if (allocated(data_points)) deallocate(data_points)
-    if (allocated(flagged_points)) deallocate(flagged_points)
-    if (allocated(model_points)) deallocate(model_points)
 
   end subroutine plot_triple_amp
 

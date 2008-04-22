@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.11 2006/08/18 16:22:19 jsy1001 Exp $
+# $Id: fitgui.py,v 1.12 2008/04/22 09:51:19 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.11 $")[1]
+_revision = string.split("$Revision: 1.12 $")[1]
 
 
 class GUI:
@@ -70,9 +70,10 @@ class GUI:
         self.nofit = IntVar()
         self.nofit.set(0)
         self.plots = ['No plot', 'uv', 'vis2', 't3amp', 't3phi',
-                      'vis2wl', 't3ampwl', 't3phiwl',
-                      'vis2mjd', 't3ampmjd', 't3phimjd', 'post', 'mpost',
-                      'post2d', 'mpost2d']
+                      'vis2-wl', 't3amp-wl', 't3phi-wl',
+                      'vis2-mjd', 't3amp-mjd', 't3phi-mjd',
+                      'vis2-st', 't3amp-st', 't3phi-st', 'vis2-pa',
+                      'post', 'mpost', 'post2d', 'mpost2d']
         self.selPlot = StringVar()
         self.selPlot.set(self.plots[1])
         self.plotXIndex = StringVar()
@@ -306,7 +307,7 @@ class GUI:
         if self.nofit.get(): optText += ' --nofit'
         if self.margErr.get():
             optText += ' --margerr %s' % (self.margErrVar.get())
-        command = '%s%s --device %s %s %s' % (
+        command = 'nice %s%s --device %s %s %s' % (
             self.exe, optText, self.device, self.fileName.get(),
             self._tempName)
         self.ShowResult('Running %s:\n' % command, tag='commentary')

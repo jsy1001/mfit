@@ -96,10 +96,11 @@ if Platform() != 'win32':
 
 # Configure libraries to link in
 baseLibs = env.get('LIBS', [])
-pdaLibs = ['pda', 'emsf', 'ems', 'cnf']
+# include slalib here since its distributed with Starlink
+starLibs = ['pda', 'emsf', 'ems', 'cnf', 'sla']
 if conf.CheckLib('starmem'):
     # NB CheckLib() appends to env['LIBS'] if found
-    pdaLibs += ['starmem']
+    starLibs += ['starmem']
 pgLibs = ['pgplot', 'X11']
 fitsioLibs = ['cfitsio']
 if conf.CheckLib('socket'):
@@ -133,10 +134,10 @@ sources['mplot'] = ['modelplot.f90',
 sources['calc'] = ['calc.f90',
                    'maths.f90', 'gamma.f', 'rjbesl.f']
 libs = {}
-libs['mfit'] = baseLibs + pdaLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
-libs['clfit'] = baseLibs + pdaLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
-libs['mplot'] = baseLibs + pdaLibs + pgLibs + fitsioLibs + fftwLibs
-libs['calc'] = baseLibs + pdaLibs
+libs['mfit'] = baseLibs + starLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
+libs['clfit'] = baseLibs + starLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
+libs['mplot'] = baseLibs + starLibs + pgLibs + fitsioLibs + fftwLibs
+libs['calc'] = baseLibs + starLibs
 objects = {}
 # ...object files
 for key in sources.keys():

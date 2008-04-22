@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.23 2007/09/07 17:04:45 jsy1001 Exp $
+!$Id: clfit.f90,v 1.24 2008/04/22 09:51:19 jsy1001 Exp $
 
 program Main
 
@@ -38,13 +38,13 @@ program Main
   character(len=8) :: sel_plot
   integer :: narg, iarg, i, n, user_target_id, margerr_var
   integer :: indx(2)
-  integer :: degfreedom, useful_vis, useful_amp, useful_cp
+  integer :: degfreedom, useful_vis, useful_amp, useful_cp, xindex
   double precision :: nlposterior, nlevidence, nlnpost, chisqrd, normchisqrd
   double precision :: calib_error, uxmin, uxmax, uymin, uymax
   double precision :: x0, y0, xsig, ysig
-  real :: xzero
   logical :: force_symm, nofit, zoom, mod_line, marg
   logical :: fit_ok, found_min, hes_valid
+  logical :: pl_vis, pl_amp, pl_cp
 
   integer :: pgopen, istat
 
@@ -55,7 +55,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.23 $'
+  cvs_rev = '$Revision: 1.24 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -239,7 +239,6 @@ program Main
      force_symm = .false.
 
   else if (ext(len_trim(ext)-4:len_trim(ext)) == 'calib') then
-     !Model is forced to be centrosymmetric (real visibilities)
      !.*Calib has no waveband data so must be supplied by wavelength range
      if (wb(2) .eq. -1.0D0) &
           stop 'need waveband for wbCalib format'
@@ -393,8 +392,9 @@ program Main
         normchisqrd = chisqrd/degfreedom
         print *, 'chi sqrd / deg freedom =',real(normchisqrd)
      end if
-     mod_line = (symm .and. size(sel_wavebands, 1) == 1)
+     mod_line = (symm_model .and. size(sel_wavebands, 1) == 1)
      top_title = trim(source)//' - initial model: '//trim(model_name)
+
      if (sel_plot == 'vis2' .and. useful_vis > 0) then
         if (zoom) then 
            call plot_vis_bas(model_spec, model_param, mod_line, &
@@ -404,95 +404,36 @@ program Main
            call plot_vis_bas(model_spec, model_param, mod_line, &
                 'Baseline /M\gl', 'Squared visibility', top_title)
         end if
-     end if
-     if (sel_plot == 'vis2wl' .and. useful_vis > 0) then
-        if (zoom) then 
-           call plot_vis(1, model_spec, model_param, &
-                'Wavelength /nm', 'Squared visibility', top_title, &
-                0., uxmin, uxmax)
-        else
-           call plot_vis(1, model_spec, model_param, &
-                'Wavelength /nm', 'Squared visibility', top_title, 0.)
+        !cannot do '(m)post(2d)' plot if --nofit
+     else
+        call parse_plot_arg(sel_plot, pl_vis, pl_amp, pl_cp, &
+             xindex, xlabel, ylabel)
+        if (pl_vis .and. useful_vis > 0) then
+           if (zoom) then 
+              call plot_vis(xindex, model_spec, model_param, &
+                   xlabel, ylabel, top_title, uxmin, uxmax)
+           else
+              call plot_vis(xindex, model_spec, model_param, &
+                   xlabel, ylabel, top_title)
+           end if
+        else if (pl_amp .and. useful_amp > 0) then
+           if (zoom) then 
+              call plot_triple_amp(xindex, model_spec, model_param, &
+                   xlabel, ylabel, top_title, uxmin, uxmax)
+           else
+              call plot_triple_amp(xindex, model_spec, model_param, &
+                   xlabel, ylabel, top_title)
+           end if
+        else if (pl_cp .and. useful_cp > 0) then
+           if (zoom) then 
+              call plot_triple_phase(xindex, model_spec, model_param, &
+                   xlabel, ylabel, top_title, uxmin, uxmax)
+           else
+              call plot_triple_phase(xindex, model_spec, model_param, &
+                   xlabel, ylabel, top_title)
+           end if
         end if
      end if
-     if (sel_plot == 'vis2mjd' .and. useful_vis > 0) then
-        xzero = floor(minval(vis_data(:,7)))
-        write (xlabel, *) 'Modified Julian Day -', xzero
-        if (zoom) then 
-           call plot_vis(7, model_spec, model_param, &
-                xlabel, 'Squared visibility', top_title, xzero, uxmin, uxmax)
-        else
-           call plot_vis(7, model_spec, model_param, &
-                xlabel, 'Squared visibility', top_title, xzero)
-        end if
-     end if
-     if (sel_plot == 't3amp' .and. useful_amp > 0) then
-        if (zoom) then 
-           call plot_triple_amp_bas(model_spec, model_param, &
-                'Longest baseline /M\gl', 'Triple amplitude', top_title, &
-                uxmin, uxmax)
-        else
-           call plot_triple_amp_bas(model_spec, model_param, &
-                'Longest baseline /M\gl', 'Triple amplitude', top_title)
-        end if
-     end if
-     if (sel_plot == 't3ampwl' .and. useful_amp > 0) then
-        if (zoom) then 
-           call plot_triple_amp(1, model_spec, model_param, &
-                'Wavelength /nm', &
-                'Triple amplitude', top_title, 0., uxmin, uxmax)
-        else
-           call plot_triple_amp(1, model_spec, model_param, &
-                'Wavelength /nm', &
-                'Triple amplitude', top_title, 0.)
-        end if
-     end if
-     if (sel_plot == 't3ampmjd' .and. useful_amp > 0) then
-        xzero = floor(minval(triple_data(:,11)))
-        write (xlabel, *) 'Modified Julian Day -', xzero
-        if (zoom) then 
-           call plot_triple_amp(11, model_spec, model_param, &
-                xlabel, 'Triple amplitude', top_title, xzero, uxmin, uxmax)
-        else
-           call plot_triple_amp(11, model_spec, model_param, &
-                xlabel, 'Triple amplitude', top_title, xzero)
-        end if
-     end if
-     if (sel_plot == 't3phi' .and. useful_cp > 0) then
-        if (zoom) then 
-           call plot_triple_phase_bas(model_spec, model_param, &
-                'Longest baseline /M\gl', 'Closure phase /'//char(176), &
-                top_title, uxmin, uxmax)
-        else
-           call plot_triple_phase_bas(model_spec, model_param, &
-                'Longest baseline /M\gl', 'Closure phase /'//char(176), &
-                top_title)
-        end if
-     end if
-     if (sel_plot == 't3phiwl' .and. useful_cp > 0) then
-        if (zoom) then 
-           call plot_triple_phase(1, model_spec, model_param, &
-                'Wavelength /nm', &
-                'Closure phase /'//char(176), top_title, 0., uxmin, uxmax)
-        else
-           call plot_triple_phase(1, model_spec, model_param, &
-                'Wavelength /nm', &
-                'Closure phase /'//char(176), top_title, 0.)
-        end if
-     end if
-     if (sel_plot == 't3phimjd' .and. useful_cp > 0) then
-        xzero = floor(minval(triple_data(:,11)))
-        write (xlabel, *) 'Modified Julian Day -', xzero
-        if (zoom) then 
-           call plot_triple_phase(11, model_spec, model_param, &
-                xlabel, 'Closure phase /'//char(176), top_title, xzero, &
-                uxmin, uxmax)
-        else
-           call plot_triple_phase(11, model_spec, model_param, &
-                xlabel, 'Closure phase /'//char(176), top_title, xzero)
-        end if
-     end if
-     !cannot do '(m)post(2d)' plot if --nofit
   else
      !-------------------------------------------------------------------------
      !fit model to the data by minimising negative log posterior
@@ -531,6 +472,8 @@ program Main
      end if
 
      if (fit_ok) then
+        if (.not. is_minimum(n, sol)) &
+             print *, 'NOT A LOCAL MINIMUM'
         call err_est(n, sol, &
              found_min, hes_valid, hes, cov, cor, err, nlevidence, info)
         if (info /= '') then
@@ -598,107 +541,8 @@ program Main
         !----------------------------------------------------------------------
         !plot
         call allparam_setvar(allpar, sol)
-        mod_line = (symm .and. size(sel_wavebands, 1) == 1)
+        mod_line = (symm_model .and. size(sel_wavebands, 1) == 1)
         top_title = trim(source)//' - final model: '//trim(model_name)
-        if (sel_plot == 'vis2' .and. useful_vis > 0) then
-           if (zoom) then 
-              call plot_vis_bas(model_spec, allpar%param, mod_line, &
-                   'Baseline /M\gl', 'Squared visibility', top_title, &
-                   uxmin, uxmax)
-           else
-              call plot_vis_bas(model_spec, allpar%param, mod_line, &
-                   'Baseline /M\gl', 'Squared visibility', top_title)
-           end if
-        end if
-        if (sel_plot == 'vis2wl' .and. useful_vis > 0) then
-           if (zoom) then 
-              call plot_vis(1, model_spec, allpar%param, &
-                   'Wavelength /nm', 'Squared visibility', top_title, &
-                   0., uxmin, uxmax)
-           else
-              call plot_vis(1, model_spec, allpar%param, &
-                   'Wavelength /nm', 'Squared visibility', top_title, 0.)
-           end if
-        end if
-        if (sel_plot == 'vis2mjd' .and. useful_vis > 0) then
-           xzero = floor(minval(vis_data(:,7)))
-           write (xlabel, *) 'Modified Julian Day -', xzero
-           if (zoom) then 
-              call plot_vis(7, model_spec, allpar%param, &
-                   xlabel, 'Squared visibility', top_title, xzero, &
-                   uxmin, uxmax)
-           else
-              call plot_vis(7, model_spec, allpar%param, &
-                   xlabel, 'Squared visibility', top_title, xzero)
-           end if
-        end if
-        if (sel_plot == 't3amp' .and. useful_amp > 0) then
-           if (zoom) then 
-              call plot_triple_amp_bas(model_spec, allpar%param, &
-                   'Longest baseline /M\gl', 'Triple amplitude', &
-                   top_title, uxmin, uxmax)
-           else
-              call plot_triple_amp_bas(model_spec, allpar%param, &
-                   'Longest baseline /M\gl', 'Triple amplitude', &
-                   top_title)
-           end if
-        end if
-        if (sel_plot == 't3ampwl' .and. useful_amp > 0) then
-           if (zoom) then 
-              call plot_triple_amp(1, model_spec, allpar%param, &
-                   'Wavelength /nm', &
-                   'Triple amplitude', top_title, 0., uxmin, uxmax)
-           else
-              call plot_triple_amp(1, model_spec, allpar%param, &
-                   'Wavelength /nm', &
-                   'Triple amplitude', top_title, 0.)
-           end if
-        end if
-        if (sel_plot == 't3ampmjd' .and. useful_amp > 0) then
-           xzero = floor(minval(triple_data(:,11)))
-           write (xlabel, *) 'Modified Julian Day -', xzero
-           if (zoom) then 
-              call plot_triple_amp(11, model_spec, allpar%param, &
-                   xlabel, 'Triple amplitude', top_title, xzero, uxmin, uxmax)
-           else
-              call plot_triple_amp(11, model_spec, allpar%param, &
-                   xlabel, 'Triple amplitude', top_title, xzero)
-           end if
-        end if
-        if (sel_plot == 't3phi' .and. useful_cp > 0) then
-           if (zoom) then 
-              call plot_triple_phase_bas(model_spec, allpar%param, &
-                   'Longest baseline /M\gl', &
-                   'Closure phase /'//char(176), top_title, uxmin, uxmax)
-           else
-              call plot_triple_phase_bas(model_spec, allpar%param, &
-                   'Longest baseline /M\gl', &
-                   'Closure phase /'//char(176), top_title)
-           end if
-        end if
-        if (sel_plot == 't3phiwl' .and. useful_cp > 0) then
-           if (zoom) then 
-              call plot_triple_phase(1, model_spec, allpar%param, &
-                   'Wavelength /nm', &
-                   'Closure phase /'//char(176), top_title, 0., uxmin, uxmax)
-           else
-              call plot_triple_phase(1, model_spec, allpar%param, &
-                   'Wavelength /nm', &
-                   'Closure phase /'//char(176), top_title, 0.)
-           end if
-        end if
-        if (sel_plot == 't3phimjd' .and. useful_cp > 0) then
-           xzero = floor(minval(triple_data(:,11)))
-           write (xlabel, *) 'Modified Julian Day -', xzero
-           if (zoom) then 
-              call plot_triple_phase(11, model_spec, allpar%param, &
-                   xlabel, 'Closure phase /'//char(176), top_title, xzero, &
-                   uxmin, uxmax)
-           else
-              call plot_triple_phase(11, model_spec, allpar%param, &
-                   xlabel, 'Closure phase /'//char(176), top_title, xzero)
-           end if
-        end if
         if (sel_plot == 'post' .or. sel_plot == 'mpost') then
            if (indx(1) > n) stop 'Invalid parameter number'
            if (.not. zoom) then
@@ -732,8 +576,7 @@ program Main
            end if
            call plot_post1d(marg, nlnpost, allpar, indx(1), &
                 var_desc(indx(1)), ylabel, top_title, uxmin, uxmax)
-        end if
-        if (sel_plot == 'post2d' .or. sel_plot == 'mpost2d') then
+        else if (sel_plot == 'post2d' .or. sel_plot == 'mpost2d') then
            if (indx(1) > n .or. indx(2) > n) &
                 stop 'Invalid parameter number'
            if (.not. zoom) then
@@ -766,7 +609,46 @@ program Main
            call plot_post2d(marg, nlposterior, allpar, indx, &
                 var_desc(indx(1)), var_desc(indx(2)), top_title, &
                 uxmin, uxmax, uymin, uymax)
+        else if (sel_plot == 'vis2' .and. useful_vis > 0) then
+           if (zoom) then 
+              call plot_vis_bas(model_spec, allpar%param, mod_line, &
+                   'Baseline /M\gl', 'Squared visibility', top_title, &
+                   uxmin, uxmax)
+           else
+              call plot_vis_bas(model_spec, allpar%param, mod_line, &
+                   'Baseline /M\gl', 'Squared visibility', top_title)
+           end if
+        else
+           call parse_plot_arg(sel_plot, pl_vis, pl_amp, pl_cp, &
+                xindex, xlabel, ylabel)
+           if (pl_vis .and. useful_vis > 0) then
+              if (zoom) then 
+                 call plot_vis(xindex, model_spec, allpar%param, &
+                      xlabel, ylabel, top_title, uxmin, uxmax)
+              else
+                 call plot_vis(xindex, model_spec, allpar%param, &
+                      xlabel, ylabel, top_title)
+              end if
+           else if (pl_amp .and. useful_amp > 0) then
+              if (zoom) then 
+                 call plot_triple_amp(xindex, model_spec, allpar%param, &
+                      xlabel, ylabel, top_title, uxmin, uxmax)
+              else
+                 call plot_triple_amp(xindex, model_spec, allpar%param, &
+                      xlabel, ylabel, top_title)
+              end if
+           else if (pl_cp .and. useful_cp > 0) then
+              if (zoom) then 
+                 call plot_triple_phase(xindex, model_spec, allpar%param, &
+                      xlabel, ylabel, top_title, uxmin, uxmax)
+              else
+                 call plot_triple_phase(xindex, model_spec, allpar%param, &
+                      xlabel, ylabel, top_title)
+              end if
+           end if
         end if
+
+        !----------------------------------------------------------------------
         if (margerr_var >= 1 .and. margerr_var <= n) then
            !check specified error bar
            print *, 'checking error bar',margerr_var,' by marginalisation...'
@@ -814,6 +696,84 @@ program Main
 
 contains
 
+!==============================================================================
+
+  subroutine parse_plot_arg(plot_id, plot_v2, plot_t3amp, plot_t3phi, &
+       xindex, xlabel, ylabel)
+
+    character(len=*), intent(in) :: plot_id
+    logical, intent(out) :: plot_v2, plot_t3amp, plot_t3phi
+    integer, intent(out) :: xindex
+    character(len=*), intent(out) :: xlabel, ylabel
+
+    plot_v2 = .false.
+    plot_t3amp = .false.
+    plot_t3phi = .false.
+
+    select case (plot_id)
+
+    case ('vis2')
+       plot_v2 = .true.
+       xindex = -1
+       xlabel = 'Baseline /M\gl'
+    case ('t3amp')
+       plot_t3amp = .true.
+       xindex = -1
+       xlabel = 'Longest baseline /M\gl'
+    case ('t3phi')
+       plot_t3phi = .true.
+       xindex = -1
+       xlabel = 'Longest baseline /M\gl'
+    case ('vis2-wl')
+       plot_v2 = .true.
+       xindex = 1
+       xlabel = 'Wavelength /nm'
+    case ('t3amp-wl')
+       plot_t3amp = .true.
+       xindex = 1
+       xlabel = 'Wavelength /nm'
+    case ('t3phi-wl')
+       plot_t3phi = .true.
+       xindex = 1
+       xlabel = 'Wavelength /nm'
+    case ('vis2-mjd')
+       plot_v2 = .true.
+       xindex = 7
+       xlabel = 'Modified Julian Day'
+    case ('t3amp-mjd')
+       plot_t3amp = .true.
+       xindex = 11
+       xlabel = 'Modified Julian Day'
+    case ('t3phi-mjd')
+       plot_t3phi = .true.
+       xindex = 11
+       xlabel = 'Modified Julian Day'
+    case ('vis2-st')
+       plot_v2 = .true.
+       xindex = -2
+       xlabel = 'GMST /h'
+    case ('t3amp-st')
+       plot_t3amp = .true.
+       xindex = -2
+       xlabel = 'GMST /h'
+    case ('t3phi-st')
+       plot_t3phi = .true.
+       xindex = -2
+       xlabel = 'GMST /h'
+    case ('vis2-pa')
+       plot_v2 = .true.
+       xindex = -3
+       xlabel = 'Baseline PA /deg'
+    case default
+       return
+    end select
+
+    if (plot_v2) ylabel = 'Squared visibility'
+    if (plot_t3amp) ylabel = 'Triple amplitude'
+    if (plot_t3phi) ylabel = 'Closure phase /'//char(176)
+
+  end subroutine parse_plot_arg
+ 
 !==============================================================================
 
   subroutine filt_by_wb(data, wb, sig)
@@ -894,10 +854,12 @@ contains
     print *, '-t|--target_id ID       select this target (default is 1st in OI_TARGET table)'
     print *, '-c|--calerr FRAC        add calibration error (frac. err. in system visib.)'
     print *, '-p|--plot      uv|post N|mpost N|post2d M N|mpost2d M N|vis2|t3amp|t3phi'
-    print *, '                |vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd'
+    print *, '                |vis2-wl|t3amp-wl|t3phi-wl|vis2-mjd|t3amp-mjd|t3phi-mjd'
+    print *, '                |vis2-st|t3amp-st|t3phi-st|vis2-pa'
     print *, '                        make specified plot'
     print *, '-z|--zoomplot  uv|post N|mpost N|post2d M N|mpost2d M N|vis2|t3amp|t3phi'
-    print *, '                |vis2wl|t3ampwl|t3phiwl|vis2mjd|t3ampmjd|t3phimjd XMIN XMAX'
+    print *, '                |vis2-wl|t3amp-wl|t3phi-wl|vis2-mjd|t3amp-mjd|t3phi-mjd'
+    print *, '                |vis2-st|t3amp-st|t3phi-st|vis2-pa XMIN XMAX'
     print *, '                        plot with specified x-axis range'
     print *, '-d|--device DEV         PGPLOT device to use'
     print *, '-m|--margerr N          alternate error bar N by brute-force marginalisation'

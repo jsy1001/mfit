@@ -1,4 +1,4 @@
-!$Id: main.f90,v 1.25 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: main.f90,v 1.26 2008/04/22 09:51:19 jsy1001 Exp $
 
 program Main
 
@@ -169,7 +169,7 @@ program Main
         read (*, '(a)') wavestr
         read (wavestr, *, end=58) wave(1), wave(2)
         !two values - wavelength range
-        if (wave(2) .lt. wave(1)) then
+        if (wave(2) < wave(1)) then
            temp = wave(2)
            wave(2) = wave(1)
            wave(1) = temp
@@ -297,16 +297,16 @@ program Main
 
      !-------------------------------------------------------------------------
      ! plot initial model
-     mod_line = (symm .and. size(sel_wavebands, 1) == 1)
+     mod_line = (symm_model .and. size(sel_wavebands, 1) == 1)
      top_title = trim(source)//' - initial model: '//trim(model_name)
      if (useful_vis > 0) &
           call plot_vis_bas(model_spec, model_param, mod_line, &
           'Baseline /M\gl', 'Squared visibility', top_title)
      if (useful_amp > 0) &
-          call plot_triple_amp_bas(model_spec, model_param, &
+          call plot_triple_amp(-1, model_spec, model_param, &
           'Longest baseline /M\gl', 'Triple amplitude', top_title)
      if (useful_cp > 0) &
-          call plot_triple_phase_bas(model_spec, model_param, &
+          call plot_triple_phase(-1, model_spec, model_param, &
           'Longest baseline /M\gl', &
           'Closure phase /'//char(176), top_title)
 
@@ -410,14 +410,14 @@ program Main
         !----------------------------------------------------------------------
         !plot
         call allparam_setvar(allpar, sol)
-        mod_line = (symm .and. size(sel_wavebands, 1) == 1)
+        mod_line = (symm_model .and. size(sel_wavebands, 1) == 1)
         top_title = trim(source)//' - final model: '//trim(model_name)
         if (useful_vis > 0) then
            call plot_vis_bas(model_spec, allpar%param, mod_line, &
                 'Baseline /M\gl', 'Squared Visibility', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
-           if (len_trim(xrange) .gt. 0) then
+           if (len_trim(xrange) > 0) then
               read (xrange, *) uxmin, uxmax
               call plot_vis_bas(model_spec, allpar%param, mod_line, &
                    'Baseline /M\gl', 'Squared Visibility', top_title, &
@@ -425,26 +425,26 @@ program Main
            end if
         end if
         if (useful_amp > 0) then 
-           call plot_triple_amp_bas(model_spec, allpar%param, &
+           call plot_triple_amp(-1, model_spec, allpar%param, &
                 'Longest baseline /M\gl', 'Triple amplitude', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
-           if (len_trim(xrange) .gt. 0) then
+           if (len_trim(xrange) > 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_triple_amp_bas(model_spec, allpar%param, &
-                   'Longest baseline /M\gl', 'Triple amplitude', top_title, &
-                   uxmin, uxmax)
+              call plot_triple_amp(-1, model_spec, allpar%param, &
+                   'Longest baseline /M\gl', 'Triple amplitude', &
+                   top_title, uxmin, uxmax)
              end if
         end if
         if (useful_cp > 0) then
-           call plot_triple_phase_bas(model_spec, allpar%param, &
+           call plot_triple_phase(-1, model_spec, allpar%param, &
                 'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                 top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
-           if (len_trim(xrange) .gt. 0) then
+           if (len_trim(xrange) > 0) then
               read (xrange, *) uxmin, uxmax
-              call plot_triple_phase_bas(model_spec, allpar%param, &
+              call plot_triple_phase(-1, model_spec, allpar%param, &
                    'Longest baseline /M\gl', 'Closure phase /'//char(176), &
                    top_title, uxmin, uxmax)
              end if
@@ -478,7 +478,7 @@ program Main
                 var_desc(indx(1)), ylabel, top_title, uxmin, uxmax)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
-           if (len_trim(xrange) .gt. 0) then
+           if (len_trim(xrange) > 0) then
               read (xrange, *) uxmin, uxmax
               call plot_post1d(marg, nlnpost, allpar, indx(1), &
                    var_desc(indx(1)), ylabel, top_title, uxmin, uxmax)
@@ -520,7 +520,7 @@ program Main
                 uxmin, uxmax, uymin, uymax)
            print *, 'enter x-axis range for replot ([return] to skip)'
            read (*, '(a)') xrange
-           if (len_trim(xrange) .gt. 0) then
+           if (len_trim(xrange) > 0) then
               print *, 'enter y-axis range for replot'
               read *, uymin, uymax
               call plot_post2d(marg, nlposterior, allpar, indx, &
