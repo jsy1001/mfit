@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.14 2007/08/16 16:40:33 jsy1001 Exp $
+!$Id: model.f90,v 1.15 2008/04/22 11:44:09 jsy1001 Exp $
 
 module Model
 
@@ -27,7 +27,7 @@ module Model
   !public module variables contained:
   public :: model_spec, model_pos_relto, model_wldep, nwave, model_wb
   public :: model_param, model_prior, model_limits, max_order
-  public :: model_desc, model_desc_len, model_name, symm
+  public :: model_desc, model_desc_len, model_name, symm_model
   public :: nxsiz, clv_mdiam, clv_mvis, clv_mbase
 
   !! Specifies nature of model cpts -
@@ -76,7 +76,7 @@ module Model
   character(len=128) :: model_name
 
   !! Centrosymmetric model?
-  logical :: symm
+  logical :: symm_model
 
   !numerical CLV data
   real, allocatable :: clv_rad(:)
@@ -654,18 +654,18 @@ contains
     close (11)
 
     !is this a centrosymmetric model?
-    symm = .true.
+    symm_model = .true.
     do i = 1, size(model_param, 1)
        !need all epsilon fixed at unity
        ipar = 9 + (4*model_wldep(1) + model_wldep(2))*(nwave-1)
        do j = 1, 1+model_wldep(3)*(nwave-1)
           if (.not.((model_param(i,ipar+(j-1)*3)==1D0) &
-               .and.(model_prior(i,ipar+(j-1)*3)==0D0))) symm = .false.
+               .and.(model_prior(i,ipar+(j-1)*3)==0D0))) symm_model = .false.
        end do
        !and all r fixed at zero
        do j = 1, 1+model_wldep(1)*(nwave-1)
           if (.not.((model_param(i,2+(j-1)*4)==0D0) &
-               .and.(model_prior(i,2+(j-1)*4)==0D0))) symm = .false.
+               .and.(model_prior(i,2+(j-1)*4)==0D0))) symm_model = .false.
        end do
     end do
 
@@ -761,7 +761,7 @@ contains
 
     !if centrosymmetric model is forced then must have 
     !eccentricity epsilon fixed to be unity and position radius fixed at zero
-    if (force_symm .and. .not. symm) then
+    if (force_symm .and. .not. symm_model) then
        model_valid = .false.
        info = 'for vis/nvis data must have guaranteed symmetric model'
     end if
