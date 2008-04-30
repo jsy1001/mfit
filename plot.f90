@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.24 2008/04/22 12:35:12 jsy1001 Exp $
+!$Id: plot.f90,v 1.25 2008/04/30 09:26:53 jsy1001 Exp $
 
 module Plot
   
@@ -77,6 +77,28 @@ contains
 
   !============================================================================
 
+  function xval_is_periodic(xindex, period)
+
+    !function arguments
+    integer, intent(in) :: xindex
+    real, intent(out) :: period
+    logical :: xval_is_periodic
+
+    if (xindex == -2) then
+       xval_is_periodic = .true.
+       period = 24.0
+    else if (xindex == -3) then
+       xval_is_periodic = .true.
+       period = 360.0
+    else
+       xval_is_periodic = .false.
+       period = 0.0
+    end if
+
+  end function xval_is_periodic
+
+  !============================================================================
+
   subroutine get_plot_vis_data(xindex, xzero, &
        data_points, num_data, flagged_points, num_flagged, xrange, yrange, &
        uxmin, uxmax)
@@ -96,27 +118,32 @@ contains
 
     !local variables
     integer :: i
-    real :: xmin, x, xspan
+    logical :: periodic
+    real :: xmin, x, xspan, period
     double precision :: lambda, delta_lambda, u, v, vsq, err
 
     !choose xzero
     xzero = 0.
     if(xindex >= 1 .and. xindex <= size(vis_data, 2)) then
        xmin = minval(vis_data(:, xindex))
-       if(abs(xmin) > 100.*(maxval(vis_data(:, xindex)) - xmin)) &
-            xzero = xmin
+       xspan = maxval(vis_data(:, xindex)) - xmin
+       if(xspan > tiny(xspan) .and. abs(xmin) > 1E3*xspan) xzero = xmin
     end if
 
     !make up data arrays
+    periodic = xval_is_periodic(xindex, period)
     num_data = 0
     num_flagged = 0
     do i = 1, num_vis
        x = plot_vis_xval(i, xindex)
-       !skip if x value outside plot range
-       if (present(uxmin)) then
+       if(present(uxmin) .and. present(uxmax)) then
+          !shift by one period towards user-specified range
+          if(periodic) then
+             if((x-xzero) < uxmin) x = x + period
+             if((x-xzero) > uxmax) x = x - period
+          end if
+          !skip if x value (still) outside plot range
           if ((x-xzero) < uxmin) cycle
-       end if
-       if (present(uxmax)) then
           if ((x-xzero) > uxmax) cycle
        end if
        lambda = vis_data(i, 1)
@@ -161,9 +188,12 @@ contains
           xrange(2) = maxval(flagged_points(:num_flagged, 1))
        end if
     end if
+
+    !expand x range if not user-specified
     xspan = xrange(2) - xrange(1)
-    xrange(1) = xrange(1) - 0.05*xspan
-    xrange(2) = xrange(2) + 0.05*xspan
+    if(xspan < tiny(xspan)) xspan = 1D1 !single x value
+    if(.not. present(uxmin)) xrange(1) = xrange(1) - 0.02*xspan
+    if(.not. present(uxmax)) xrange(2) = xrange(2) + 0.02*xspan
 
     !calculate y range
     if (num_data > 0) then
@@ -248,27 +278,33 @@ contains
     real, dimension(2), intent(out) :: xrange, yrange
 
     !local variables
-    integer :: i
-    real :: xmin, x, y, y_err, xspan
+    integer :: i, num_x
+    logical :: periodic
+    real :: xmin, x, y, y_err, xspan, period
 
     !choose xzero
     xzero = 0.
-    if(xindex >= 1 .and. xindex <= size(triple_data, 2)) then
+    if(num_triple > 1 &
+         .and. xindex >= 1 .and. xindex <= size(triple_data, 2)) then
        xmin = minval(triple_data(:, xindex))
-       if(abs(xmin) > 100.*(maxval(triple_data(:, xindex)) - xmin)) &
-            xzero = xmin
+       xspan = maxval(triple_data(:, xindex)) - xmin
+       if(xspan > tiny(xspan) .and. abs(xmin) > 1E3*xspan) xzero = xmin
     end if
 
     !make up data arrays
+    periodic = xval_is_periodic(xindex, period)
     num_data = 0
     num_flagged = 0
     do i = 1, num_triple
        x = plot_triple_xval(i, xindex)
-       !skip if x value outside plot range
-       if (present(uxmin)) then
+       if(present(uxmin) .and. present(uxmax)) then
+          !shift by one period towards user-specified range
+          if(periodic) then
+             if((x-xzero) < uxmin) x = x + period
+             if((x-xzero) > uxmax) x = x - period
+          end if
+          !skip if x value (still) outside plot range
           if ((x-xzero) < uxmin) cycle
-       end if
-       if (present(uxmax)) then
           if ((x-xzero) > uxmax) cycle
        end if
        if (get_amp) then
@@ -296,6 +332,7 @@ contains
     if(num_data + num_flagged == 0) return
 
     !calculate x range required
+    num_x = -1
     if (present(uxmin)) then
        xrange(1) = uxmin
     else
@@ -315,11 +352,14 @@ contains
           xrange(2) = maxval(flagged_points(:num_flagged, 1))
        end if
     end if
-    xspan = xrange(2) - xrange(1)
-    xrange(1) = xrange(1) - 0.05*xspan
-    xrange(2) = xrange(2) + 0.05*xspan
 
-    !calculate y range
+    !expand x range if not user-specified
+    xspan = xrange(2) - xrange(1)
+    if(xspan < tiny(xspan)) xspan = 1D1 !single x value
+    if(.not. present(uxmin)) xrange(1) = xrange(1) - 0.02*xspan
+    if(.not. present(uxmax)) xrange(2) = xrange(2) + 0.02*xspan
+
+    !calculate y range (to accommodate error bars)
     if (num_data > 0) then
        yrange(1) = minval(data_points(:num_data, 4))
        yrange(2) = maxval(data_points(:num_data, 3))
@@ -626,7 +666,8 @@ contains
     double precision :: x, lambda, delta_lambda, u, v, mjd
     integer :: num_data, num_flagged, num_model, i, istat
     real, dimension(2) :: xrange, yrange
-    real :: xzero, mymin, mymax
+    real :: xzero, mymin, mymax, period
+    logical :: periodic
 
     !functions
     integer :: pgopen
@@ -642,9 +683,14 @@ contains
     end if
 
     !calculate model points corresponding to plotted data points
+    periodic = xval_is_periodic(xindex, period)
     num_model = 0
     do i = 1, num_vis
        x = plot_vis_xval(i, xindex)
+       if(periodic) then
+          if((x-xzero) < xrange(1)) x = x + period
+          if((x-xzero) > xrange(2)) x = x - period
+       end if
        if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
           model_points(num_model, 1) = x - xzero
@@ -707,7 +753,8 @@ contains
     double precision :: x, lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
     real, dimension(2) :: xrange, yrange
-    real :: xzero, model_phase, mymin, mymax
+    real :: xzero, model_phase, mymin, mymax, period
+    logical :: periodic
 
     !functions
     integer :: pgopen
@@ -723,9 +770,14 @@ contains
     end if
 
     !calculate model points corresponding to plotted data points
+    periodic = xval_is_periodic(xindex, period)
     num_model = 0
     do i = 1, num_triple
        x = plot_triple_xval(i, xindex)
+       if(periodic) then
+          if((x-xzero) < xrange(1)) x = x + period
+          if((x-xzero) > xrange(2)) x = x - period
+       end if
        if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
           model_points(num_model, 1) = x - xzero
@@ -795,7 +847,8 @@ contains
     double precision :: x, lambda, delta_lambda, u1, v1, u2, v2, mjd
     double complex :: vis1, vis2, vis3
     real, dimension(2) :: xrange, yrange
-    real :: xzero, mymin, mymax
+    real :: xzero, mymin, mymax, period
+    logical :: periodic
 
     !functions
     integer :: pgopen
@@ -814,6 +867,10 @@ contains
     num_model = 0
     do i = 1, num_triple
        x = plot_triple_xval(i, xindex)
+       if(periodic) then
+          if((x-xzero) < xrange(1)) x = x + period
+          if((x-xzero) > xrange(2)) x = x - period
+       end if
        if ((x-xzero) >= xrange(1) .and. (x-xzero) <= xrange(2)) then
           num_model = num_model + 1
           model_points(num_model, 1) = x - xzero
