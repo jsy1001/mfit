@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.12 2008/04/22 09:51:19 jsy1001 Exp $
+# $Id: fitgui.py,v 1.13 2008/05/14 15:11:51 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.12 $")[1]
+_revision = string.split("$Revision: 1.13 $")[1]
 
 
 class GUI:
@@ -315,16 +315,16 @@ class GUI:
         fd = self._popen4.fromchild.fileno() # stdout & stderr of child process
         oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, oldflags|os.O_NONBLOCK)
-        self.parent.tk.createfilehandler(fd, READABLE, self._DisplayOutput)
+        self.parent.tk.createfilehandler(fd, READABLE, self._HandleChildOutput)
 
-    def _DisplayOutput(self, fd, mask):
-        """Read and display output from child process."""
-        self.ShowResult(self._popen4.fromchild.read(), 'result')
+    def _HandleChildOutput(self, fd, mask):
+        """Handle output from child process."""
+        self._ShowOutput()
         status = self._popen4.poll()
         if status != -1:
             # child process completed
-            time.sleep(0.5)
-            self.ShowResult(self._popen4.fromchild.read(), 'result')
+            time.sleep(0.5) # wait for last output
+            self._ShowOutput()
             if os.WEXITSTATUS(status) != 0:
                 self.ShowResult('Subprocess exited with code %d\n' \
                                 % os.WEXITSTATUS(status), 'error')
@@ -335,6 +335,16 @@ class GUI:
             # Execute post-callback
             if callable(self.postFitCallback):
                 self.postFitCallback()
+
+    def _ShowOutput(self):
+        """Read child process output and pass to ShowResult()."""
+        try:
+            result = self._popen4.fromchild.read()
+        except IOError, (errNo, errMsg):
+            self.ShowResult('I/O Error %d: %s\n' % (errNo, errMsg),
+                            'commentary')
+        else:
+            self.ShowResult(result, 'result')
     
 
 def _main(altExe=None):
@@ -355,8 +365,8 @@ def _main(altExe=None):
             Pmw.initialise(root, fontScheme='pmw1')
         root.title('fitgui %s' % _revision)
         main = GUI(root)
-        #main.fileName.set('/net/oberon/home/jsy1001/reductions/alp_ori_02/alp_ori_0203-04_corr2.mapdat')
-        #main.ReadModel('/net/oberon/home/jsy1001/reductions/alp_ori_02/alpOri.model')
+        main.fileName.set('test.oifits')
+        main.ReadModel('test.model')
         if altExe is not None: main.exe = altExe
         root.mainloop()
     else:
