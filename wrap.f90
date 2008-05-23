@@ -149,7 +149,7 @@ contains
     print *, 'param:', this%param
     print *, 'nvar:', this%nvar
     print *, 'var_pos:', this%var_pos
-    print *, 'var_sca;e:', this%var_scale
+    print *, 'var_scale:', this%var_scale
 
   end subroutine allparam_print
 
