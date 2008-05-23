@@ -1,4 +1,4 @@
-!$Id: fit.f90,v 1.24 2007/08/17 17:50:27 jsy1001 Exp $
+!$Id: fit.f90,v 1.25 2008/05/23 09:24:04 jsy1001 Exp $
 
 module Fit
 
@@ -17,6 +17,7 @@ module Fit
   !minimiser - wrapper to the minimising routine (can call multiple times to
   !            implement a minimisation strategy)
   !err_est - check for minimum, estimate parameter error bars at solution point
+  !is_minimum - just check for minimum
   !free_fit - frees storage allocated by minimiser
   private :: alloc_work, posterior, post2
 
@@ -63,10 +64,14 @@ contains
     logical, intent(out) :: success
     character(len=*), intent(out) :: info   !! Error/warning message
 
+    !parameters
+    integer, parameter :: max_rescales = 4 !! Max. # times to rescale fit vars
+
     !local variables
-    integer :: n, i, flag
+    integer :: n, i, j, flag
     double precision :: minval
     double precision :: x_scale(size(sol,1)), x0(size(sol,1)), x(size(sol,1))
+    logical :: var_ok(size(sol,1))
 
     interface
        subroutine PDA_UNCMND(n, x0, fcn, x, f, flag, w, lw)
@@ -83,7 +88,12 @@ contains
     !copy model parameters to private module variable
     call allparam_copy(inpar, fitpar)
 
-    !set variable scaling, and
+    !set default values for intent(out) arguments
+    info = ''
+    success = .false.
+    chisqrd = 0D0
+    nlposterior = 0D0
+
     !assign initial values of fit variables (=SCALED variable model parameters)
     n = inpar%nvar !number of fit variables
     do i = 1, n
@@ -93,17 +103,28 @@ contains
     end do
     call allparam_setscale(fitpar, x_scale)
 
-    !set default values for intent(out) arguments
-    info = ''
-    success = .false.
-    chisqrd = 0D0
-    nlposterior = 0D0
-
-    !call minimising algorithm
     call alloc_work(n*(n+10))
-    call PDA_UNCMND(n, x0, posterior, x, minval, flag, work, lwork)
-    nlposterior = minval
-    sol = x*x_scale !x contains scaled solution
+    rescale: do j = 1, max_rescales
+
+       !call minimising algorithm
+       call PDA_UNCMND(n, x0, posterior, x, minval, flag, work, lwork)
+       nlposterior = minval
+       sol = x*x_scale !x contains scaled solution
+       if (flag == -1) exit rescale !insufficient workspace
+       if (is_minimum(n, sol, var_ok)) exit rescale
+
+       !rescale unminimised fit variables
+       print *, 'RESCALING FIT VARIABLE(S), ROUND', j
+       do i = 1, n
+          if (.not. var_ok(i)) then
+             x_scale(i) = 0.1D0 * x_scale(i)
+             print *, 'VAR', i
+          end if
+       end do
+       x0 = sol / x_scale
+       call allparam_setscale(fitpar, x_scale)
+
+    end do rescale
 
     !restart from where it finished, this time minimising
     !1/(posterior probability) rather than -log(prob)
@@ -111,10 +132,11 @@ contains
        x0 = x
        post2_nlnorm = nlposterior
        call PDA_UNCMND(n, x0, post2, x, minval, flag, work, lwork)
-       print *, x-(sol/x_scale) !is shift significant?
-       print *, nlposterior
-       nlposterior = log(minval) + post2_nlnorm
-       sol = x*x_scale !x contains scaled solution
+       if ((log(minval) + post2_nlnorm) < nlposterior) then
+          !fit is improved
+          nlposterior = log(minval) + post2_nlnorm
+          sol = x*x_scale !x contains scaled solution
+       end if
     end if
 
     !set error/warning message
@@ -234,7 +256,6 @@ contains
              hes(i,i) = diff / ((deltai**2)*(x_scale(i)**2))
              !check we are at a minimum w.r.t. this parameter
              grad(i) = (P_u - P_l)/(2D0*deltai)
-             print *, 'gradient', i, grad(i)
              if (abs(grad(i)) > maxgrad .or. hes(i,i) < 0D0) then
                 info = 'Final position not a local minimum'
                 return
@@ -302,6 +323,60 @@ contains
     end if
 
   end subroutine err_est
+  !===========================================================================
+  
+  !! Check for minimum
+  !! Need to call minimiser() before invoking this routine
+  function is_minimum(n, sol, var_minimised)
+
+    !function arguments
+    integer, intent(in) :: n !! Number of variable parameters
+    !! Variable parameter values at minimum
+    double precision, intent(in) :: sol(n)
+    !! At minimum w.r.t. variable i?
+    logical, intent(out), optional :: var_minimised(n)
+    logical :: is_minimum
+
+    !parameters
+    double precision, parameter :: maxgrad = 1D-1 !! Max. acceptable gradient
+
+    !local variables
+    integer :: i
+    double precision :: P, P_l, P_u, delta, grad_i, hes_ii
+    double precision :: x_scale(n), x(n), temp_x(n)
+
+    if (.not. fitpar%done_init) &
+         stop 'minimiser() not called prior to calling is_minimum()'
+
+    !posterior() works with SCALED parameters
+    x_scale = fitpar%var_scale
+    do i = 1, n
+       x(i) = sol(i) / x_scale(i)
+    end do
+
+    delta = 1D0
+    is_minimum = .true.
+    if (present(var_minimised)) var_minimised = .true.
+    do i = 1, n
+       temp_x = x
+       !P(i)
+       call posterior(n, temp_x, P)
+       !P(i-di)
+       temp_x(i) = x(i)-delta
+       call posterior(n, temp_x, P_l)
+       !P(i+di)
+       temp_x(i) = x(i)+delta
+       call posterior(n, temp_x, P_u)
+       !check we are at a minimum w.r.t. this parameter
+       grad_i = (P_u - P_l)/(2D0*delta)
+       hes_ii = P_u + P_l - (2D0*P) !unnormalised - only want sign
+       if (abs(grad_i) > maxgrad .or. hes_ii < 0D0) then
+          if (present(var_minimised)) var_minimised(i) = .false.
+          is_minimum = .false.
+       end if
+    end do
+
+  end function is_minimum
 
   !============================================================================
 

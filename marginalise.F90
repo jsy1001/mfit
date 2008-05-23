@@ -1,4 +1,4 @@
-!$Id: marginalise.F90,v 1.2 2007/08/17 17:50:27 jsy1001 Exp $
+!$Id: marginalise.F90,v 1.3 2008/05/23 09:24:05 jsy1001 Exp $
 
 module Marginalise
 
@@ -17,7 +17,7 @@ module Marginalise
   use Bayes
   use Wrap
   use Model
-  use Fit, only: minimiser
+  use Fit, only: minimiser, is_minimum
 
   implicit none
 
@@ -108,9 +108,14 @@ contains
     if (ndim > 0) then
        allocate(sol(ndim))
        !minimiser sets parameter scaling using model_prior
+       !?? also sets initial parameter values from model_param
        call minimiser(fitpar, sol, chisqrd, unmg_post, fit_ok, info)
        if (.not. fit_ok) then
           info = 'Fit failed in marg_post'
+          return
+       end if
+       if (.not. is_minimum(ndim, sol)) then
+          info = 'Not a local minimum in marg_post'
           return
        end if
     else
@@ -434,3 +439,7 @@ contains
   !============================================================================
 
 end module Marginalise
+
+! Local Variables:
+! mode: F90
+! End:

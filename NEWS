@@ -2,6 +2,10 @@
 New in mfit release 1.5.1
 =========================
 
+* Minimiser now works with scaled model parameters, hence performs
+  better. Parameter scaling factors are varied iteratively to find the
+  best minimum
+
 * Now built using scons (more portable) rather than make
 
 * Use of NAG library optional (detected by scons)
@@ -18,14 +22,14 @@ New in mfit release 1.5.1
 * '#relto' option for model component positions - specifies position
   of model component w.r.t. position of another component
 
-* Added plots versus Modified Julian Day
+* Comments now allowed anywhere in model file
+
+* Added plots versus Modified Julian Day, GMST and baseline position angle
 
 * Plotted points are also saved to text files, for re-plotting in
   other applications
 
 * Added 'mplot' application to plot intensity distribution of model
-
-* Minimiser now works with scaled model parameters, hence performs better
 
 
 New in mfit release 1.4.1
