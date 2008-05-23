@@ -7,7 +7,7 @@ release = 0
 # Locations of 64-bit files appear first,
 # since they don't exist on 32-bit machines
 includePath = Split('/opt/local/include /soft/star64/include /star/include /sw/include /usr/include')
-libPath = Split('/opt/local/lib /soft/star64/lib /star/lib /sw/lib /usr/lib /usr/X11R6/lib64 /usr/X11R6/lib')
+libPath = Split('/opt/local/lib /usr/lib64 /soft/star64/lib /star/lib /sw/lib /usr/lib /usr/X11R6/lib64 /usr/X11R6/lib')
 
 # Path to Sun F95 (if installed); used to auto-set compiler switches
 sun_f95 = '/opt/SUNWspro/bin/f95'
