@@ -4,4 +4,4 @@ Avoid using allocatable dummy arguments (extension in f95).
 
 Use automatic arrays instead of local allocatable arrays.
 
-Test with G95 compiler.
+Test with Intel fortran compiler.

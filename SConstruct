@@ -79,8 +79,14 @@ elif f95 == nagw_f95:
     # need different f2kcli for this compiler
     f2kcli = 'f2kcli_nagw.f90'
     # Ignores LD_RUN_PATH, so pass "-rpath <path>" to ld
-    env.Append(LINKFLAGS=['-Wl,-Xlinker', '-Wl,-rpath',
-                          '-Wl,-Xlinker', '-Wl,%s' % ':'.join(libPath)])
+    if env['PLATFORM'] == 'linux':
+        # f95 runs gcc which runs linux ld
+        env.Append(LINKFLAGS=['-Wl,-Xlinker', '-Wl,-rpath',
+                              '-Wl,-Xlinker', '-Wl,%s' % ':'.join(libPath)])
+    elif env['PLATFORM'] == 'sunos':
+        # f95 runs cc or gcc (specified at purchase) which runs sunos ld
+        # Fortunately cc understands -R directly
+        env.Append(LINKFLAGS=['-Wl,-R%s' % ':'.join(libPath)])
 else:
     print "Configuring for generic Fortran 9x compiler"
     f2kcli = 'f2kcli.f90'
@@ -90,7 +96,7 @@ env.Prepend(FORTRANPATH=includePath)
 # FORTRANPATH seems not to be used for .f90
 env.Prepend(F90PATH=includePath)
 env.Prepend(LIBPATH=libPath)
-if Platform() != 'win32':
+if env['PLATFORM'] != 'win32':
     libUnixPath = ':'.join(env['LIBPATH'])
     env.Append(ENV={'LD_RUN_PATH' : libUnixPath})
 

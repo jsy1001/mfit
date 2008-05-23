@@ -95,8 +95,8 @@ Model file format
 =================
 
 The program reads through the model file until it comes across the keyword
-'source' at the begining of a line. It then reads the next 2 words as the
-source name.  There must be 2 words present like 'alp' 'Ori' etc.
+'source' at the begining of a line. It then reads the text following this
+keyword as the source/model name.
 
 The program then reads in the various components of the model. It runs through
 the model file until it comes across the keyword "component" at the begining of
@@ -110,7 +110,7 @@ of the line followed by the values associated with it.
 Maximum number of components is set to 10.  Maximum order of taylor and
 gauss-hermite LD types is also set to 10.
 
-Currently, all models are wavelength-independent.
+By default, models are wavelength-independent.
 
 Keyword            Parameter information
 -------            ---------------------
@@ -365,8 +365,6 @@ between models to be compared have been neglected.
 Known deficiencies
 ==================
 
-Other plot choices (e.g. versus hour angle) should be added.
-
 Ignores complex visibilities from OI-FITS file.
 
 If closure phase data are supplied, these can result in discontinuities in the
@@ -379,7 +377,7 @@ phases are (perhaps) incorrectly counted as independent data points when
 evaluating the number of degrees of freedom.
 
 
-$Id: documentation,v 1.13 2007/09/07 17:04:45 jsy1001 Exp $
+$Id: documentation,v 1.14 2008/05/23 17:42:41 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
