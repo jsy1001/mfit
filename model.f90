@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.16 2008/05/23 09:09:58 jsy1001 Exp $
+!$Id: model.f90,v 1.17 2008/05/23 17:37:03 jsy1001 Exp $
 
 module Model
 
@@ -92,25 +92,30 @@ contains
 
   !============================================================================
 
-  !! Read consecutive lines starting with specified character
-  !! Backspace on reading first non-comment line
-  subroutine skip_comments(iunit, mark, eof)
+  !! Read consecutive lines which are blank or start with specified character
+  !! Backspace on reading first non-blank, non-comment line
+  function skip_lines(iunit, mark, eof)
 
     !subroutine arguments
     integer, intent(in) :: iunit
     character (len=1), intent(in) :: mark
     logical, intent(out) :: eof
+    integer skip_lines
 
     !local variables
-    character(len=256) :: line
+    !!character(len=256) :: line
+    character(len=80) :: line
 
+    skip_lines = 0
     eof = .false.
     do
        read(iunit,'(a)', end=1, err=2) line
-       if(line(1:1) /= mark) then
+       if(len_trim(line) > 0 .and. line(1:1) /= mark) then
           backspace(iunit)
           return
        end if
+       skip_lines = skip_lines + 1
+       print *, line
     end do
 
 1   eof = .true.
@@ -119,7 +124,7 @@ contains
     ! I/O error, rely on calling routine to re-detect
 2   return
 
-  end subroutine skip_comments
+  end function skip_lines
 
   !============================================================================
 
@@ -137,12 +142,12 @@ contains
     logical eof
     character(len=1) :: comment
     character(len=2) :: numbers(10)
-    character(len=32) :: dummy, source1, source2, cpt
+    character(len=32) :: keyw, cpt
     character(len=32), allocatable :: wb(:)
     character(len=128) :: clv_filename, shape_type, ld_type
     character(len=256) :: line
-    integer :: i, j, k, iwave, loc, relto
-    integer :: nlines, comps, order, pos, npar, ipar, nread, nn
+    integer :: i, j, k, n, line_no, iwave, loc, relto
+    integer :: comps, order, pos, npar, ipar, nread, nn
 
     !check for zero length filename
     if (file_name == '') then
@@ -160,17 +165,19 @@ contains
     model_wldep = 0
     nwave = -1
     max_order = 0
+    line_no = 1
     pass1:    do
-       call skip_comments(11, comment, eof)
+       line_no = line_no + skip_lines(11, comment, eof)
        if(eof) exit pass1
        read (11, '(a)', err=92) line
-       if (len_trim(line) == 0) cycle
-       read (line, *) dummy !read keyword & qualifiers
-       if (dummy == 'component') comps = comps+1
-       if (dummy(:8) == 'position' .and. index(dummy, '#fofwave') /= 0) then
+       line_no = line_no + 1
+       if (len_trim(line) == 0) cycle !blank line
+       read (line, *) keyw !read keyword & qualifiers
+       if (keyw == 'component') comps = comps+1
+       if (keyw(:8) == 'position' .and. index(keyw, '#fofwave') /= 0) then
           model_wldep(1) = 1
           ! qualifiers could be any combination of #fofwave, #rotate, #reltoN
-          if (index(dummy, '#rotate') /= 0) then
+          if (index(keyw, '#rotate') /= 0) then
              !{r, theta(t0), t0, d(theta)/dt} poss. repeated for each waveband
              nn = (countsym(line)-1)/4
           else
@@ -180,25 +187,25 @@ contains
           if (nwave == -1) then
              nwave = nn
           else if (nn /= nwave) then
-             write(info, *) 'line ', i, ': expecting values for ', nwave, &
-                  ' wavebands, got ', nn
+             write(info, *) 'line ', line_no, &
+                  ': expecting values for ', nwave, ' wavebands, got ', nn
              close(11)
              return
           end if
-       else if (dummy == 'flux#fofwave') then
+       else if (keyw == 'flux#fofwave') then
           model_wldep(2) = 1
           nn = countsym(line)-1
           if (nwave == -1) then
              nwave = nn
           else if (nn /= nwave) then
-             write(info, *) 'line ', i, ': expecting values for ', nwave, &
-                  ' wavebands, got ', nn
+             write(info, *) 'line ', line_no, &
+                  ': expecting values for ', nwave, ' wavebands, got ', nn
              close(11)
              return
           end if
-       else if (dummy == 'shape_type') then
-          read (line, *, end=95) dummy, shape_type
-       else if (dummy == 'shape_param#fofwave') then
+       else if (keyw == 'shape_type') then
+          read (line, *, end=95) keyw, shape_type
+       else if (keyw == 'shape_param#fofwave') then
           select case (shape_type)
           case ('point')
              print *, 'cannot have wavelength-dependent point: no shape parameters'
@@ -216,33 +223,33 @@ contains
           if (nwave == -1) then
              nwave = nn
           else if (nn /= nwave) then
-             write(info, *) 'line ', i, ': expecting values for ', nwave, &
-                  ' wavebands, got ', nn
+             write(info, *) 'line ', line_no, &
+                  ': expecting values for ', nwave, ' wavebands, got ', nn
              close(11)
              return
           end if
-       else if (dummy == 'ld_type') then
-          read (line, *, end=95) dummy, ld_type
+       else if (keyw == 'ld_type') then
+          read (line, *, end=95) keyw, ld_type
           !Read LD order (preset for some LD type cases)
           !Non-integer will cause error in read statement
           select case (trim(ld_type))
           case ('uniform','gaussian')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 0
           case ('square-root')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 2
           case ('hestroffer')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 1
           case ('taylor','gauss-hermite') 
-             read (11,*,err=95,end=95) dummy, order
+             read (11,*,err=95,end=95) keyw, order
           case ('two-layer')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 5
           case default
              if (ld_type(1:1) == '<') then
-                read (11,*,err=95,end=95) dummy
+                read (11,*,err=95,end=95) keyw
                 order = 0
              else
                 !not <filename>
@@ -251,8 +258,9 @@ contains
                 return
              end if
           end select
+          line_no = line_no + 1
           if (order > max_order) max_order = order
-       else if (dummy == 'ld_param#fofwave') then
+       else if (keyw == 'ld_param#fofwave') then
           model_wldep(4) = 1
           if (trim(ld_type) == 'two-layer') then
              nn = countsym(line)-5
@@ -262,15 +270,14 @@ contains
           if (nwave == -1) then
              nwave = nn
           else if (nn /= nwave) then
-             write(info, *) 'line ', i, ': expecting values for ', nwave, &
-                  ' wavebands, got ', nn
+             write(info, *) 'line ', line_no, &
+                  ': expecting values for ', nwave, ' wavebands, got ', nn
              close(11)
              return
           end if
        end if
     end do pass1
 
-    nlines = i-1
     close(11)
 
     !check if legal number of components
@@ -351,69 +358,65 @@ contains
        model_desc(j, 1) = trim(cpt) // ' LD order'
     end do
 
-    !read source name
-    open (unit=11, action='read', file=file_name)
-    do i = 1, nlines
-       read (11, *, err=94) dummy
-       if (dummy == 'source') then
-          backspace(11)
-          read (11, *, err=94) dummy, source1, source2
-          model_name = trim(source1) // ' ' // trim(source2)
-          exit
-       end if
-    end do
-    close (11)
-
     !read spec and param info for components
     open (unit=11, action='read', file=file_name)
     j = 0 !component counter
-    do i = 1, nlines
-       read (11,*,err=94,end=2) dummy
-       if (dummy == 'component') then
+    model_name = 'model' !default if "source" keyword missing
+    pass2: do
+       read (11,*,err=94,end=12) keyw
+       if (keyw == 'source') then
+          backspace(11)
+          read (11,'(a)',err=95,end=95) line
+          line = line(index(line, 'source')+6:) !strip 'source'
+          pos = verify(line, ' '//achar(9))
+          model_name = line(pos:) !strip leading spaces and tabs
+       end if
+       if (keyw == 'component') then
           j = j+1
           cpt = 'cpt '// trim(adjustl(numbers(j))) // ', '
 
           !read component name
-          call skip_comments(11, comment, eof)
-          read (11,*,err=95,end=95) dummy, model_spec(j,1)
-          if (dummy /= 'name') goto 96
+          n = skip_lines(11, comment, eof)
+          read (11,*,err=95,end=95) keyw, model_spec(j,1)
+          if (keyw /= 'name') goto 96
 
           !read shape type
-          call skip_comments(11, comment, eof)
-          read (11,*,err=95,end=95) dummy, model_spec(j,2)
-          if (dummy /= 'shape_type') goto 96
+          n = skip_lines(11, comment, eof)
+          read (11,*,err=95,end=95) keyw, model_spec(j,2)
+          if (keyw /= 'shape_type') goto 96
 
           !read LD type (set as uniform for point case)
           select case (trim(model_spec(j,2)))
           case ('point')
-             read (11,*,err=95) dummy
+             read (11,*,err=95) keyw
              model_spec(j,3) = 'uniform'
           case default
-             call skip_comments(11, comment, eof)
+             n = skip_lines(11, comment, eof)
              read (11,'(a)',err=95,end=95) line
-             read (line,*,err=95,end=95) dummy
+             read (line,*,err=95,end=95) keyw
+             !from last non-trailing space or tab character:
              pos = scan(trim(line), ' '//achar(9), back=.true.) + 1
              model_spec(j,3) = line(pos:)
           end select
-          if (dummy /= 'ld_type') goto 96
+          if (keyw /= 'ld_type') goto 96
 
           !Read LD order (preset for some LD type cases)
           !Non-integer will cause error in read statement
-          call skip_comments(11, comment, eof)
+          n = skip_lines(11, comment, eof)
           select case (trim(model_spec(j,3)))
           case ('uniform','gaussian')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 0
           case ('square-root')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 2
           case ('hestroffer')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 1
           case ('taylor','gauss-hermite') 
-             read (11,*,err=95,end=95) dummy, order
+             read (11,*,err=95,end=95) keyw, order
           case ('two-layer')
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
              order = 5
           case default
              if (model_spec(j,3)(1:1) == '<') then
@@ -433,7 +436,7 @@ contains
                    close (11)
                    return
                 end if
-                read (11,*,err=95,end=95) dummy
+                read (11,*,err=95,end=95) keyw
                 order = 0
              else
                 !not <filename>
@@ -442,16 +445,16 @@ contains
                 return
              end if
           end select
-          if (dummy /= 'ld_order') goto 96
+          if (keyw /= 'ld_order') goto 96
           model_param(j,1) = dble(order)
 
           !read position r and theta etc.
-          call skip_comments(11, comment, eof)
-          read (11,*,err=95,end=95) dummy
-          if (dummy(:8) /= 'position') goto 96
-          loc = index(dummy, '#relto')
+          n = skip_lines(11, comment, eof)
+          read (11,*,err=95,end=95) keyw
+          if (keyw(:8) /= 'position') goto 96
+          loc = index(keyw, '#relto')
           if (loc /= 0) then
-             read (dummy(loc+6:), *) model_pos_relto(j)
+             read (keyw(loc+6:), *) model_pos_relto(j)
           else
              model_pos_relto(j) = 0
           end if
@@ -505,33 +508,33 @@ contains
              end if
           end do
           ! qualifiers could be any combination of #fofwave, #rotate, #reltoN
-          if (index(dummy, '#rotate') /= 0) then
+          if (index(keyw, '#rotate') /= 0) then
              !{r, theta(t0), t0, d(theta)/dt} poss. repeated for each waveband
              backspace(11)
              nread = 4*(1 + model_wldep(1)*(nwave-1))
-             read (11,*,err=95,end=95) dummy, model_param(j, 2:1+nread)
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy, model_prior(j, 2:1+nread)
-             if (dummy /= 'position_prior') goto 96
+             read (11,*,err=95,end=95) keyw, model_param(j, 2:1+nread)
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw, model_prior(j, 2:1+nread)
+             if (keyw /= 'position_prior') goto 96
           else
              !file contains {r, theta} poss. repeated for each waveband
              backspace(11)
-             read (11,*,err=95,end=95) dummy, &
+             read (11,*,err=95,end=95) keyw, &
                   (model_param(j, 2+(k-1)*4:3+(k-1)*4), &
                   k=1,(1+model_wldep(1)*(nwave-1)))
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy, &
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw, &
                   (model_prior(j, 2+(k-1)*4:3+(k-1)*4), &
                   k=1,(1+model_wldep(1)*(nwave-1)))
-             if (dummy /= 'position_prior') goto 96
+             if (keyw /= 'position_prior') goto 96
           end if
 
           !read flux
           ipar = 6+4*model_wldep(1)*(nwave-1)
-          call skip_comments(11, comment, eof)
-          read (11,*,err=95,end=95) dummy, &
+          n = skip_lines(11, comment, eof)
+          read (11,*,err=95,end=95) keyw, &
                model_param(j, ipar:ipar+model_wldep(2)*(nwave-1))
-          if (dummy(:4) /= 'flux') goto 96
+          if (keyw(:4) /= 'flux') goto 96
           do k = 1, 1+model_wldep(2)*(nwave-1)
              model_limits(j,ipar+(k-1),1:2) = dble((/-100, 100/))
              if (model_wldep(2) == 1) then
@@ -542,10 +545,10 @@ contains
           end do
 
           !read flux prior, must be non-negative
-          call skip_comments(11, comment, eof)
-          read (11,*,err=95,end=95) dummy, &
+          n = skip_lines(11, comment, eof)
+          read (11,*,err=95,end=95) keyw, &
                model_prior(j, ipar:ipar+model_wldep(2)*(nwave-1))
-          if (dummy /= 'flux_prior') goto 96  
+          if (keyw /= 'flux_prior') goto 96  
 
           !Read shape parameters a, phi, epsilon depending on
           !shape type. Also read priors
@@ -569,54 +572,54 @@ contains
                 model_desc(j,ipar+(k-1)*3+2) = trim(cpt) // ' ellipticity'
              end if
           end do
-          call skip_comments(11, comment, eof)
+          n = skip_lines(11, comment, eof)
           select case (trim(model_spec(j,2)))
           case ('point')
-             read (11,*,err=95,end=95) dummy
-             if (dummy(:11) /= 'shape_param') goto 96
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
+             if (keyw(:11) /= 'shape_param') goto 96
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw
           case ('disc')
-             read (11,*,err=95,end=95) dummy, (model_param(j,ipar+(k-1)*3), &
+             read (11,*,err=95,end=95) keyw, (model_param(j,ipar+(k-1)*3), &
                   k=1,(1+model_wldep(3)*(nwave-1)))
-             if (dummy(:11) /= 'shape_param') goto 96
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy, (model_prior(j,ipar+(k-1)*3), &
+             if (keyw(:11) /= 'shape_param') goto 96
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw, (model_prior(j,ipar+(k-1)*3), &
                   k=1,(1+model_wldep(3)*(nwave-1)))
           case ('ellipse')
              nread = 3*(1 + model_wldep(3)*(nwave-1))
-             read (11,*,err=95,end=95) dummy, model_param(j,ipar:ipar+nread-1)
-             if (dummy(:11) /= 'shape_param') goto 96
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy, model_prior(j,ipar:ipar+nread-1)
+             read (11,*,err=95,end=95) keyw, model_param(j,ipar:ipar+nread-1)
+             if (keyw(:11) /= 'shape_param') goto 96
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw, model_prior(j,ipar:ipar+nread-1)
           case default
              info = 'invalid shape type'
              close (11)
              return
           end select
-          if (dummy /= 'shape_param_prior') goto 96
+          if (keyw /= 'shape_param_prior') goto 96
 
           !read LD parameters
-          call skip_comments(11, comment, eof)
+          n = skip_lines(11, comment, eof)
           ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
                + 3*model_wldep(3))*(nwave-1)
           select case (order)
           case (0)
-             read (11,*,err=95,end=95) dummy
-             if (dummy(:8) /= 'ld_param') goto 96
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy
+             read (11,*,err=95,end=95) keyw
+             if (keyw(:8) /= 'ld_param') goto 96
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw
           case default
              if (trim(model_spec(j,3)) == 'two-layer') then
                 nread = 5 + model_wldep(4)*(nwave-1)
              else
                 nread = order*(1 + model_wldep(4)*(nwave-1))
              end if
-             read (11,*,err=95,end=95) dummy, &
+             read (11,*,err=95,end=95) keyw, &
                   model_param(j, ipar:ipar+nread-1)
-             if (dummy(:8) /= 'ld_param') goto 96
-             call skip_comments(11, comment, eof)
-             read (11,*,err=95,end=95) dummy, &
+             if (keyw(:8) /= 'ld_param') goto 96
+             n = skip_lines(11, comment, eof)
+             read (11,*,err=95,end=95) keyw, &
                   model_prior(j, ipar:ipar+nread-1)
           end select
           if (trim(model_spec(j,3)) == 'two-layer') then
@@ -693,12 +696,12 @@ contains
                call calcvis_clv(model_param(j, &
                7+(4*model_wldep(1)+model_wldep(2))*(nwave-1)))
 
-          if (dummy /= 'ld_param_prior') goto 96
+          if (keyw /= 'ld_param_prior') goto 96
 
        end if
-    end do
+    end do pass2
 
-2   continue 
+12  continue 
     close (11)
 
     !is this a centrosymmetric model?
