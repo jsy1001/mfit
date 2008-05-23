@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.15 2008/04/22 11:44:09 jsy1001 Exp $
+!$Id: model.f90,v 1.16 2008/05/23 09:09:58 jsy1001 Exp $
 
 module Model
 
@@ -92,6 +92,37 @@ contains
 
   !============================================================================
 
+  !! Read consecutive lines starting with specified character
+  !! Backspace on reading first non-comment line
+  subroutine skip_comments(iunit, mark, eof)
+
+    !subroutine arguments
+    integer, intent(in) :: iunit
+    character (len=1), intent(in) :: mark
+    logical, intent(out) :: eof
+
+    !local variables
+    character(len=256) :: line
+
+    eof = .false.
+    do
+       read(iunit,'(a)', end=1, err=2) line
+       if(line(1:1) /= mark) then
+          backspace(iunit)
+          return
+       end if
+    end do
+
+1   eof = .true.
+    return
+
+    ! I/O error, rely on calling routine to re-detect
+2   return
+
+  end subroutine skip_comments
+
+  !============================================================================
+
   !! Read model files
   !! (Re-)Allocates and assigns to module variables
   subroutine read_model(info, file_name, wavebands)
@@ -103,7 +134,8 @@ contains
     double precision, intent(in), optional :: wavebands(:,:) 
 
     !local variables
-    integer, parameter :: max_lines = 1000
+    logical eof
+    character(len=1) :: comment
     character(len=2) :: numbers(10)
     character(len=32) :: dummy, source1, source2, cpt
     character(len=32), allocatable :: wb(:)
@@ -123,12 +155,15 @@ contains
     !how many wavebands values are supplied for (nwave),
     !and the maximum ld_order (max_order)
     open (unit=11, err=91, status='old', action='read', file=file_name)
+    comment = '!'
     comps = 0
     model_wldep = 0
     nwave = -1
     max_order = 0
-    do i = 1, max_lines+1
-       read (11, '(a)', err=92, end=18) line
+    pass1:    do
+       call skip_comments(11, comment, eof)
+       if(eof) exit pass1
+       read (11, '(a)', err=92) line
        if (len_trim(line) == 0) cycle
        read (line, *) dummy !read keyword & qualifiers
        if (dummy == 'component') comps = comps+1
@@ -233,13 +268,10 @@ contains
              return
           end if
        end if
-    end do
-    info = 'file exceeds maximum permitted length'
-    close (11)
-    return
+    end do pass1
 
-18  nlines = i-1
-    close (11)
+    nlines = i-1
+    close(11)
 
     !check if legal number of components
     if ((comps<1).or.(comps>10)) then
@@ -342,10 +374,12 @@ contains
           cpt = 'cpt '// trim(adjustl(numbers(j))) // ', '
 
           !read component name
+          call skip_comments(11, comment, eof)
           read (11,*,err=95,end=95) dummy, model_spec(j,1)
           if (dummy /= 'name') goto 96
 
           !read shape type
+          call skip_comments(11, comment, eof)
           read (11,*,err=95,end=95) dummy, model_spec(j,2)
           if (dummy /= 'shape_type') goto 96
 
@@ -355,6 +389,7 @@ contains
              read (11,*,err=95) dummy
              model_spec(j,3) = 'uniform'
           case default
+             call skip_comments(11, comment, eof)
              read (11,'(a)',err=95,end=95) line
              read (line,*,err=95,end=95) dummy
              pos = scan(trim(line), ' '//achar(9), back=.true.) + 1
@@ -364,6 +399,7 @@ contains
 
           !Read LD order (preset for some LD type cases)
           !Non-integer will cause error in read statement
+          call skip_comments(11, comment, eof)
           select case (trim(model_spec(j,3)))
           case ('uniform','gaussian')
              read (11,*,err=95,end=95) dummy
@@ -410,6 +446,7 @@ contains
           model_param(j,1) = dble(order)
 
           !read position r and theta etc.
+          call skip_comments(11, comment, eof)
           read (11,*,err=95,end=95) dummy
           if (dummy(:8) /= 'position') goto 96
           loc = index(dummy, '#relto')
@@ -473,6 +510,7 @@ contains
              backspace(11)
              nread = 4*(1 + model_wldep(1)*(nwave-1))
              read (11,*,err=95,end=95) dummy, model_param(j, 2:1+nread)
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy, model_prior(j, 2:1+nread)
              if (dummy /= 'position_prior') goto 96
           else
@@ -481,6 +519,7 @@ contains
              read (11,*,err=95,end=95) dummy, &
                   (model_param(j, 2+(k-1)*4:3+(k-1)*4), &
                   k=1,(1+model_wldep(1)*(nwave-1)))
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy, &
                   (model_prior(j, 2+(k-1)*4:3+(k-1)*4), &
                   k=1,(1+model_wldep(1)*(nwave-1)))
@@ -489,6 +528,7 @@ contains
 
           !read flux
           ipar = 6+4*model_wldep(1)*(nwave-1)
+          call skip_comments(11, comment, eof)
           read (11,*,err=95,end=95) dummy, &
                model_param(j, ipar:ipar+model_wldep(2)*(nwave-1))
           if (dummy(:4) /= 'flux') goto 96
@@ -502,6 +542,7 @@ contains
           end do
 
           !read flux prior, must be non-negative
+          call skip_comments(11, comment, eof)
           read (11,*,err=95,end=95) dummy, &
                model_prior(j, ipar:ipar+model_wldep(2)*(nwave-1))
           if (dummy /= 'flux_prior') goto 96  
@@ -528,21 +569,25 @@ contains
                 model_desc(j,ipar+(k-1)*3+2) = trim(cpt) // ' ellipticity'
              end if
           end do
+          call skip_comments(11, comment, eof)
           select case (trim(model_spec(j,2)))
           case ('point')
              read (11,*,err=95,end=95) dummy
              if (dummy(:11) /= 'shape_param') goto 96
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy
           case ('disc')
              read (11,*,err=95,end=95) dummy, (model_param(j,ipar+(k-1)*3), &
                   k=1,(1+model_wldep(3)*(nwave-1)))
              if (dummy(:11) /= 'shape_param') goto 96
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy, (model_prior(j,ipar+(k-1)*3), &
                   k=1,(1+model_wldep(3)*(nwave-1)))
           case ('ellipse')
              nread = 3*(1 + model_wldep(3)*(nwave-1))
              read (11,*,err=95,end=95) dummy, model_param(j,ipar:ipar+nread-1)
              if (dummy(:11) /= 'shape_param') goto 96
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy, model_prior(j,ipar:ipar+nread-1)
           case default
              info = 'invalid shape type'
@@ -552,12 +597,14 @@ contains
           if (dummy /= 'shape_param_prior') goto 96
 
           !read LD parameters
+          call skip_comments(11, comment, eof)
           ipar = 10 + (4*model_wldep(1) + model_wldep(2) &
                + 3*model_wldep(3))*(nwave-1)
           select case (order)
           case (0)
              read (11,*,err=95,end=95) dummy
              if (dummy(:8) /= 'ld_param') goto 96
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy
           case default
              if (trim(model_spec(j,3)) == 'two-layer') then
@@ -568,6 +615,7 @@ contains
              read (11,*,err=95,end=95) dummy, &
                   model_param(j, ipar:ipar+nread-1)
              if (dummy(:8) /= 'ld_param') goto 96
+             call skip_comments(11, comment, eof)
              read (11,*,err=95,end=95) dummy, &
                   model_prior(j, ipar:ipar+nread-1)
           end select
