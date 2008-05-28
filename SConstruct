@@ -79,7 +79,7 @@ elif f95 == nagw_f95:
     # need different f2kcli for this compiler
     f2kcli = 'f2kcli_nagw.f90'
     # Ignores LD_RUN_PATH, so pass "-rpath <path>" to ld
-    if env['PLATFORM'] == 'linux':
+    if env['PLATFORM'] in ['linux','posix']:
         # f95 runs gcc which runs linux ld
         env.Append(LINKFLAGS=['-Wl,-Xlinker', '-Wl,-rpath',
                               '-Wl,-Xlinker', '-Wl,%s' % ':'.join(libPath)])
