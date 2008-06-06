@@ -1,4 +1,4 @@
-! $Id: bayes.f90,v 1.2 2008/04/22 11:42:07 jsy1001 Exp $
+! $Id: bayes.f90,v 1.3 2008/06/06 13:02:22 jsy1001 Exp $
 
 module Bayes
 
@@ -17,7 +17,7 @@ module Bayes
   !public module variables contained:
 
   public :: vis_data, triple_data, sel_wavebands
-  public :: num_vis, num_triple
+  public :: num_vis, num_triple, num_wb
 
   !! Data arrays
   double precision, allocatable :: vis_data(:,:), triple_data(:,:)
@@ -26,6 +26,7 @@ module Bayes
   !! Wavebands included in data (for wavelength-dependent models).
   !! Not used in this module, but should go with data
   double precision, allocatable :: sel_wavebands(:,:)
+  integer :: num_wb
 
 contains
 

@@ -1,4 +1,4 @@
-!$Id: clfit.f90,v 1.25 2008/04/22 11:42:07 jsy1001 Exp $
+!$Id: clfit.f90,v 1.26 2008/06/06 13:02:22 jsy1001 Exp $
 
 program Main
 
@@ -55,7 +55,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.25 $'
+  cvs_rev = '$Revision: 1.26 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -270,23 +270,25 @@ program Main
      end do
 
      if (wb(1) /= -1.0D0) then
-        call filt_by_wb(vis_data, wb, sig)
-        call filt_by_wb(triple_data, wb, sig)
-        allocate(sel_wavebands(1, 2))
+        call filt_by_wb(vis_data, wb, sig, num_vis)
+        call filt_by_wb(triple_data, wb, sig, num_triple)
+        num_wb = 1
+        allocate(sel_wavebands(num_wb, 2))
         sel_wavebands(1, :) = wb
         print *, ' '
         print '(1x, a, 1x, 2f8.2)', 'Using specified waveband:', wb
      else if (wl(1) /= -1.0D0) then
-        call filt_by_wl(vis_data, wl(1), wl(2))
-        call filt_by_wl(triple_data, wl(1), wl(2))
+        call filt_by_wl(vis_data, wl(1), wl(2), num_vis)
+        call filt_by_wl(triple_data, wl(1), wl(2), num_triple)
         allocate(sel_wavebands(size(wavebands, 1), 2))
         sel_wavebands = wavebands
-        call filt_by_wl(sel_wavebands, wl(1), wl(2))
+        call filt_by_wl(sel_wavebands, wl(1), wl(2), num_wb)
         print *, ' '
         print '(1x, a, 1x, 2f8.2)', 'Using specified wavelength range:', wl
      else
         !use all wavebands present
-        allocate(sel_wavebands(size(wavebands, 1), 2))
+        num_wb = size(wavebands, 1)
+        allocate(sel_wavebands(num_wb, 2))
         sel_wavebands = wavebands
      end if
 
@@ -776,18 +778,18 @@ contains
  
 !==============================================================================
 
-  subroutine filt_by_wb(data, wb, sig)
+  subroutine filt_by_wb(data, wb, sig, new_dim1)
 
     !Filter 2d double precision data array by 1st two columns
     !Rows are kept if 1st two columns match wb to precision sig
     !Reallocates data array
-    double precision, allocatable :: data(:,:)
-    double precision :: wb(2)
-    double precision :: sig
-    integer :: dim2
+    double precision, allocatable, intent(inout) :: data(:,:)
+    double precision, intent(in) :: wb(2)
+    double precision, intent(in) :: sig
+    integer, intent(out) :: new_dim1
 
     !local variables
-    integer :: nfilt
+    integer :: dim2
     logical, allocatable :: mask(:)
     double precision, allocatable :: filt_data(:,:)
 
@@ -795,12 +797,13 @@ contains
     allocate(mask(size(data,1)))
     mask = (data(:, 1) >= wb(1)-sig .and. data(:, 1) <= wb(1)+sig &
          .and. data(:, 2) >= wb(2)-sig .and. data(:, 2) <= wb(2)+sig)
-    nfilt = count(mask)
-    allocate(filt_data(nfilt, dim2))
-    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/nfilt, dim2/))
+    new_dim1 = count(mask)
+    allocate(filt_data(new_dim1, dim2))
+    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/new_dim1, dim2/))
     deallocate(data)
-    allocate(data(nfilt, dim2))
+    allocate(data(new_dim1, dim2))
     data = filt_data
+    new_dim1 = size(data,1)
     deallocate(filt_data)
     deallocate(mask)
 
@@ -808,28 +811,28 @@ contains
 
 !==============================================================================
 
-  subroutine filt_by_wl(data, wlmin, wlmax)
+  subroutine filt_by_wl(data, wlmin, wlmax, new_dim1)
 
     !Filter 2d double precision data array by 1st column
     !Rows are kept if 1st column between wlmin and wlmax
     !Reallocates data array
-    double precision, allocatable :: data(:,:)
-    double precision :: wlmin, wlmax
-    integer :: dim2
+    double precision, allocatable, intent(inout) :: data(:,:)
+    double precision, intent(in) :: wlmin, wlmax
+    integer, intent(out) :: new_dim1
 
     !local variables
-    integer :: nfilt
+    integer :: dim2
     logical, allocatable :: mask(:)
     double precision, allocatable :: filt_data(:, :)
 
     dim2 = size(data,2)
     allocate(mask(size(data,1)))
     mask = (data(:, 1) >= wlmin .and. data(:, 1) <= wlmax)
-    nfilt = count(mask)
-    allocate(filt_data(nfilt, dim2))
-    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/nfilt, dim2/))
+    new_dim1 = count(mask)
+    allocate(filt_data(new_dim1, dim2))
+    filt_data = reshape(pack(data, spread(mask, 2, dim2)), (/new_dim1, dim2/))
     deallocate(data)
-    allocate(data(nfilt, dim2))
+    allocate(data(new_dim1, dim2))
     data = filt_data
     deallocate(filt_data)
     deallocate(mask)
