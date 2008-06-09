@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.14 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: visibility.f90,v 1.15 2008/06/09 11:18:14 jsy1001 Exp $
 
 module Visibility
 
@@ -306,9 +306,9 @@ contains
     double precision, dimension(:), allocatable :: bs1, bs2, bs3
 
     !get bessel function values
-    call bessel(0D0, pi*a*rho, 1, bs1)
-    call bessel(0.5D0, pi*a*rho, 1, bs2)
-    call bessel(0.25D0, pi*a*rho, 1, bs3)
+    call bessel(0D0, pi*a*rho, 2, bs1)
+    call bessel(0.5D0, pi*a*rho, 2, bs2)
+    call bessel(0.25D0, pi*a*rho, 2, bs3)
 
     !calculate visibility
     x1 = ((1D0-alpha-beta)*(bs1(2)))/(pi*a*rho)
