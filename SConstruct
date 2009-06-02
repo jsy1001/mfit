@@ -90,6 +90,9 @@ elif f95 == nagw_f95:
 else:
     print "Configuring for generic Fortran 9x compiler"
     f2kcli = 'f2kcli.f90'
+# Work around inconsistent behaviour between scons versions
+env.Replace(F90FLAGS=env['FORTRANFLAGS'])
+env.Replace(F90=f95)
 
 # Prepend to include/library paths from variables above
 env.Prepend(FORTRANPATH=includePath)
