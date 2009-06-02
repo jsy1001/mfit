@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.23 2008/04/22 11:42:07 jsy1001 Exp $
+!$Id: inout.f90,v 1.24 2009/06/02 17:51:39 jsy1001 Exp $
 
 module Inout
 
@@ -399,6 +399,7 @@ contains
 
     !local variables
     character(len=32) :: dummy, source1, source2
+    character(len=256) :: line
     integer :: i, j, i1, i2, lines, num, year, month, day, hour, min
     real :: sec
     double precision :: vis, vis_err, amp, amp_err, cp, cp_err, mjd
@@ -413,10 +414,10 @@ contains
     i1 = 0
     i2 = 0
     do i = 1, max_lines+1
-       read (11, *, err=92, end=1) dummy
-       if (dummy == 'vis') then 
+       read (11, '(a)', err=92, end=1) line
+       if (line(:3) == 'vis') then 
           i1 = i1 + 1
-       else if (dummy == 'triple') then 
+       else if (line(:6) == 'triple') then 
           i2 = i2 + 1
        end if
     end do
@@ -436,20 +437,19 @@ contains
 
     !read data properly and close
     open (unit=11, action='read', file=file_name)
-    open (unit=12, action='read', file=file_name)
     i1 = 0 !counters for vis and triple data item
     i2 = 0
     do i = 1, lines
-       read (11, *) dummy
+       read (11, '(a)') line
 
-       if (dummy == 'group_date') then
+       if (line(:10) == 'group_date') then
 
-          read (12,*,err=95) dummy, year, month, day
+          read (line,*,err=95) dummy, year, month, day
 
-       else if (dummy == 'vis') then
+       else if (line(:3) == 'vis') then
 
           i1 = i1 + 1
-          read (12,*,err=95) dummy, dummy, dummy, vis_data(i1,1:2), &
+          read (line,*,err=95) dummy, dummy, dummy, vis_data(i1,1:2), &
                hour, min, sec, vis_data(i1,3:4), vis, vis_err
 
           !reverse signs of u, v, to correct for inconsistent sign in FT
@@ -472,11 +472,11 @@ contains
 
           if (vis_err<0D0) vis_data(i1,6) = -vis_data(i1,6)
 
-       else if (dummy == 'triple') then
+       else if (line(:6) == 'triple') then
 
           i2 = i2 + 1
-          read (12,*,err=95) dummy, dummy, dummy, dummy, triple_data(i2,1:2), &
-               hour, min, sec, triple_data(i2,3:6), &
+          read (line,*,err=95) dummy, dummy, dummy, dummy, &
+               triple_data(i2,1:2), hour, min, sec, triple_data(i2,3:6), &
                amp, amp_err, cp, cp_err
 
           !reverse signs of u1, v1, u2, v2 to correct for inconsistent sign in FT
@@ -496,17 +496,14 @@ contains
                ((((hour*60) + min)*60) + sec)/86400.
           triple_data(i2,11) = mjd
 
-       else if (dummy == 'source') then
+       else if (line(:6) == 'source') then
 
-          read (12,*,err=95) dummy, source1, source2
+          read (line,*,err=95) dummy, source1, source2
           source = trim(source1)//' '//trim(source2)
 
-       else
-          read (12,*,err=95) dummy
        end if
     end do
     close (11)
-    close (12)
 
     !make array of wavebands detected:
     !collate all (wavelength, bandwidth) pairs
