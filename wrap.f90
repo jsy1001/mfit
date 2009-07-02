@@ -8,10 +8,12 @@ module Wrap
    
      logical :: done_init = .false.
      double precision, pointer :: param(:,:)
+     double precision, pointer :: svar(:)
      double precision, pointer :: limits(:,:,:)
      integer :: nvar
      integer, pointer :: var_pos(:,:)
      double precision, pointer :: var_scale(:)
+     double precision, pointer :: var_offset(:)
 
   end type allparam
 
@@ -20,7 +22,7 @@ contains
   !============================================================================
 
   !! Initialise allparam instance
-  subroutine allparam_init(this, param, limits, nvar, var_pos, var_scale)
+  subroutine allparam_init(this, param, limits, nvar, var_pos, var_scale, var_offset)
 
     !subroutine arguments
     type(allparam), intent(out) :: this
@@ -29,10 +31,13 @@ contains
     integer, intent(in) :: nvar
     integer, intent(in) :: var_pos(nvar,2)
     double precision, intent(in), optional :: var_scale(nvar)
+    double precision, intent(in), optional :: var_offset(nvar)
 
     this%done_init = .true.
     allocate(this%param(size(param,1), size(param,2)))
     this%param = param
+    allocate(this%svar(nvar))
+    this%svar = 0D0  !incorrect until first call to allparam_setvar()
     allocate(this%limits(size(limits,1), size(limits,2), 2))
     this%limits = limits
     this%nvar = nvar
@@ -43,6 +48,12 @@ contains
        this%var_scale = var_scale
     else
        this%var_scale = 1D0
+    end if
+    allocate(this%var_offset(nvar))
+    if (present(var_offset)) then
+       this%var_offset = var_offset
+    else
+       this%var_offset = 0D0
     end if
 
   end subroutine allparam_init
@@ -76,11 +87,15 @@ contains
     allocate(dest%param(size(src%param,1), size(src%param,2)))
     dest%param = src%param
 
+    !copy src%svar-> dest%svar
+    allocate(dest%svar(size(src%svar,1)))
+    dest%svar = src%svar
+
     !copy src%limits -> dest%limits
     allocate(dest%limits(size(src%limits,1), size(src%limits,2), 2))
     dest%limits = src%limits
 
-    !assign dest%nvar, dest%var_pos and dest%var_scale...
+    !assign dest%nvar, dest%var_pos, dest%var_scale and dest%var_offset...
     if (present(fix_var)) then
        !...pass 1 - count variables
        dest%nvar = 0
@@ -89,6 +104,7 @@ contains
        end do
        allocate(dest%var_pos(dest%nvar,2))
        allocate(dest%var_scale(dest%nvar))
+       allocate(dest%var_offset(dest%nvar))
        !...pass 2 - copy variable positions and scaling
        idest = 0
        do isrc = 1, src%nvar
@@ -96,6 +112,7 @@ contains
              idest = idest + 1
              dest%var_pos(idest,:) = src%var_pos(isrc,:)
              dest%var_scale(idest) = src%var_scale(isrc)
+             dest%var_offset(idest) = src%var_offset(isrc)
           end if
        end do
     else
@@ -105,6 +122,8 @@ contains
        dest%var_pos = src%var_pos
        allocate(dest%var_scale(dest%nvar))
        dest%var_scale = src%var_scale
+       allocate(dest%var_offset(dest%nvar))
+       dest%var_offset = src%var_offset
     end if
 
   end subroutine allparam_copy
@@ -125,6 +144,20 @@ contains
 
   !==========================================================================
 
+  !! Set offset for future calls to allparam_inlimit, _setvar, and _setone
+  subroutine allparam_setoffset(this, var_offset)
+
+    !subroutine arguments
+    type(allparam), intent(inout) :: this
+    double precision, intent(in) :: var_offset(:)
+    
+    if (.not. this%done_init) stop 'allparam instance not initialised'
+    this%var_offset = var_offset
+
+  end subroutine allparam_setoffset
+
+  !==========================================================================
+
   !! Disable variable scaling for future calls to allparam_inlimit,
   !! _setvar, and _setone
   subroutine allparam_setnoscale(this)
@@ -139,6 +172,20 @@ contains
 
   !==========================================================================
 
+  !! Disable variable offsetting for future calls to allparam_inlimit,
+  !! _setvar, and _setone
+  subroutine allparam_setnooffset(this)
+
+    !subroutine arguments
+    type(allparam), intent(inout) :: this
+    
+    if (.not. this%done_init) stop 'allparam instance not initialised'
+    this%var_offset = 0D0
+
+  end subroutine allparam_setnooffset
+
+  !==========================================================================
+
   !! Print values of allparam components
   subroutine allparam_print(this)
 
@@ -147,9 +194,11 @@ contains
 
     if (.not. this%done_init) stop 'allparam instance not initialised'
     print *, 'param:', this%param
+    print *, 'svar:', this%svar
     print *, 'nvar:', this%nvar
     print *, 'var_pos:', this%var_pos
     print *, 'var_scale:', this%var_scale
+    print *, 'var_offset:', this%var_offset
 
   end subroutine allparam_print
 
@@ -166,7 +215,7 @@ contains
 
     !local variables
     integer :: ivar, indx1, indx2
-    double precision :: scale
+    double precision :: scale, offset
 
     if (.not. this%done_init) stop 'allparam instance not initialised'
     ok = .false.
@@ -174,8 +223,9 @@ contains
        indx1 = this%var_pos(ivar,1)
        indx2 = this%var_pos(ivar,2)
        scale = this%var_scale(ivar)
-       if (var(ivar)*scale < this%limits(indx1, indx2, 1)) return
-       if (var(ivar)*scale > this%limits(indx1, indx2, 2)) return
+       offset = this%var_offset(ivar)
+       if ((var(ivar)*scale + offset) < this%limits(indx1, indx2, 1)) return
+       if ((var(ivar)*scale + offset) > this%limits(indx1, indx2, 2)) return
     end do
     ok = .true.
 
@@ -198,8 +248,8 @@ contains
 
     if (.not. this%done_init) stop 'allparam instance not initialised'
     do ivar = 1, this%nvar
-       this%param(this%var_pos(ivar,1), this%var_pos(ivar,2)) &
-            = var(ivar)*this%var_scale(ivar)
+       this%svar(ivar) = var(ivar)*this%var_scale(ivar) + this%var_offset(ivar)
+       this%param(this%var_pos(ivar,1), this%var_pos(ivar,2)) = this%svar(ivar)
     end do
 
   end subroutine allparam_setvar
@@ -216,8 +266,8 @@ contains
     double precision, intent(in) :: val
 
     if (.not. this%done_init) stop 'allparam instance not initialised'
-    this%param(this%var_pos(ivar,1), this%var_pos(ivar,2)) &
-         = val*this%var_scale(ivar)
+    this%svar(ivar) = val*this%var_scale(ivar) + this%var_offset(ivar)
+    this%param(this%var_pos(ivar,1), this%var_pos(ivar,2)) = this%svar(ivar)
 
   end subroutine allparam_setone
 
@@ -231,9 +281,11 @@ contains
     if (.not. this%done_init) return !harmless
     this%done_init = .false.
     deallocate(this%param)
+    deallocate(this%svar)
     deallocate(this%limits)
     deallocate(this%var_pos)
     deallocate(this%var_scale)
+    deallocate(this%var_offset)
     
   end subroutine allparam_free
 
