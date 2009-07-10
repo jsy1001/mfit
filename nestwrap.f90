@@ -26,7 +26,7 @@ module nestwrapper
   !max no. of live points
   integer nest_nlive
   parameter(nest_nlive=500)
-      
+       
   !tot no. of parameters, should be nvar in most cases but if you need to
   !store some additional parameters with the actual parameters then
   !you need to pass them through the likelihood routine
@@ -67,9 +67,9 @@ module nestwrapper
   logical nest_resume
   parameter(nest_resume=.false.)
 	
-  !parameters to wrap around (0 is F & non-zero T)
   integer nest_maxDim
   parameter(nest_maxDim=20)
+  !parameters to wrap around (0 is F & non-zero T)
   integer nest_pWrap(nest_maxDim)
 
   !feedback on the sampling progress?

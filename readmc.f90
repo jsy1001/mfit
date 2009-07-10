@@ -1,4 +1,4 @@
-!$Id: readmc.f90,v 1.1 2009/07/02 13:48:56 jsy1001 Exp $
+!$Id: readmc.f90,v 1.2 2009/07/10 16:18:50 jsy1001 Exp $
 
 module ReadMC
 
@@ -140,7 +140,7 @@ contains
     integer, parameter :: ounit = 11
     integer, parameter :: nbin = 10
     integer :: ibin, i
-    double precision :: binw, binl, like, wt, mlike
+    double precision :: binw, binl, mlike
 
     open(unit=ounit, file=outfname, action='write')
     binw = (range(2)-range(1))/nbin
@@ -149,10 +149,8 @@ contains
        mlike = 1d-9
        do i = 1, nsamp
           if(var(ivar, i) > binl .and. var(ivar, i) <= (binl+binw)) then
-             like = exp(loglike(i))
-             !weight by (prior mass)/evidence
-             wt = prob(i)/like
-             mlike = mlike + wt*like  
+             !weight likelihood by (prior mass)/evidence i.e. prob(i)/likelihood
+             mlike = mlike + prob(i)
           end if
        end do
        write(ounit, '(2f12.6)') binl+0.5d0*binw, log(mlike)
@@ -176,7 +174,7 @@ contains
     integer, parameter :: ounit = 11
     integer, parameter :: nbin = 10
     integer :: ibin, jbin, i
-    double precision :: like, wt, mlike
+    double precision :: mlike
     double precision :: binl(2), binw(2)
 
     open(unit=ounit, file=outfname, action='write')
@@ -191,10 +189,8 @@ contains
                   .and. var(ivar(1), i) <= (binl(1)+binw(1)) &
                   .and. var(ivar(2), i) > binl(2) &
                   .and. var(ivar(2), i) <= (binl(2)+binw(2))) then
-                like = exp(loglike(i))
-                !weight by (prior mass)/evidence
-                wt = prob(i)/like
-                mlike = mlike + wt*like  
+                !weight likelihood by (prior mass)/evidence i.e. prob(i)/likelihood
+                mlike = mlike + prob(i)
              end if
           end do
           write(ounit, '(3f12.6)') binl+0.5d0*binw, log(mlike)
