@@ -1,4 +1,4 @@
-!$Id: readmc.f90,v 1.2 2009/07/10 16:18:50 jsy1001 Exp $
+!$Id: readmc.f90,v 1.3 2009/07/14 16:35:21 jsy1001 Exp $
 
 module ReadMC
 
@@ -6,35 +6,79 @@ module ReadMC
 
   private
 
-  public :: mc_count_lines, mc_get_params
+  public :: mc_count_lines, mc_count_vars, mc_get_params
 
 contains
   
   !! Count number of lines in specified text file
-  subroutine mc_count_lines(filename, nline)
+  subroutine mc_count_lines(filename, mode, nline)
  
     !! Pathname of text file
     character(len=*), intent(in) :: filename
+    !! If positive, only count samples for this mode
+    integer, intent(in) :: mode
     !! On exit, number of lines in text file
     integer, intent(out) :: nline
 
-    integer, parameter :: iunit = 12
-    character(len=1) :: dummy
+    integer, parameter :: iunit = 12, mode_max = 100
+    integer :: imode
+    character(len=256) :: line
 
-    nline = 0
     open(unit=iunit, action='read', err=2, file=filename)
-    do
-       read(iunit, *, end=2) dummy
-       nline = nline + 1
-    end do
+    nline = 0
+    modeloop: do imode = 0, mode_max
+       do
+          read(iunit, '(a)', end=2) line
+          if(trim(line) == '') then
+             read(iunit, '(a)', end=2) line  !2 blank lines between modes
+             cycle modeloop
+          end if
+          if(mode <= 0 .or. imode == mode) then
+             nline = nline + 1
+          end if
+       end do
+    end do modeloop
 2   close(iunit)
 
   end subroutine mc_count_lines
+  
+  !! Get number of variables from number of columns in specified text file
+  subroutine mc_count_vars(filename, nvar)
+ 
+    !! Pathname of text file
+    character(len=*), intent(in) :: filename
+    !! On exit, number of variables
+    integer, intent(out) :: nvar
+
+    integer, parameter :: iunit = 12
+    double precision, parameter :: blank = -99.99d0
+    integer :: i
+    character(len=256) :: line
+    double precision :: val(100)
+
+    open(unit=iunit, action='read', err=2, file=filename)
+    !Get 3rd line, won't be blank
+    do i = 1, 3
+       read(iunit, '(a)') line
+    end do
+    close(iunit)
+    val = blank
+    read(line, *, end=2) (val(i), i=1, size(val,1))
+2   nvar = size(val,1) - 2
+    do i = 3, size(val,1)
+       if(val(i) == blank) then
+          nvar = i - 3
+          exit
+       end if
+    end do
+
+  end subroutine mc_count_vars
 
 
   !! Calculate parameter means from [root].txt file written by MultiNest
   !! Writes marginalised posterior pdf for each parameter
-  subroutine mc_get_params(filename, nest_root, nsamp, nvar, mean, stddev)
+  subroutine mc_get_params(filename, nest_root, nsamp, nvar, mode, &
+       mean, stddev)
 
     !! Pathname of text file
     character(len=*), intent(in) :: filename
@@ -44,6 +88,8 @@ contains
     integer, intent(in) :: nsamp
     !! Number of variable parameters
     integer, intent(in) :: nvar
+    !! If positive, only process samples for this mode
+    integer, intent(in), optional :: mode
     !! On exit, mean parameter values
     double precision, intent(out) :: mean(nvar)
     !! On exit, standard deviations of parameters
@@ -59,7 +105,7 @@ contains
     double precision :: range2(2, 2)
     character(len=20) :: suffix
 
-    call mc_read_txt(filename, nsamp, nvar, prob, loglike, var)
+    call mc_read_txt(filename, nsamp, nvar, mode, prob, loglike, var)
 
     !calculate parameter means and standard deviations
     sumwt = 0d0
@@ -77,7 +123,12 @@ contains
     do ivar = 1, nvar
        range(1) = mean(ivar) - 3d0*stddev(ivar)
        range(2) = mean(ivar) + 3d0*stddev(ivar)
-       write(suffix, '(a, i1, a)') 'param_', ivar, '.dat'
+       if(mode >= 0) then
+          write(suffix, '(a, i1, a, i1, a)') 'mode', mode, &
+               '_param_', ivar, '.dat'
+       else
+          write(suffix, '(a, i1, a)') 'param_', ivar, '.dat'
+       end if
        call mc_marg_1d(trim(nest_root)//suffix, & 
             nsamp, nvar, ivar, range, prob, loglike, var)
     end do
@@ -88,8 +139,13 @@ contains
        ivar2(2) = ivar+1
        range2(:, 1) = mean(ivar2(:)) - 3d0*stddev(ivar2(:))
        range2(:, 2) = mean(ivar2(:)) + 3d0*stddev(ivar2(:))
-       write(suffix, '(a, i1, a, i1, a)') 'param_', ivar2(1), '_', ivar2(2), &
-            '.dat'
+       if(mode >= 0) then
+          write(suffix, '(a, i1, a, i1, a, i1, a)') 'mode', mode, &
+               '_param_', ivar2(1), '_', ivar2(2), '.dat'
+       else
+          write(suffix, '(a, i1, a, i1, a)') &
+               'param_', ivar2(1), '_', ivar2(2), '.dat'
+       end if
        call mc_marg_2d(trim(nest_root)//suffix, & 
             nsamp, nvar, ivar2, range2, prob, loglike, var)
     end do
@@ -98,7 +154,7 @@ contains
 
   
   !! Read [root].txt file written by MultiNest
-  subroutine mc_read_txt(filename, nsamp, nvar, prob, loglike, var)
+  subroutine mc_read_txt(filename, nsamp, nvar, mode, prob, loglike, var)
 
     !! Pathname of text file
     character(len=*), intent(in) :: filename
@@ -106,6 +162,8 @@ contains
     integer, intent(in) :: nsamp
     !! Number of variable parameters to read sample values for
     integer, intent(in) :: nvar
+    !! If positive, only process samples for this mode
+    integer, intent(in), optional :: mode
     !! On exit, sample probability (sample probability is the sample
     !! prior mass multiplied by its likelihood & normalized by the evidence)
     double precision, intent(out) :: prob(nsamp)
@@ -114,13 +172,26 @@ contains
     !! On exit, parameter values
     double precision, intent(out) :: var(nvar, nsamp)
 
-    integer, parameter :: iunit = 12
-    integer :: i
+    integer, parameter :: iunit = 12, mode_max = 100
+    integer :: imode, i
+    character(len=256) :: line
 
     open(unit=iunit, action='read', file=filename)
-    do i = 1, nsamp
-       read(iunit, *) prob(i), loglike(i), var(:, i)
-    end do
+    i = 1
+    modeloop: do imode = 0, mode_max
+       do
+          read(iunit, '(a)') line
+          if(trim(line) == '') then
+             read(iunit, '(a)') line
+             cycle modeloop
+          end if
+          if(mode <= 0 .or. imode == mode) then
+             read(line, *) prob(i), loglike(i), var(:, i)
+             i = i + 1
+             if(i == nsamp+1) exit modeloop
+          end if
+       end do
+    end do modeloop
     close(iunit)
 
   end subroutine mc_read_txt

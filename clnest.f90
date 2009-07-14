@@ -1,4 +1,4 @@
-!$Id: clnest.f90,v 1.1 2009/07/02 13:48:56 jsy1001 Exp $
+!$Id: clnest.f90,v 1.2 2009/07/14 16:35:21 jsy1001 Exp $
 
 program Main
 
@@ -28,7 +28,7 @@ program Main
   character(len=128) :: switch, arg, info, file_name, ext, source
   character(len=128) :: cvs_rev, revision
   integer :: narg, iarg, i, n, user_target_id
-  integer :: useful_vis, useful_amp, useful_cp
+  integer :: useful_vis, useful_amp, useful_cp, mode
   double precision :: calib_error
   logical :: mmodal, force_symm
 
@@ -46,14 +46,14 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.1 $'
+  cvs_rev = '$Revision: 1.2 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
   print *,' '
   print *,'  clnest - command-line OI nested sampler'
   print *,'  package release ',release
-  print *,'  [clfit revision ',trim(revision),']'
+  print *,'  [clnest revision ',trim(revision),']'
   print *,' '
   print *,spacer_line
 
@@ -68,6 +68,7 @@ program Main
   user_target_id = -1 !default to 1st target in OI_TARGET
   calib_error = 0D0
   mmodal = .false.
+  mode = -1
   do
      if (iarg == narg - 1) exit
      if (iarg > narg - 1) then
@@ -98,6 +99,10 @@ program Main
            iarg = iarg + 1
         case('-m', '--multimodal')
            mmodal = .true.
+        case('-n', '--mode')
+           call get_command_argument(iarg+1, arg)
+           read(arg, *) mode
+           iarg = iarg + 1
         case default
            print *, 'Ignoring invalid command-line argument: ', arg
         end select
@@ -335,13 +340,18 @@ program Main
   call nest_Sample(n, mmodal)
 
   !display results
-  sampFilename = trim(nest_root)//'.txt'
-  call mc_count_lines(sampFilename, nsamp)
-  print *, 'Reading', nsamp, 'samples from ', sampFilename
+  if(mode > 0) then
+     sampFilename = trim(nest_root)//'post_separate.dat'
+  else
+     sampFilename = trim(nest_root)//'.txt'
+  end if
+  call mc_count_lines(sampFilename, mode, nsamp)
+  print '(1x, a, i6, a, a)', &
+       'Reading', nsamp, ' samples from ', sampFilename
   print *, 'Mean results are in ', trim(nest_root)//'stats.dat'
   allocate(sol(n), err(n))
   allocate(var_pos(n,2), var_desc(n))
-  call mc_get_params(sampFilename, nest_root, nsamp, n, sol, err)
+  call mc_get_params(sampFilename, nest_root, nsamp, n, mode, sol, err)
   call model_getvar(n, var_pos, var_desc)
   print '(1x, a, 49x, a)', '                   ', '  mean     standard'
   print '(1x, a, 49x, a)', 'num  parameter name', ' value    deviation'
@@ -435,7 +445,7 @@ contains
 
     print *, 'Usage:'
     print *, ' '
-    print *, 'clfit [options] datafile modelfile'
+    print *, 'clnest [options] datafile modelfile'
     print *, ' '
     print *, 'Options (may appear in any order):'
     print *, ' '
@@ -445,6 +455,7 @@ contains
     print *, '-t|--target_id ID       select this target (default is 1st in OI_TARGET table)'
     print *, '-c|--calerr FRAC        add calibration error (frac. err. in system visib.)'
     print *, '-m|--multimodal         do multimodal sampling'
+    print *, '-n|--mode               process only samples for this mode'
 
   end subroutine print_usage
 
