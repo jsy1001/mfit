@@ -1,4 +1,4 @@
-!$Id: binnest.f90,v 1.1 2009/07/14 16:35:21 jsy1001 Exp $
+!$Id: binnest.f90,v 1.2 2009/07/15 08:48:57 jsy1001 Exp $
 
 program Main
 
@@ -12,7 +12,7 @@ program Main
   !variables
   integer, parameter :: width = 78            !for spacer lines
   character(len=width) :: spacer_line
-  integer narg, iarg, mode, n, nsamp
+  integer narg, iarg, mode, n, nsamp, i
   character(len=128) :: switch, arg, sampFilename
   double precision, allocatable :: sol(:), err(:)
 
@@ -68,6 +68,12 @@ program Main
   print *, 'Mean results are in ', trim(nest_root)//'stats.dat'
   allocate(sol(n), err(n))
   call mc_get_params(sampFilename, nest_root, nsamp, n, mode, sol, err)
+  print '(1x, a, 10x, a)', '   ', '  mean     standard'
+  print '(1x, a, 10x, a)', 'num', ' value    deviation'
+  do i = 1, n
+     write(*,62) i, sol(i), err(i)
+  end do
+62 format(' (', i2, ') ', 1x, f13.6, 1x, f12.6) 
 
   !-------------------------------------------------------------------------
   !Deallocate storage
