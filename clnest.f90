@@ -1,4 +1,4 @@
-!$Id: clnest.f90,v 1.2 2009/07/14 16:35:21 jsy1001 Exp $
+!$Id: clnest.f90,v 1.3 2009/07/16 13:27:11 jsy1001 Exp $
 
 program Main
 
@@ -28,10 +28,12 @@ program Main
   character(len=128) :: switch, arg, info, file_name, ext, source
   character(len=128) :: cvs_rev, revision
   integer :: narg, iarg, i, n, user_target_id
-  integer :: useful_vis, useful_amp, useful_cp, mode
+  integer :: useful_vis, useful_amp, useful_cp, mode, degfreedom
+  double precision :: chisqrd, normchisqrd
   double precision :: calib_error
   logical :: mmodal, force_symm
-
+  type(allparam) :: mean_param
+  
   !posterior samples
   integer nsamp
   character(len=128) :: sampFilename
@@ -46,7 +48,7 @@ program Main
   !----------------------------------------------------------------------------
   !Introduction
 
-  cvs_rev = '$Revision: 1.2 $'
+  cvs_rev = '$Revision: 1.3 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,spacer_line
@@ -359,6 +361,21 @@ program Main
      write(*,62) i, var_desc(i), sol(i), err(i)
   end do
 62 format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6) 
+
+  !Display chi-squared
+  call allparam_init(mean_param, model_param, model_limits, n, var_pos)
+  call allparam_setvar(mean_param, sol)
+  chisqrd = 2d0*likelihood(vis_data, triple_data, model_spec, mean_param%param)
+  call allparam_free(mean_param)
+  degfreedom = useful_vis + useful_amp + useful_cp - n
+  print *, ' '
+  print *, '           chi squared =',real(chisqrd) 
+  print *, '    degrees of freedom =',degfreedom
+  if (degfreedom > 0) then
+     normchisqrd = chisqrd/degfreedom
+     print *, 'chi sqrd / deg freedom =',real(normchisqrd)
+  end if
+  
 
   !-------------------------------------------------------------------------
   !Deallocate storage
