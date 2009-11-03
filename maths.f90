@@ -1,4 +1,4 @@
-!$Id: maths.f90,v 1.8 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: maths.f90,v 1.9 2009/11/03 14:54:27 jsy1001 Exp $
 
 module Maths
   
@@ -208,17 +208,20 @@ contains
   function bess1(x)
 
     !function arguments
-    double precision :: bess1, PDA_DBESJ1, x
+    double precision :: bess1, x
     
     !local variables
+    integer :: ncalc
+    double precision, dimension(2) :: output
     integer :: ifail
 
-    !call PDA bessel function routine
-    ifail = 0
-    bess1 = PDA_DBESJ1(x, ifail)
-    if (ifail /= 0) then
-       stop 'maths error: bess1: error flag set by PDA_DBESJ1'
+    call RJBESL(x, 0D0, 2, output, ncalc)
+    if (ncalc < 0) then
+       stop 'maths error: bess1: an argument to RJBESL is out of range'
+    else if (ncalc < 2) then
+       stop 'maths error: bess1: not all requested function values could be calculated accurately'
     end if
+    bess1 = output(2)
 
   end function bess1
 
