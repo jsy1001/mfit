@@ -6,8 +6,8 @@ release = 0
 
 # Locations of 64-bit files appear first,
 # since they don't exist on 32-bit machines
-includePath = Split('/opt/local/include /soft/star64/include /opt/star/include /sw/include /usr/include ./MultiNest_v2.7')
-libPath = Split('/opt/local/lib /usr/lib64 /soft/star64/lib /opt/star/lib /sw/lib /usr/lib /usr/X11R6/lib64 /usr/X11R6/lib ./MultiNest_v2.7')
+includePath = Split('/opt/local/include /soft/star64/include /opt/star/include /star/include /sw/include /usr/include ./MultiNest_v2.7')
+libPath = Split('/opt/local/lib /usr/lib64 /soft/star64/lib /opt/star/lib /star/lib /sw/lib /usr/lib /usr/X11R6/lib64 /usr/X11R6/lib ./MultiNest_v2.7')
 
 # Path to Sun F95 (if installed); used to auto-set compiler switches
 sun_f95 = '/opt/SUNWspro/bin/f95'
@@ -167,7 +167,7 @@ for key in sources.keys():
 # ...executables
 for key in objects.keys():
     prog = env.Program(key, objects[key], LIBS=libs[key])
-    if key != 'clnest':
+    if key not in ['clnest', 'binnest']:
         Default(prog)
 
 # ...targets for distribution of mfit
