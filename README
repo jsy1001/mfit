@@ -1,6 +1,6 @@
        mfit: Model Fitting Software for Optical Interferometry
 
-                       package release 1.5.1
+                       package release 1.5.2
 
 
                            Release notes
@@ -48,14 +48,7 @@ software):
 
 * CFITSIO - http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html
 
-* Starlink PDA - http://www.starlink.ac.uk/star/docs/sun194.htx/sun194.html
-
 * FFTW (v3) - http://www.fftw.org/
-
-Note that PGPLOT, CFITSIO, and PDA are all included in the Starlink Software
-Collection distributed by the Joint Astronomy Centre, which is available from
-http://starlink.jach.hawaii.edu/
-mfit has been tested with the 'Hokulei' release of this collection.
 
 If you have it, mfit can make use of the commercial Numerical Algorithms Group
 Fortran Library (Mark 19 recommended) - see
@@ -89,16 +82,20 @@ README	        This file
 NEWS            Outline of new features in this and previous releases
 documentation   Instructions for using mfit
 SConstruct      scons configuration file, used to build mfit (see below)
-maths.f90, fit.f90, visibility.f90, inout.f90, plot.f90, model.f90
+bayes.f90, fit.f90, inout.f90, marginalise.F90, model.f90, plot.f90, postplot.f90,
+visibility.f90, wrap.f90
 		Routines used by mfit and clfit
 main.f90	mfit main function
 clfit.f90	clfit main function
 calc.f90	Test code for maths module
+modelplot.f90, fitsimage.f90
+	        Image-space model plot utility
 fitgui.py	GUI interface to clfit
 fitgui		Wrapper script for fitgui.py - put this in PATH
 fitgui_dev      Alt. wrapper script for fitgui.py - used for development
 test.oifits     Test dataset (COAST data on Capella)
 test.model      Binary model that fits test.oifits
+pda_xermsg.f    Replacement for Starlink routine
 
 The following files, authored by third parties, are distributed with mfit for
 your convenience:
@@ -106,6 +103,10 @@ your convenience:
 gamma.f	        Gamma function from SPECFUN 2.5 - see readme.specfun
 rjbesl.f        Bessel function from SPECFUN 2.5 - see readme.specfun
 readme.specfun	Readme for SPECFUN 2.5 routines
+gmst.f, dranrm.f
+                Sidereal time function from SLALIB
+maths_pda.f, fit_pda.f
+                Functions from Starlink PDA library
 f2kcli.f90	Fortran 200x Command Line Interface, (c) Interactive
 		Software Services Ltd. - see f2kcli.txt
 f2kcli_nagw.f90	Fortran 200x Command Line Interface - version for NAGWare f95
@@ -139,6 +140,7 @@ mfit has been tested using:
 - NAGWare Fortran 95 on Solaris
 - NAGWare Fortran 95 on Linux
 - G95 on Linux
+- GFortran 4.3 on Linux (will not work with older GFortran versions)
 - G95 on MacOS X (thanks to Ettore Pedretti)
 
 Please report successes or failures with other compilers/operating systems.
@@ -179,7 +181,7 @@ Please report the inevitable bugs to jsy1001 (at) cam.ac.uk. Various
 missing features are listed in 'documentation'.
 
 
-$Id: README,v 1.4 2007/09/07 17:04:45 jsy1001 Exp $
+$Id: README,v 1.5 2009/11/03 17:26:26 jsy1001 Exp $
 
 Local variables:
 fill-column: 79

@@ -1,8 +1,9 @@
-!$Id: model.f90,v 1.17 2008/05/23 17:37:03 jsy1001 Exp $
+!$Id: model.f90,v 1.18 2009/11/03 17:26:27 jsy1001 Exp $
 
 module Model
 
   use Maths
+  use Search
 
   implicit none
 

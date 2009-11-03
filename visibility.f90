@@ -1,8 +1,9 @@
-!$Id: visibility.f90,v 1.15 2008/06/09 11:18:14 jsy1001 Exp $
+!$Id: visibility.f90,v 1.16 2009/11/03 17:26:27 jsy1001 Exp $
 
 module Visibility
 
   use Maths
+  use Search
   use Model
 
   implicit none

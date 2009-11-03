@@ -2,6 +2,13 @@
 New in mfit release 1.5.1
 =========================
 
+* No longer depends on Starlink SLALIB and PDA libraries; the required
+  source code from these libraries is distributed with mfit.
+
+
+New in mfit release 1.5.1
+=========================
+
 * Minimiser now works with scaled model parameters, hence performs
   better. Parameter scaling factors are varied iteratively to find the
   best minimum

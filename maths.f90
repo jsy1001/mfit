@@ -1,4 +1,4 @@
-!$Id: maths.f90,v 1.9 2009/11/03 14:54:27 jsy1001 Exp $
+!$Id: maths.f90,v 1.10 2009/11/03 17:26:26 jsy1001 Exp $
 
 module Maths
   
@@ -31,7 +31,6 @@ module Maths
   !machine_precision() - returns the machine precsion
   !modulus(z) -    returns the modulus of complex z
   !modx(a,b) -     difference mod 360 of a and b
-  !locate(xx, x) - return index i such that xx(i) < x < xx(i+1) - xx monotonic
 
   !public parameters and conversions
   double precision, parameter :: pi = 3.1415926535897932D0
@@ -376,36 +375,6 @@ contains
     if (modx>180D0) modx = 360D0 - modx
 
   end function modx
-
-  !============================================================================
-
-  function locate(xx, x)
-
-    !return index i such that xx(i) < x < xx(i+1)
-    !xx must be monotonic
-
-    !function arguments
-    real, dimension(:) :: xx
-    real :: x
-    integer :: locate
-
-    !local variables
-    integer n, lower, mid, upper
-
-    n = size(xx)
-    lower = 0
-    upper = n + 1
-    do while (upper - lower > 1)
-       mid = (upper + lower)/2
-       if ((xx(n) > xx(1)).eqv.(x > xx(mid))) then
-          lower = mid
-       else
-          upper = mid
-       end if
-    end do
-    locate = lower
-
-  end function locate
 
   !============================================================================
 

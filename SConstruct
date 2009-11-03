@@ -6,8 +6,8 @@ release = 0
 
 # Locations of 64-bit files appear first,
 # since they don't exist on 32-bit machines
-includePath = Split('/opt/local/include /soft/star64/include /opt/star/include /star/include /sw/include /usr/include ./MultiNest_v2.7')
-libPath = Split('/opt/local/lib /usr/lib64 /soft/star64/lib /opt/star/lib /star/lib /sw/lib /usr/lib /usr/X11R6/lib64 /usr/X11R6/lib ./MultiNest_v2.7')
+includePath = Split('/opt/local/include /sw/include /usr/include ./MultiNest_v2.7')
+libPath = Split('/opt/local/lib /usr/lib64 /sw/lib /usr/lib /usr/X11R6/lib64 /usr/X11R6/lib ./MultiNest_v2.7')
 
 # Path to Sun F95 (if installed); used to auto-set compiler switches
 sun_f95 = '/opt/SUNWspro/bin/f95'
@@ -105,11 +105,6 @@ if env['PLATFORM'] != 'win32':
 
 # Configure libraries to link in
 baseLibs = env.get('LIBS', [])
-# include slalib here since its distributed with Starlink
-starLibs = ['pda', 'emsf', 'ems', 'cnf', 'sla']
-if conf.CheckLib('starmem'):
-    # NB CheckLib() appends to env['LIBS'] if found
-    starLibs += ['starmem']
 pgLibs = ['pgplot', 'X11']
 fitsioLibs = ['cfitsio']
 if conf.CheckLib('socket'):
@@ -129,34 +124,35 @@ env = conf.Finish()
 # Define targets and dependencies...
 sources = {}
 sources['mfit'] = ['main.f90',
-                   'maths.f90', 'fit.f90', 'visibility.f90', 'inout.f90',
+                   'maths.f90', 'search.f90', 'fit.f90', 'visibility.f90', 'inout.f90',
                    'plot.f90', 'postplot.f90', 'model.f90',
-                   'gamma.f', 'rjbesl.f',
+                   'gamma.f', 'rjbesl.f', 'maths_pda.f', 'fit_pda.f', 'pda_xermsg.f',
+                   'gmst.f', 'dranrm.f',
                    'marginalise.F90', 'wrap.f90', 'bayes.f90']
 sources['clfit'] = ['clfit.f90',
-                   'maths.f90', 'fit.f90', 'visibility.f90', 'inout.f90',
-                   'plot.f90', 'postplot.f90', 'model.f90',
-                   'gamma.f', 'rjbesl.f',
+                    'maths.f90', 'search.f90', 'fit.f90', 'visibility.f90', 'inout.f90',
+                    'plot.f90', 'postplot.f90', 'model.f90',
+                    'gamma.f', 'rjbesl.f', 'maths_pda.f', 'fit_pda.f', 'pda_xermsg.f',
+                    'gmst.f', 'dranrm.f',
                    'marginalise.F90', 'wrap.f90', 'bayes.f90'] + [f2kcli]
 sources['clnest'] = ['clnest.f90', 'nestwrap.f90', 'readmc.f90',
-                   'maths.f90', 'fit.f90', 'visibility.f90', 'inout.f90',
-                   'model.f90', 'gamma.f', 'rjbesl.f',
-                   'wrap.f90', 'bayes.f90'] + [f2kcli]
+                     'maths.f90', 'search.f90', 'visibility.f90', 'inout.f90',
+                     'model.f90', 'gamma.f', 'rjbesl.f', 'maths_pda.f',
+                     'wrap.f90', 'bayes.f90'] + [f2kcli]
 sources['binnest'] = ['binnest.f90', 'nestwrap.f90', 'readmc.f90',
                       'wrap.f90', 'model.f90', 'bayes.f90', 'visibility.f90',
-                      'maths.f90', 'rjbesl.f'] + [f2kcli]
-sources['mplot'] = ['modelplot.f90',
-                    'maths.f90', 'model.f90',
+                      'maths.f90', 'search.f90', 'rjbesl.f', 'maths_pda.f'] + [f2kcli]
+sources['mplot'] = ['modelplot.f90', 'model.f90', 'search.f90',
                     'gamma.f', 'rjbesl.f', 'fitsimage.f90', 'inout.f90']
 sources['calc'] = ['calc.f90',
-                   'maths.f90', 'gamma.f', 'rjbesl.f']
+                   'maths.f90', 'gamma.f', 'rjbesl.f', 'maths_pda.f']
 libs = {}
-libs['mfit'] = baseLibs + starLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
-libs['clfit'] = baseLibs + starLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
-libs['clnest'] = baseLibs + starLibs + fitsioLibs + fftwLibs + nestLibs
-libs['binnest'] = baseLibs + nestLibs + starLibs + fftwLibs
-libs['mplot'] = baseLibs + starLibs + pgLibs + fitsioLibs + fftwLibs
-libs['calc'] = baseLibs + starLibs
+libs['mfit'] = baseLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
+libs['clfit'] = baseLibs + pgLibs + fitsioLibs + fftwLibs + nagLibs
+libs['clnest'] = baseLibs + fitsioLibs + fftwLibs + nestLibs
+libs['binnest'] = baseLibs + nestLibs + fftwLibs
+libs['mplot'] = baseLibs + pgLibs + fitsioLibs + fftwLibs
+libs['calc'] = baseLibs
 objects = {}
 # ...object files
 for key in sources.keys():

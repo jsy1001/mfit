@@ -36,17 +36,27 @@ clfit will generate at most one plot for each invocation. Use the '-p'
 argument to specify the plot type, or the '-z' argument to specify the plot
 type and x-axis range. Valid plot types are:
 
-uv      uv coverage for squared-visibility data
-vis2    squared visibility against projected baseline
-t3amp   triple product amplitude against longest projected baseline in triangle
-t3phi   triple product phase against longest projected baseline in triangle
-post n  one-dimensional cut through the minimum of the negative log posterior,
-        along the axis of variable parameter n (i.e. not a marginalised
-        posterior)
-vis2wl  squared visibility against wavelength (for data with multiple
-        spectral channels)
-t3ampwl triple product amplitude against wavelength
-t3phiwl triple product phase against wavelength
+uv          uv coverage for squared-visibility data
+vis2        Squared visibility against projected baseline
+t3amp       Triple product amplitude against longest projected baseline in
+            triangle
+t3phi       Triple product phase against longest projected baseline in triangle
+post N      One-dimensional cut through the minimum of the negative log
+            posterior, along the axis of variable parameter N (i.e. not a
+            marginalised posterior)
+post2d M N  Two-dimensional slice through the minimum of the negative log
+            posterior, along the axes of variable parameters M and N
+vis2-wl     Squared visibility against wavelength (for data with multiple
+            spectral channels)
+t3amp-wl    Triple product amplitude against wavelength
+t3phi-wl    Triple product phase against wavelength
+vis2-mjd    Squared visibility against Modified Julian Day
+t3amp-mjd   Triple product amplitude against Modified Julian Day
+t3phi-mjd   Triple product phase against Modified Julian Day
+vis2-st     Squared visibility against Greenwich Mean Sidereal Time
+t3amp-st    Triple product amplitude against Greenwich Mean Sidereal Time
+t3phi-st    Triple product phase against Greenwich Mean Sidereal Time
+vis2-pa     Squared visibility against baseline position angle
 
 fitgui will similarly make up to one plot each time 'Go' is clicked. The plot
 types are as listed above.
@@ -60,7 +70,7 @@ mfit and clfit (and hence fitgui) will read the following types of data file:
 *fits	    OIFITS format - see
 	    http://www.mrao.cam.ac.uk/~jsy1001/exchange/
 	    Only the squared visibility and triple product data types are
-	    used. The file must have extension .fits
+	    used.
 
 *calib      MSC wbCalib and nbCalib formats
             The code for reading these formats has not been tested extensively.
@@ -377,7 +387,7 @@ phases are (perhaps) incorrectly counted as independent data points when
 evaluating the number of degrees of freedom.
 
 
-$Id: documentation,v 1.14 2008/05/23 17:42:41 jsy1001 Exp $
+$Id: documentation,v 1.15 2009/11/03 17:26:26 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
