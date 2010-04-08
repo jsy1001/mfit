@@ -1,4 +1,4 @@
-!$Id: modelplot.f90,v 1.3 2006/08/31 08:52:52 jsy1001 Exp $
+!$Id: modelplot.f90,v 1.4 2010/04/08 11:06:02 jsy1001 Exp $
 
 ! Plot sky brightness distribution for mfit-format model
 !
@@ -43,7 +43,7 @@ program Modelplot
   !functions
   integer pgopen
 
-  cvs_rev = '$Revision: 1.3 $'
+  cvs_rev = '$Revision: 1.4 $'
   revision = cvs_rev(scan(cvs_rev, ':')+2:scan(cvs_rev, '$', .true.)-1)
   print *,' '
   print *,'  mplot - greyscale/contour plot of mfit-format model'
@@ -231,7 +231,7 @@ program Modelplot
         write (tag, '(i1)') iwb
         outfil = trim(outbase)//'_'//trim(tag)//'.fits'
         status = 0
-        call writefits2d(outfil, plotxy, npts, npts, status)
+        call writefits2d(outfil, plotxy, npts, npts, 2*xmax/npts, status)
      endif
 
      !do greyscale/contour plot

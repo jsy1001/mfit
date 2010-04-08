@@ -1,4 +1,4 @@
-!$Id: fitsimage.f90,v 1.1 2005/05/24 12:53:06 jsy1001 Exp $
+!$Id: fitsimage.f90,v 1.2 2010/04/08 11:06:02 jsy1001 Exp $
 
 module fitsimage
 
@@ -6,16 +6,24 @@ module fitsimage
 
 contains
 
-  subroutine writefits2d(outfile, image, nx, ny, status)
+  subroutine writefits2d(outfile, image, nx, ny, pixscal, status)
 
     ! Routine to write out a 2d fits image file
     !
     ! Based on Fortran 77 code by DFB/CAH/JSY
-    ! Needs to be linked with fitsio library 
+    ! Needs to be linked with fitsio library
+
+    !subroutine arguments
+    !! FITS filename
     character(len=*), intent(in) :: outfile
+    !! Dimensions of image to write
     integer, intent(in) :: nx, ny
+    !! Status variable
     integer, intent(inout) :: status
+    !! Image pixel array
     real, dimension(:,:), intent(in) :: image
+    !! Pixellation [milliarcsec/pixel]
+    real, intent(in) :: pixscal
 
     integer iunit, bitpix, naxis, pcount, gcount
     integer, dimension(2) :: naxes
@@ -44,8 +52,9 @@ contains
          extend,status)
     group=1
 
-    !define primary array structure
-    call ftrdef(iunit,status)
+    !write PIXEL keyword as required by vis_sim
+    call ftpkyf(iunit,'PIXEL',pixscal,4, &
+         '[mas/pixel] Pixellation',status)
 
     !write the primary array of data
     call ftp2de(iunit,group,size(image,1),nx,ny,image,status)
