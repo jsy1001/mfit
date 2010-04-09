@@ -1,4 +1,4 @@
-!$Id: readmc.f90,v 1.3 2009/07/14 16:35:21 jsy1001 Exp $
+!$Id: readmc.f90,v 1.4 2010/04/09 11:33:54 jsy1001 Exp $
 
 module ReadMC
 
@@ -22,7 +22,7 @@ contains
 
     integer, parameter :: iunit = 12, mode_max = 100
     integer :: imode
-    character(len=256) :: line
+    character(len=1024) :: line
 
     open(unit=iunit, action='read', err=2, file=filename)
     nline = 0
@@ -53,7 +53,7 @@ contains
     integer, parameter :: iunit = 12
     double precision, parameter :: blank = -99.99d0
     integer :: i
-    character(len=256) :: line
+    character(len=1024) :: line
     double precision :: val(100)
 
     open(unit=iunit, action='read', err=2, file=filename)
@@ -100,7 +100,7 @@ contains
     double precision :: prob(nsamp), loglike(nsamp)
     double precision :: var(nvar, nsamp)
     double precision :: sumsq(nvar)
-    double precision :: sumwt
+    double precision :: sumwt, probscal
     double precision :: range(2)
     double precision :: range2(2, 2)
     character(len=20) :: suffix
@@ -112,9 +112,10 @@ contains
     mean = 0d0
     sumsq = 0d0
     do i = 1, nsamp
-       sumwt = sumwt + prob(i)
-       mean = mean + prob(i)*var(:, i)
-       sumsq = sumsq + prob(i)*var(:, i)*var(:, i)
+       probscal = prob(i)/prob(1)
+       sumwt = sumwt + probscal
+       mean = mean + probscal*var(:, i)
+       sumsq = sumsq + probscal*var(:, i)*var(:, i)
     end do
     mean = mean/sumwt
     stddev = sqrt(sumsq/sumwt - mean*mean)
@@ -174,7 +175,7 @@ contains
 
     integer, parameter :: iunit = 12, mode_max = 100
     integer :: imode, i
-    character(len=256) :: line
+    character(len=1024) :: line
 
     open(unit=iunit, action='read', file=filename)
     i = 1
