@@ -1,4 +1,4 @@
-!$Id: plot.f90,v 1.25 2008/04/30 09:26:53 jsy1001 Exp $
+!$Id: plot.f90,v 1.26 2010/12/16 15:30:32 jsy1001 Exp $
 
 module Plot
   
@@ -591,6 +591,8 @@ contains
     character(len=*), intent(in), optional :: device
 
     !local variables
+    integer, parameter :: iunit = 12
+    character(len=*), parameter :: save_filename = 'uv_pts.dat'
     real, dimension(num_vis, 2) :: data_points, flagged_points
     real :: u, v, lambda, delta_lambda, bas, max
     integer :: num_data, num_flagged, i, istat
@@ -634,6 +636,20 @@ contains
     call pgsci(1)
     call pgpt(num_data, data_points(:, 1), data_points(:, 2), 17)
     call pgpt(num_data, -data_points(:, 1), -data_points(:, 2), 22)
+
+    !save unflagged points to text file, suitable for use with e.g. gnuplot
+    open (unit=iunit, file=save_filename, status='replace', &
+         action='write', err=92)
+    write (iunit, '(a)') '# UV points from mfit'
+    write (iunit, '(a, 2a25)') '# ', trim(x_title), trim(y_title)
+    do i = 1, num_data
+       write (iunit, '(2x, 2f25.6)') data_points(i, 1), data_points(i, 2)
+    end do
+    close (iunit)
+
+    return
+
+92  print *, 'Cannot open file '//trim(save_filename)
 
   end subroutine plot_uv
 

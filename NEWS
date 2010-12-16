@@ -1,5 +1,12 @@
 
-New in mfit release 1.5.1
+New in mfit release 1.5.3
+=========================
+
+* Plotted uv points are saved to text files (this feature was
+  previously added for other plot types)
+
+
+New in mfit release 1.5.2
 =========================
 
 * No longer depends on Starlink SLALIB and PDA libraries; the required

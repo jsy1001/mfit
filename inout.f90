@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.24 2009/06/02 17:51:39 jsy1001 Exp $
+!$Id: inout.f90,v 1.25 2010/12/16 15:30:32 jsy1001 Exp $
 
 module Inout
 
@@ -27,7 +27,7 @@ module Inout
 
   public :: release
 
-  character(len=5), parameter :: release = '1.5.1' !! Package release number
+  character(len=5), parameter :: release = '1.5.3' !! Package release number
 
 contains
   
