@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# $Id: fitgui.py,v 1.13 2008/05/14 15:11:51 jsy1001 Exp $
+# $Id: fitgui.py,v 1.14 2012/04/02 14:41:40 jsy1001 Exp $
 
 """Graphical user interface for clfit.
 
@@ -14,7 +14,7 @@ from Tkinter import *
 from ScrolledText import ScrolledText
 import tkFileDialog
 
-_revision = string.split("$Revision: 1.13 $")[1]
+_revision = string.split("$Revision: 1.14 $")[1]
 
 
 class GUI:
@@ -128,24 +128,27 @@ class GUI:
         Label(midFrame1, text='Plot:').pack(side=LEFT, anchor=NW)
         plotFrame = Frame(midFrame1)
         plotFrame.pack(side=LEFT)
+        ncol = 3
         for i in range(len(self.plots)):
             p = self.plots[i]
             Radiobutton(plotFrame, text=p, variable=self.selPlot,
-                        value=p).grid(row=(i+1)/2, column=(i+1)%2, sticky=W)
+                        value=p).grid(row=(i+1)/ncol, column=(i+1)%ncol,
+                                      sticky=W)
         Entry(plotFrame, textvariable=self.plotXIndex,
-              width=3).grid(row=len(self.plots)/2-1, column=2)
+              width=3).grid(row=len(self.plots)/ncol-1, column=ncol)
         Entry(plotFrame, textvariable=self.plotYIndex,
-              width=3).grid(row=len(self.plots)/2, column=2)
+              width=3).grid(row=len(self.plots)/ncol, column=ncol)
         rangeFrame = Frame(midFrame1)
         rangeFrame.pack(side=LEFT)
         Label(rangeFrame, text='X From:').grid(row=0, column=0, sticky=E)
         Entry(rangeFrame, textvariable=self.plotXFrom, width=5).grid(row=0, column=1)
         Label(rangeFrame, text='To:').grid(row=0, column=2)
         Entry(rangeFrame, textvariable=self.plotXTo, width=5).grid(row=0, column=3)
-        Label(rangeFrame, text='[(m)post2d only] Y From:').grid(row=1, column=0, sticky=E)
+        Label(rangeFrame, text='Y From:').grid(row=1, column=0, sticky=E)
         Entry(rangeFrame, textvariable=self.plotYFrom, width=5).grid(row=1, column=1)
         Label(rangeFrame, text='To:').grid(row=1, column=2)
         Entry(rangeFrame, textvariable=self.plotYTo, width=5).grid(row=1, column=3)
+        Label(rangeFrame, text='[Y for (m)post2d only]').grid(row=2, columnspan=4)
         Button(midFrame1, text='Go', command=self.Go).pack(side=RIGHT,
                                                            anchor=NE, padx=4)
         Button(midFrame1, text='Save model',
@@ -349,20 +352,9 @@ class GUI:
 
 def _main(altExe=None):
     """Main routine."""
-
-    # Find out if Python Megawidgets are installed
-    try:
-        import Pmw
-    except ImportError:
-        havePmw = 0
-    else:
-        havePmw = 1
-
     if len(sys.argv) == 1:
         # No command-line arguments - run graphical user interface
         root = Tk()
-        if havePmw:
-            Pmw.initialise(root, fontScheme='pmw1')
         root.title('fitgui %s' % _revision)
         main = GUI(root)
         main.fileName.set('test.oifits')
