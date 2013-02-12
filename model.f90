@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.18 2009/11/03 17:26:27 jsy1001 Exp $
+!$Id: model.f90,v 1.19 2013/02/12 14:53:09 jsy1001 Exp $
 
 module Model
 
@@ -1175,11 +1175,11 @@ contains
     ncalc = size(clv_inten, 2) !either unity or no. of wavebands
 
     if (ncalc > 20) then
-       call dfftw_plan_dft_r2c_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
-            FFTW_MEASURE)
+       call dfftw_plan_r2r_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
+            FFTW_R2HC, FFTW_MEASURE)
     else
-       call dfftw_plan_dft_r2c_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
-            FFTW_ESTIMATE)
+       call dfftw_plan_r2r_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
+            FFTW_R2HC, FFTW_ESTIMATE)
     end if
 
     do icalc = 1, ncalc
@@ -1240,7 +1240,7 @@ contains
        end do
 
        !and take the fourier transform of this real (symmetric) array
-       call dfftw_execute(plan)
+       call dfftw_execute_r2r(plan, map1d, map1d_rft)
 
        !normalise to zero freq. value and fudge the sign
        sign = 1

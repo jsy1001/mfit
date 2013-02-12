@@ -1,4 +1,4 @@
-!$Id: inout.f90,v 1.25 2010/12/16 15:30:32 jsy1001 Exp $
+!$Id: inout.f90,v 1.26 2013/02/12 14:53:09 jsy1001 Exp $
 
 module Inout
 
@@ -605,7 +605,7 @@ contains
     double precision, dimension(:, :), allocatable, intent(out) :: wavebands
 
     !local variables
-    integer, parameter :: maxhdu = 40 !must exceed no. of tables in file
+    integer, parameter :: maxhdu = 500 !must exceed no. of tables in file
     integer, dimension(maxhdu) :: vis2_hdus, t3_hdus, wl_hdus
     integer, dimension(maxhdu) :: vis2_rows, t3_rows, vis2_nwave, t3_nwave
     character(len=80), dimension(maxhdu) :: vis2_insname, t3_insname, wl_insname
