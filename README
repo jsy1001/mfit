@@ -140,7 +140,7 @@ mfit has been tested using:
 - NAGWare Fortran 95 on Solaris
 - NAGWare Fortran 95 on Linux
 - G95 on Linux
-- GFortran 4.3 on Linux (will not work with older GFortran versions)
+- GFortran 4.6 & 4.3 on Linux (will not work with GFortran versions < 4.3)
 - G95 on MacOS X (thanks to Ettore Pedretti)
 
 Please report successes or failures with other compilers/operating systems.
@@ -181,7 +181,7 @@ Please report the inevitable bugs to jsy1001 (at) cam.ac.uk. Various
 missing features are listed in 'documentation'.
 
 
-$Id: README,v 1.5 2009/11/03 17:26:26 jsy1001 Exp $
+$Id: README,v 1.6 2013/02/18 13:18:48 jsy1001 Exp $
 
 Local variables:
 fill-column: 79
