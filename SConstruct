@@ -56,8 +56,6 @@ elif f95 == 'gfortran':
     env.Append(FORTRANFLAGS=['-Wall'])
     if release:
         env.Append(FORTRANFLAGS=['-O3'])
-    if debug:
-        env.Append(FORTRANFLAGS=['-fcheck=bounds'])
     f2kcli = 'f2kcli.f90'
 elif f95 == sun_f95:
     print "Configuring for Sun WorkShop Fortran 95"
