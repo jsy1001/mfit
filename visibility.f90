@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.17 2013/02/18 11:42:07 jsy1001 Exp $
+!$Id: visibility.f90,v 1.18 2013/02/18 13:18:16 jsy1001 Exp $
 
 module Visibility
 
@@ -24,6 +24,7 @@ module Visibility
   !all arguments to double precision where possible
   !
   !uniform           happy - thesis ok
+  !thin-ring         JAG added
   !taylor            happy - thesis ok
   !square_root       not happy - db thesis seems incorrect
   !gaussian          happy - thesis ok
@@ -163,6 +164,8 @@ contains
                 select case (trim(spec(i,3)))
                 case ('uniform')
                    F = uniform(a, rho)
+		case ('thin-ring')
+                   F = thin_ring(a, rho)
                 case ('taylor')
                    !alpha is array of taylor coeffs 0-20 (0th defined as -1)
                    alpha(0) = -1D0
@@ -224,6 +227,18 @@ contains
     uniform = (2D0*bess1(pi*a*rho))/(pi*a*rho)
 
   end function uniform
+
+  !============================================================================
+
+  function thin_ring(a, rho)
+
+    !function arguments
+    double precision :: thin_ring, a, rho
+
+    !evaluate visibility
+    thin_ring = bess0(pi*a*rho)
+
+  end function thin_ring
 
   !============================================================================
 

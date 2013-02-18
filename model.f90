@@ -1,4 +1,4 @@
-!$Id: model.f90,v 1.19 2013/02/12 14:53:09 jsy1001 Exp $
+!$Id: model.f90,v 1.20 2013/02/18 13:18:16 jsy1001 Exp $
 
 module Model
 
@@ -234,7 +234,7 @@ contains
           !Read LD order (preset for some LD type cases)
           !Non-integer will cause error in read statement
           select case (trim(ld_type))
-          case ('uniform','gaussian')
+          case ('uniform','gaussian','thin-ring')
              read (11,*,err=95,end=95) keyw
              order = 0
           case ('square-root')
@@ -405,7 +405,7 @@ contains
           !Non-integer will cause error in read statement
           n = skip_lines(11, comment, eof)
           select case (trim(model_spec(j,3)))
-          case ('uniform','gaussian')
+          case ('uniform','gaussian','thin-ring')
              read (11,*,err=95,end=95) keyw
              order = 0
           case ('square-root')
