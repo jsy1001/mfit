@@ -1,4 +1,4 @@
-!$Id: visibility.f90,v 1.16 2009/11/03 17:26:27 jsy1001 Exp $
+!$Id: visibility.f90,v 1.17 2013/02/18 11:42:07 jsy1001 Exp $
 
 module Visibility
 
@@ -488,24 +488,29 @@ contains
 
     !subroutine arguments
     double precision :: clvvis, a, rho
-    integer :: iwb
+    integer :: iwb, j
 
     !local variables
     real bas_scaled, frac
     integer ifind
 
     bas_scaled = a*rho*1D-6/(mas2rad*clv_mdiam) !scaled baseline in Mega-lambda
+    if(size(clv_mvis, 2) == 1) then
+       j = 1  !wavelength-independent CLV
+    else
+       j = iwb
+    end if
 
     ifind = locate(clv_mbase, bas_scaled)
     if (ifind == 0) then
-       clvvis = clv_mvis(1, iwb)
+       clvvis = clv_mvis(1, j)
     else if (ifind == nxsiz+1) then
-       clvvis = clv_mvis(nxsiz+1, iwb)
+       clvvis = clv_mvis(nxsiz+1, j)
     else
        frac = (bas_scaled - clv_mbase(ifind)) / &
             (clv_mbase(ifind+1) - clv_mbase(ifind))
-       clvvis = clv_mvis(ifind, iwb) &
-            + frac*(clv_mvis(ifind+1, iwb) - clv_mvis(ifind, iwb))
+       clvvis = clv_mvis(ifind, j) &
+            + frac*(clv_mvis(ifind+1, j) - clv_mvis(ifind, j))
     end if
 
   end function clvvis
