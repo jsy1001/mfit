@@ -16,7 +16,7 @@ nagw_f95 = '/usr/local/nag/bin_amd64/f95'
 #nagw_f95 = '/opt/NAGWare/bin/f95'
 
 # Fortran 90/95 compilers to search for, in preferred order
-f95List = ['g95', sun_f95, nagw_f95, 'f95', 'f90']
+f95List = ['g95', 'gfortran', sun_f95, nagw_f95, 'f95', 'f90']
 
 ####### End of editable section #######
 
@@ -50,6 +50,14 @@ if debug:
 if f95 == 'g95':
     print "Configuring for G95"
     env.Append(FORTRANFLAGS=['-fno-second-underscore'])
+    f2kcli = 'f2kcli.f90'
+elif f95 == 'gfortran':
+    print "Configuring for gfortran"
+    env.Append(FORTRANFLAGS=['-Wall'])
+    if release:
+        env.Append(FORTRANFLAGS=['-O3'])
+    if debug:
+        env.Append(FORTRANFLAGS=['-fcheck=bounds'])
     f2kcli = 'f2kcli.f90'
 elif f95 == sun_f95:
     print "Configuring for Sun WorkShop Fortran 95"
