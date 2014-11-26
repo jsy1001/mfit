@@ -2,15 +2,12 @@
 
 module Fit
 
-  use Maths
-  use Bayes
+  use Maths, only: machine_min, machine_max, invdet_mat, pi
+  use Bayes, only: likelihood, prior, gof, vis_data, triple_data
   use Wrap
   use Model
 
   implicit none
-
-  !Compilation using g95 fails if default is "private"
-  public
 
   !public subroutines contained
   !
@@ -19,7 +16,11 @@ module Fit
   !err_est - check for minimum, estimate parameter error bars at solution point
   !is_minimum - just check for minimum
   !free_fit - frees storage allocated by minimiser
-  private :: alloc_work, posterior, post2
+
+  !private subroutines contained
+  !alloc_work
+  !posterior
+  !post2
 
   !private module variables contained:
   private :: fitpar, work, lwork, post2_nlnorm
@@ -50,19 +51,47 @@ contains
   end subroutine alloc_work
 
   !============================================================================
-  
-  !! Run minimiser and calculate goodness-of-fit at stopping point
-  subroutine minimiser(inpar, sol, chisqrd, nlposterior, success, info)
+
+  subroutine minimiser_wrap(nvar, sol, chisqrd, nlposterior, success, info)
 
     !subroutine arguments
-    type(allparam), intent(inout) :: inpar !! Model parameters
+    integer, intent(in) :: nvar
+    double precision, intent(out) :: sol(nvar)
+    double precision, intent(out) :: chisqrd    !! chi-squared at sol
+    double precision, intent(out) :: nlposterior!! -ln(posterior) at sol
+    !! True if minimiser completed (but may not have stopped at a minimum)
+    logical, intent(out) :: success
+    character(len=128), intent(out) :: info   !! Error/warning message
+
+    !local variables
+    integer, allocatable :: var_pos(:,:)
+    character(len=model_desc_len), allocatable :: var_desc(:)
+
+    allocate(var_pos(nvar,2), var_desc(nvar))
+    call model_getvar(nvar, var_pos, var_desc)
+
+    call allparam_init(fitpar, model_param, model_limits, nvar, var_pos)
+    call minimiser(sol, chisqrd, nlposterior, success, info)
+    !:TODO: call allparam_free() and remove free_fit()
+
+    if (allocated(var_pos)) deallocate(var_pos)
+    if (allocated(var_desc)) deallocate(var_desc)
+
+  end subroutine minimiser_wrap
+
+  !============================================================================
+  
+  !! Run minimiser and calculate goodness-of-fit at stopping point
+  subroutine minimiser(sol, chisqrd, nlposterior, success, info)
+
+    !subroutine arguments
     !! Variable parameter values at minimum
     double precision, intent(out) :: sol(:)
     double precision, intent(out) :: chisqrd    !! chi-squared at sol
     double precision, intent(out) :: nlposterior!! -ln(posterior) at sol
     !! True if minimiser completed (but may not have stopped at a minimum)
     logical, intent(out) :: success
-    character(len=*), intent(out) :: info   !! Error/warning message
+    character(len=128), intent(out) :: info   !! Error/warning message
 
     !parameters
     integer, parameter :: max_rescales = 4 !! Max. # times to rescale fit vars
@@ -85,9 +114,6 @@ contains
        end subroutine PDA_UNCMND
     end interface
 
-    !copy model parameters to private module variable
-    call allparam_copy(inpar, fitpar)
-
     !set default values for intent(out) arguments
     info = ''
     success = .false.
@@ -95,11 +121,11 @@ contains
     nlposterior = 0D0
 
     !assign initial values of fit variables (=SCALED variable model parameters)
-    n = inpar%nvar !number of fit variables
+    n = fitpar%nvar !number of fit variables
     do i = 1, n
-       x_scale(i) = 1D-3*model_prior(inpar%var_pos(i,1), inpar%var_pos(i,2))
+       x_scale(i) = 1D-3*model_prior(fitpar%var_pos(i,1), fitpar%var_pos(i,2))
        x0(i) = &
-            model_param(inpar%var_pos(i,1), inpar%var_pos(i,2)) / x_scale(i)
+            model_param(fitpar%var_pos(i,1), fitpar%var_pos(i,2)) / x_scale(i)
     end do
     call allparam_setscale(fitpar, x_scale)
 

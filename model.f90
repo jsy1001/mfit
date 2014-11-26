@@ -2,17 +2,18 @@
 
 module Model
 
-  use Maths
-  use Search
+  use Maths, only: mas2rad
+  use Search, only: locate
 
   implicit none
 
-  include 'fftw3.f'
-
-  private
+  ! :TODO: don't want all fftw in python module
+  ! :TODO: don't specify path
+  include '/usr/include/fftw3.f'
 
   !public subroutines contained
   !
+  !read_model_wrap
   !read_model
   !model_valid
   !model_nvar
@@ -20,10 +21,6 @@ module Model
   !print_model
   !write_model
   !free_model
-
-  public :: read_model, model_valid, model_nvar, model_getvar
-  public :: print_model, write_model, free_model
-
 
   !public module variables contained:
   public :: model_spec, model_pos_relto, model_wldep, nwave, model_wb
@@ -129,12 +126,23 @@ contains
 
   !============================================================================
 
+  subroutine read_model_wrap(info, file_name)
+
+    character(len=128), intent(out) :: info !! Error message
+    character(len=*), intent(in) :: file_name !! Filename to read
+
+    call read_model(info, file_name)
+
+  end subroutine read_model_wrap
+
+  !============================================================================
+
   !! Read model files
   !! (Re-)Allocates and assigns to module variables
   subroutine read_model(info, file_name, wavebands)
 
     !subroutine arguments
-    character(len=*), intent(out) :: info !! Error message
+    character(len=128), intent(out) :: info !! Error message
     character(len=*), intent(in) :: file_name !! Filename to read
     !! Wavebands being used in data
     double precision, intent(in), optional :: wavebands(:,:) 
@@ -753,7 +761,7 @@ contains
     logical :: model_valid
 
     !function arguments
-    character(len=*), intent(out) :: info !! Error message if model invalid
+    character(len=128), intent(out) :: info !! Error message if model invalid
     logical, intent(in) :: force_symm !! True if expecting a symmetric model
 
     !local variables
@@ -1024,7 +1032,7 @@ contains
   subroutine read_clv(info, file_name, wavebands)
 
     !subroutine arguments
-    character(len=*), intent(out) :: info !! Error message
+    character(len=128), intent(out) :: info !! Error message
     character(len=*), intent(in) :: file_name !! Filename to read
     !model can be wavelength-dependent:
     real, intent(in), optional :: wavebands(:,:)

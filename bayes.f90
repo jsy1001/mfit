@@ -2,16 +2,15 @@
 
 module Bayes
 
-  use Maths
-  use Visibility
+  use Maths, only: argument, modulus, modx, pi, rad2deg
+  use Visibility, only: cmplx_vis
 
   implicit none
 
-  private
-
   !public subroutines/functions contained:
-
-  public :: likelihood, prior, gof
+  !likelihood
+  !prior
+  !gof
 
 
   !public module variables contained:
@@ -23,7 +22,7 @@ module Bayes
   double precision, allocatable :: vis_data(:,:), triple_data(:,:)
   integer :: num_vis, num_triple
   
-  !! Wavebands included in data (for wavelength-dependent models).
+  !! Wavebands included in filtered data (for wavelength-dependent models).
   !! Not used in this module, but should go with data
   double precision, allocatable :: sel_wavebands(:,:)
   integer :: num_wb

@@ -2,9 +2,10 @@
 
 module Inout
 
-  implicit none
+  !:TODO: don't use sel_wavebands - clash with clfit
+  use Bayes, only: vis_data, triple_data, num_vis, num_triple, sel_wavebands
 
-  private
+  implicit none
 
   !public subroutines contained:
   !
@@ -15,15 +16,12 @@ module Inout
   !read_oi_fits
   !yesno
 
-  public :: read_vis, read_nvis, read_calib, read_mapdat, read_oi_fits, yesno
-
   !private subroutines contained:
+  !read_oi_target
   !read_oi_wavelength
   !read_oi_vis2
   !read_oi_t3
   !DateToMjd
-
-  !public module variables contained:
 
   public :: release
 
@@ -34,7 +32,7 @@ contains
   !============================================================================
   
   subroutine read_vis(info, file_name, source, max_lines, &
-       vis_data, num_vis, waveband, calib_error)
+       waveband, calib_error)
 
     !Reads vis file with up to max_lines (excluding blanks)
     !(Re)Allocates and fills in vis_data array. Note projected
@@ -43,11 +41,9 @@ contains
     !Adds calib_error, assumed to be constant fractional error in mod V
 
     !subroutine arguments
-    character(len=*), intent(out) :: info, source
+    character(len=128), intent(out) :: info, source
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: max_lines
-    integer, intent(out) :: num_vis
-    double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, intent(in) :: calib_error
     double precision, dimension(2), intent(in) :: waveband
 
@@ -121,7 +117,7 @@ contains
   !============================================================================
 
   subroutine read_nvis(info, file_name, source, max_lines, &
-       vis_data, num_vis, waveband, calib_error)
+       waveband, calib_error)
 
     !Reads nvis file with up to max_lines (excluding comments)
     !(Re)Allocates and fills in vis_data array. Note projected
@@ -131,10 +127,8 @@ contains
 
     !subroutine arguments
     character(len=*), intent(in) :: file_name
-    character(len=*), intent(out) :: info, source
+    character(len=128), intent(out) :: info, source
     integer, intent(in) :: max_lines
-    integer, intent(out) :: num_vis
-    double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, dimension(2), intent(in) :: waveband
     double precision, intent(in) :: calib_error
 
@@ -215,8 +209,8 @@ contains
 
   !============================================================================
 
-  subroutine read_calib(info, file_name, source, max_lines, vis_data, num_vis,&
-       waveband, wavebands, calib_error)
+  subroutine read_calib(info, file_name, source, max_lines, &
+       waveband, calib_error)
 
     !Reads ouput produced by the MSC V2 calibration applications
     !wbCalib (wide band) and nbCalib (narrow band)
@@ -226,12 +220,9 @@ contains
     !if floating point then it is wavelength and wbCalib data
 
     character(len=*), intent(in) :: file_name
-    character(len=*), intent(out) :: info, source
+    character(len=128), intent(out) :: info, source
     integer, intent(in) :: max_lines
-    integer, intent(out) :: num_vis
-    double precision, dimension(:,:), allocatable, intent(out) :: vis_data
     double precision, intent (in) :: waveband
-    double precision, dimension(:,:), allocatable, intent(out) :: wavebands
     double precision, intent(in) :: calib_error
 
     !local variables
@@ -342,19 +333,19 @@ contains
 2   close(11)
 
     !set waveband data
-    allocate(wavebands(bands,2))
+    allocate(sel_wavebands(bands,2))
     do i = 1, bands
        do j = 1, num_vis
           newband = .true.
           do k = 1, i
-             if (vis_data(j,1) == wavebands(k,1)) newband = .false.
+             if (vis_data(j,1) == sel_wavebands(k,1)) newband = .false.
           end do
           if (newband) then
-             wavebands(i, 1) = vis_data (j, 1)
+             sel_wavebands(i, 1) = vis_data (j, 1)
              exit
           end if
        end do
-       wavebands(i, 2) = waveband
+       sel_wavebands(i, 2) = waveband
     end do
 
     return
@@ -371,8 +362,7 @@ contains
 
   !============================================================================
 
-  subroutine read_mapdat(info, file_name, source, max_lines, &
-       vis_data, num_vis, triple_data, num_triple, wavebands, calib_error)
+  subroutine read_mapdat(info, file_name, source, max_lines, calib_error)
 
     !Reads mapdat file with up to max_lines (excluding blanks)
     !
@@ -384,18 +374,14 @@ contains
     !
     !Adds calib_error, assumed to be constant fractional error in mod V
     !
-    !wavebands array (allocated here) gives different (wavelength, bandwidth)
+    !sel_wavebands array (allocated here) gives different (wavelength, bandwidth)
     !pairs encountered
 
     !subroutine arguments
-    character(len=*), intent(out) :: info, source
+    character(len=128), intent(out) :: info, source
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: max_lines
-    integer, intent(out) :: num_vis, num_triple
     double precision, intent(in) :: calib_error
-    double precision, dimension(:,:), allocatable, intent(out) :: vis_data
-    double precision, dimension(:,:), allocatable, intent(out) :: triple_data
-    double precision, dimension(:,:), allocatable, intent(out) :: wavebands
 
     !local variables
     character(len=32) :: dummy, source1, source2
@@ -522,22 +508,22 @@ contains
        end if
     end do
     !make list of unique wavebands found
-    if(allocated(wavebands)) deallocate(wavebands)
-    allocate(wavebands(num, 2))
+    if(allocated(sel_wavebands)) deallocate(sel_wavebands)
+    allocate(sel_wavebands(num, 2))
     j = 0
     do i = 1, size(all_wb,1)
        if (all_wb(i, 1) /= -1) then
           j = j + 1
-          wavebands(j, :) = all_wb(i, :)
+          sel_wavebands(j, :) = all_wb(i, :)
        end if
     end do
     !sort into ascending order of wavelengths (ignore bw)
     do i = num, 2, -1
        do j = 1, i-1
-          if (wavebands(j, 1) > wavebands(j+1, 1)) then
-             swap = wavebands(j, :) 
-             wavebands(j, :) = wavebands(j+1, :)
-             wavebands(j+1, :) = swap
+          if (sel_wavebands(j, 1) > sel_wavebands(j+1, 1)) then
+             swap = sel_wavebands(j, :) 
+             sel_wavebands(j, :) = sel_wavebands(j+1, :)
+             sel_wavebands(j+1, :) = swap
           end if
        end do
     end do
@@ -569,8 +555,7 @@ contains
 
   !============================================================================
 
-  subroutine read_oi_fits(info, file_name, user_target_id, source, &
-       vis_data, num_vis, triple_data, num_triple, wavebands, calib_error)
+  subroutine read_oi_fits(info, file_name, user_target_id, source, calib_error)
 
     !Reads OIFITS format
     !
@@ -580,7 +565,7 @@ contains
     !      (vis^2) is squared visibility amplitude (may be -ve for data points)
     !triple_data: lambda, u1, v1, u2, v2, amp, err, cp, err
     !
-    !wavebands array (allocated here) gives different (wavelength, bandwidth)
+    !sel_wavebands array (allocated here) gives different (wavelength, bandwidth)
     !pairs encountered.
     !Reads rows with TARGET_ID == user_target_id,
     !unless user_target_id is -1, when 1st TARGET_ID in OI_TARGET table is used
@@ -595,14 +580,10 @@ contains
     !On error, returns message in info (otherwise empty string)
 
     !subroutine arguments
-    character(len=*), intent(out) :: info, source
+    character(len=128), intent(out) :: info, source
     character(len=*), intent(in) :: file_name
     integer, intent(in) :: user_target_id
-    integer, intent(out) :: num_vis, num_triple
     double precision, intent(in) :: calib_error
-    double precision, dimension(:, :), allocatable, intent(out) :: vis_data
-    double precision, dimension(:, :), allocatable, intent(out) :: triple_data
-    double precision, dimension(:, :), allocatable, intent(out) :: wavebands
 
     !local variables
     integer, parameter :: maxhdu = 500 !must exceed no. of tables in file
@@ -929,16 +910,16 @@ contains
        deallocate(flag)
     end do
 
-    allocate(wavebands(num_wb, 2))
-    wavebands = all_wb(:num_wb, :)
+    allocate(sel_wavebands(num_wb, 2))
+    sel_wavebands = all_wb(:num_wb, :)
     deallocate(all_wb)
     !sort into ascending order of wavelengths (ignore bw)
     do i = num_wb, 2, -1
        do j = 1, i-1
-          if (wavebands(j, 1) > wavebands(j+1, 1)) then
-             swap = wavebands(j, :) 
-             wavebands(j, :) = wavebands(j+1, :)
-             wavebands(j+1, :) = swap
+          if (sel_wavebands(j, 1) > sel_wavebands(j+1, 1)) then
+             swap = sel_wavebands(j, :) 
+             sel_wavebands(j, :) = sel_wavebands(j+1, :)
+             sel_wavebands(j+1, :) = swap
           end if
        end do
     end do
