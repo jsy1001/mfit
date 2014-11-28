@@ -26,6 +26,12 @@ import os
 env = Environment(ENV = os.environ)
 conf = Configure(env)
 
+# Add f2py builder
+# :TODO: use appropriate suffix for platform
+bld = Builder(action = 'f2py -c -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS',
+              suffix = '.so')
+env['BUILDERS']['F2PYModule'] = bld
+
 # Parse command-line arguments
 debug = int(ARGUMENTS.get('debug', debug))
 release = int(ARGUMENTS.get('release', release))
@@ -171,6 +177,16 @@ for key in objects.keys():
     prog = env.Program(key, objects[key], LIBS=libs[key])
     if key not in ['clnest', 'binnest']:
         Default(prog)
+
+# ...python modules
+noWrapSources = ['maths.f90', 'search.f90', 'component.f90', 'wrap.f90',
+                 'gamma.f', 'rjbesl.f', 'maths_pda.f', 'fit_pda.f',
+                 'pda_xermsg.f', 'gmst.f', 'dranrm.f']
+noWrapLib = env.StaticLibrary(env.SharedObject(noWrapSources))
+env.F2PYModule('mfit',
+               ['model.f90', 'visibility.f90', 'bayes.f90', 'fit.f90',
+                'inout.f90'] + [noWrapLib],
+               LIBS=['cfitsio', 'fftw3'])
 
 # ...targets for distribution of mfit
 import glob
