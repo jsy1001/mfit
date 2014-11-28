@@ -26,12 +26,6 @@ import os
 env = Environment(ENV = os.environ)
 conf = Configure(env)
 
-# Add f2py builder
-# :TODO: use appropriate suffix for platform
-bld = Builder(action = 'f2py -c -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS',
-              suffix = '.so')
-env['BUILDERS']['F2PYModule'] = bld
-
 # Parse command-line arguments
 debug = int(ARGUMENTS.get('debug', debug))
 release = int(ARGUMENTS.get('release', release))
@@ -57,12 +51,14 @@ if f95 == 'g95':
     print "Configuring for G95"
     env.Append(FORTRANFLAGS=['-fno-second-underscore'])
     f2kcli = 'f2kcli.f90'
+    f2py_fcompiler = 'g95'
 elif f95 == 'gfortran':
     print "Configuring for gfortran"
     env.Append(FORTRANFLAGS=['-Wall'])
     if release:
         env.Append(FORTRANFLAGS=['-O3'])
     f2kcli = 'f2kcli.f90'
+    f2py_fcompiler = 'gnu95'
 elif f95 == sun_f95:
     print "Configuring for Sun WorkShop Fortran 95"
     env.Append(FORTRANFLAGS=['-dalign'])
@@ -74,6 +70,7 @@ elif f95 == sun_f95:
     env.Append(LINKFLAGS=['-dalign'])
     env.Append(LIBS=['f77compat'])
     f2kcli = 'f2kcli.f90'
+    f2py_fcompiler = 'sun'
 elif f95 == nagw_f95:
     print "Configuring for NAGWare Fortran 95"
     env.Append(FORTRANFLAGS=['-mismatch'])
@@ -99,9 +96,11 @@ elif f95 == nagw_f95:
         # f95 runs cc or gcc (specified at purchase) which runs sunos ld
         # Fortunately cc understands -R directly
         env.Append(LINKFLAGS=['-Wl,-R%s' % ':'.join(libPath)])
+    f2py_fcompiler = 'nag'
 else:
     print "Configuring for generic Fortran 9x compiler"
     f2kcli = 'f2kcli.f90'
+    f2py_fcompiler = None
 # Work around inconsistent behaviour between scons versions
 env.Replace(F90FLAGS=env['FORTRANFLAGS'])
 env.Replace(F90=f95)
@@ -114,6 +113,15 @@ env.Prepend(LIBPATH=libPath)
 if env['PLATFORM'] != 'win32':
     libUnixPath = ':'.join(env['LIBPATH'])
     env.Append(ENV={'LD_RUN_PATH' : libUnixPath})
+
+# Add f2py builder
+# :TODO: use appropriate suffix for platform
+if f2py_fcompiler:
+    action = 'f2py -c --fcompiler=%s -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS' % f2py_fcompiler
+else:
+    action = 'f2py -c -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS'
+bld = Builder(action = action, suffix = '.so')
+env['BUILDERS']['F2PYModule'] = bld
 
 # Configure libraries to link in
 baseLibs = env.get('LIBS', [])
