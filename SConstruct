@@ -117,9 +117,9 @@ if env['PLATFORM'] != 'win32':
 # Add f2py builder
 # :TODO: use appropriate suffix for platform
 if f2py_fcompiler:
-    action = 'f2py -c --fcompiler=%s -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS' % f2py_fcompiler
+    action = 'f2py -c --fcompiler=%s -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $_CPPINCFLAGS' % f2py_fcompiler
 else:
-    action = 'f2py -c -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS'
+    action = 'f2py -c -m ${TARGET.base} $SOURCES $_LIBDIRFLAGS $_LIBFLAGS $_CPPPINCFLAGS'
 bld = Builder(action = action, suffix = '.so')
 env['BUILDERS']['F2PYModule'] = bld
 
@@ -194,7 +194,8 @@ noWrapLib = env.StaticLibrary(env.SharedObject(noWrapSources))
 env.F2PYModule('mfit',
                ['model.f90', 'visibility.f90', 'bayes.f90', 'fit.f90',
                 'inout.f90'] + [noWrapLib],
-               LIBS=['cfitsio', 'fftw3'])
+               LIBS=['cfitsio', 'fftw3'],
+               CPPPATH=['/usr/include'])
 
 # ...targets for distribution of mfit
 import glob

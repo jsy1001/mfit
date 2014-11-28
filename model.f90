@@ -8,8 +8,7 @@ module Model
   implicit none
 
   ! :TODO: don't want all fftw in python module
-  ! :TODO: don't specify path
-  include '/usr/include/fftw3.f'
+  include 'fftw3.f'
 
   !public subroutines contained
   !

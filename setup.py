@@ -1,4 +1,8 @@
+import sys
 from numpy.distutils.core import Extension
+
+# :TODO: determine correct flags for include 'fftw3.f'
+sys.argv.extend(["config_fc", "--f90flags='-I/usr/include'"])
 
 ext1 = Extension(name='mfit',
                  sources=['model.f90', 'visibility.f90', 'bayes.f90',
