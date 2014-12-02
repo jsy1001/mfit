@@ -4,11 +4,11 @@ module Model
 
   use Maths, only: mas2rad
   use Search, only: locate
+  use, intrinsic :: iso_c_binding
 
   implicit none
 
-  ! :TODO: don't want all fftw in python module
-  include 'fftw3.f'
+  include 'fftw3.f03'
 
   !public subroutines contained
   !
@@ -1169,9 +1169,8 @@ contains
 
     !local variables
     integer threshold, ixcen, iycen, ix, iy, i, j, lookup, sign
-    !integer plan
-    integer*8 :: plan
     integer icalc, ncalc
+    type(C_PTR) :: plan
     real flux, radius, max_rad, frac, delta, factor
     double precision :: map2d(nxsiz+1,nxsiz+1)
     double precision :: map1d(2*nxsiz+1), map1d_rft(2*nxsiz+1)
@@ -1182,10 +1181,10 @@ contains
     ncalc = size(clv_inten, 2) !either unity or no. of wavebands
 
     if (ncalc > 20) then
-       call dfftw_plan_r2r_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
+       plan = fftw_plan_r2r_1d(2*nxsiz+1, map1d, map1d_rft, &
             FFTW_R2HC, FFTW_MEASURE)
     else
-       call dfftw_plan_r2r_1d(plan, 2*nxsiz+1, map1d, map1d_rft, &
+       plan = fftw_plan_r2r_1d(2*nxsiz+1, map1d, map1d_rft, &
             FFTW_R2HC, FFTW_ESTIMATE)
     end if
 
