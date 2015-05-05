@@ -185,6 +185,13 @@ for key in objects.keys():
     prog = env.Program(key, objects[key], LIBS=libs[key])
     if key not in ['clnest', 'binnest']:
         Default(prog)
+        env.Install('/usr/local/bin', prog)
+env.Alias('install', '/usr/local/bin')
+
+# ...install fitgui python code
+env.Install('/usr/local/bin', Split('fitgui fitgui_dev'))
+env.Install('/usr/local/lib/python2.7/site-packages', 'fitgui.py')
+env.Alias('install', '/usr/local/lib/python2.7/site-packages')
 
 # ...python modules
 noWrapSources = ['maths.f90', 'search.f90', 'component.f90', 'wrap.f90',
