@@ -20,7 +20,6 @@ f95List = ['g95', 'gfortran', sun_f95, nagw_f95, 'f95', 'f90']
 
 ####### End of editable section #######
 
-
 # Inherit complete environment, including PATH
 import os
 env = Environment(ENV = os.environ)
@@ -171,6 +170,13 @@ for key in objects.keys():
     prog = env.Program(key, objects[key], LIBS=libs[key])
     if key not in ['clnest', 'binnest']:
         Default(prog)
+        env.Install('/usr/local/bin', prog)
+env.Alias('install', '/usr/local/bin')
+
+# ...install fitgui python code
+env.Install('/usr/local/bin', Split('fitgui fitgui_dev'))
+env.Install('/usr/local/lib/python2.7/site-packages', 'fitgui.py')
+env.Alias('install', '/usr/local/lib/python2.7/site-packages')
 
 # ...targets for distribution of mfit
 import glob
