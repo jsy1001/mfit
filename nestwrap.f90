@@ -1,9 +1,13 @@
 module nestwrapper
 
   use Nested  !this module built as part of MultiNest
-  use Wrap
-  use Model
-  use Bayes
+  use Wrap, only: allparam, allparam_setscale, allparam_setoffset, &
+       allparam_setvar, allparam_free
+  use Model, only: model_getvar, model_spec, model_param, model_prior, &
+       model_limits, model_desc_len
+  use Bayes, only: likelihood, vis_data, triple_data
+  use Wrap, only: allparam, allparam_init, &
+       allparam_setscale, allparam_setoffset, allparam_setvar, allparam_free
 
   implicit none
 
@@ -110,7 +114,7 @@ contains
     nest_nPar = nvar
     nest_nClsPar = nvar
     nest_mmodal = mmodal
-    nest_pWrap = 1D0  !enable wrapping
+    nest_pWrap = 1  !enable wrapping
     call nestRun(nest_mmodal, nest_ceff, nest_nlive, nest_tol, nest_efr, &
          nvar, nest_nPar, nest_nClsPar, nest_maxModes, nest_updInt, &
          nest_Ztol, nest_root, nest_rseed, nest_pWrap, &
@@ -129,9 +133,12 @@ contains
   ! return the log-likelihood in lnew
   subroutine getLogLike(Cube, n_dim, nPar, lnew, context)
 
-    integer, intent(in) :: n_dim, nPar, context
-    real*8, intent(inout) :: Cube(nPar)
-    real*8, intent(out) :: lnew
+    !!integer, intent(in) :: n_dim, nPar, context
+    !!real*8, intent(inout) :: Cube(nPar)
+    !!real*8, intent(out) :: lnew
+    integer :: n_dim, nPar, context
+    real*8 :: Cube(nPar)
+    real*8 :: lnew
 
     !call your loglike function here   
     call allparam_setvar(nest_param, Cube(1:n_dim))
