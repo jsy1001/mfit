@@ -1,0 +1,131 @@
+* Release notes - MFIT package release 1.5.2
+			   
+
+** Licensing
+
+This software is released into the public domain, in the hope that it will be useful. There is of course no warranty of any sort.
+
+
+** Description
+
+mfit is a tool for fitting simple parametrisations of the sky brightness distribution to optical (visible/IR) interferometry data.
+
+Features of mfit include:
+
+- Asymmetric, multi-component models 
+- Four limb-darkening parametrizations (Taylor and Gauss-Hermite expansions, Hestroffer and square-root models), plus support for arbitrary limb-darkening profiles specified numerically (may be wavelength-dependent)
+- Support for wavelength-dependent models (specified model parameters can take different values for different wavebands)
+- Interactive, command-line, and GUI interfaces 
+- Plots of data and model
+- Optional marginalisation by numerical integration of the posterior probability (requires commercial NAG library)
+
+The graphical interface, fitgui, can straightforwardly be integrated into other applications written in python.
+
+Please refer to the NEWS file for details of user-visible changes in this release.
+
+
+** Requirements
+
+The program should work on any unix-like operating system (see below for those it has been tested on). You will need a Fortran 90 or 95 compiler to build mfit.
+
+The following libraries are required (not supplied, but free software):
+
+- PGPLOT :: http://www.astro.caltech.edu/~tjp/pgplot/
+
+- CFITSIO :: http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html
+
+- FFTW (v3) :: http://www.fftw.org/
+
+If you have it, mfit can make use of the commercial Numerical Algorithms Group Fortran Library (Mark 19 recommended) - see http://www.nag.co.uk/numeric/fl/FLdescription.asp
+
+If the NAG library is not available, the marginalisation-by-integration features of mfit (=--margerr=, =--plot mpost=, =--plot mpost2= in clfit) will not work.
+
+To build mfit, you will need scons - see http://www.scons.org - and a working installation of Python (1.5.2 or later).
+
+To run the fitgui graphical interface, you will need a working installation of Python 2.2 or above and Tkinter (see http://www.python.org).
+
+
+** Files
+
+The files in this package are as follows:
+
+| Filename                  | Description                              |
+|---------------------------+------------------------------------------|
+| <25>                      | <40>                                     |
+| ChangeLog                 | Package ChangeLog (automatically generated from CVS log messages) |
+| README.org                | This file                                |
+| NEWS                      | Outline of new features in this and previous releases |
+| documentation             | Instructions for using mfit              |
+| SConstruct                | scons configuration file, used to build mfit (see below) |
+| bayes.f90, fit.f90, inout.f90, marginalise.F90, model.f90, plot.f90, postplot.f90, visibility.f90, wrap.f90 | Routines used by mfit and clfit          |
+| main.f90                  | mfit main function                       |
+| clfit.f90                 | clfit main function                      |
+| calc.f90                  | Test code for maths module               |
+| modelplot.f90, fitsimage.f90 | Image-space model plot utility           |
+| fitgui.py                 | GUI interface to clfit                   |
+| fitgui                    | Wrapper script for fitgui.py - put this in PATH |
+| fitgui_dev                | Alt. wrapper script for fitgui.py - used for development |
+| test.oifits               | Test dataset (COAST data on Capella)     |
+| test.model                | Binary model that fits test.oifits       |
+| pda_xermsg.f              | Replacement for Starlink routine         |
+|                           |                                          |
+
+The following files, authored by third parties, are distributed with mfit for your convenience:
+
+| Filename                  | Description                              |
+|---------------------------+------------------------------------------|
+| <25>                      | <40>                                     |
+| gamma.f                   | Gamma function from SPECFUN 2.5 - see readme.specfun |
+| rjbesl.f                  | Bessel function from SPECFUN 2.5 - see readme.specfun |
+| readme.specfun            | Readme for SPECFUN 2.5 routines          |
+| gmst.f, dranrm.f          | Sidereal time function from SLALIB       |
+| maths_pda.f, fit_pda.f    | Functions from Starlink PDA library      |
+| f2kcli.f90                | Fortran 200x Command Line Interface, (c) Interactive Software Services Ltd. - see f2kcli.txt |
+| f2kcli_nagw.f90           | Fortran 200x Command Line Interface - version for NAGWare f95 |
+| f2kcli.txt                | manual.txt from f2kcli distribution      |
+|                           |                                          |
+
+
+** Building mfit
+
+scons is now used to build mfit. If the =scons= command is not available on your system, retrieve scons from http://www.scons.org and install it.
+
+If your combination of operating system and Fortran 90/95 compiler is not one of those listed below, you *may* need to edit the section labelled =#### May need to edit this section ####= at the top of the SConstruct file.
+
+Note that the SConstruct file is a Python script. Please contact the author if the distributed SConstruct file does not work for you and you are not sure how to edit it.
+
+Build mfit by typing =scons= at the shell prompt (from the directory containing the source code). The following command-line options are supported:
+
+- =debug=1= :: compile with debugging flags (=-g= etc.) - this is the default
+- =debug=0= :: compile without debugging flags
+- =release=0= :: compile without optimization flags - this is the default
+- =release=1= :: compile with  optimization flags (=-O= etc.)
+- =f95=/path/to/f95= :: use specified compiler, rather than auto-detected one
+
+mfit has been tested using:
+- Sun Workshop Fortran 95 on Solaris
+- NAGWare Fortran 95 on Solaris
+- NAGWare Fortran 95 on Linux
+- G95 on Linux
+- GFortran 4.6 & 4.3 on Linux (will not work with GFortran versions < 4.3)
+- G95 on MacOS (thanks to Ettore Pedretti)
+
+Please report successes or failures with other compilers/operating systems.
+
+
+** Installing mfit
+
+Build the executables as described above.
+
+Edit the command following =#!= at the top of =fitgui= so that it starts the Python interpreter on your system. Put the =mfit= and =clfit= executables and the =fitgui= script somewhere in the PATH. Put =fitgui.py= somewhere in your python module search path (e.g. in one of the directories in $PYTHONPATH).
+
+
+** Using mfit
+
+Please refer to the instructions in the [[documentation]] file.
+
+
+** Bugs
+
+Please report the inevitable bugs to jsy1001 (at) cam.ac.uk. Various
+missing features are listed in [[documentation]].
