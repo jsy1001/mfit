@@ -1,14 +1,8 @@
-* Release notes - MFIT package release 1.5.2
+* Mfit release notes - package release 1.5.3
 			   
-
-** Licensing
-
-This software is released into the public domain, in the hope that it will be useful. There is of course no warranty of any sort.
-
-
 ** Description
 
-mfit is a tool for fitting simple parametrisations of the sky brightness distribution to optical (visible/IR) interferometry data.
+Mfit is a tool for fitting simple parametrisations of the sky brightness distribution to optical (visible/IR) interferometry data.
 
 Features of mfit include:
 
@@ -88,7 +82,7 @@ The following files, authored by third parties, are distributed with mfit for yo
 
 ** Building mfit
 
-scons is now used to build mfit. If the =scons= command is not available on your system, retrieve scons from http://www.scons.org and install it.
+Scons is now used to build mfit. If the =scons= command is not available on your system, retrieve scons from http://www.scons.org and install it.
 
 If your combination of operating system and Fortran 90/95 compiler is not one of those listed below, you *may* need to edit the section labelled =#### May need to edit this section ####= at the top of the SConstruct file.
 
@@ -102,7 +96,7 @@ Build mfit by typing =scons= at the shell prompt (from the directory containing 
 - =release=1= :: compile with  optimization flags (=-O= etc.)
 - =f95=/path/to/f95= :: use specified compiler, rather than auto-detected one
 
-mfit has been tested using:
+Mfit has been tested using:
 - Sun Workshop Fortran 95 on Solaris
 - NAGWare Fortran 95 on Solaris
 - NAGWare Fortran 95 on Linux
