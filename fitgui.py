@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2003-2018 John Young, Matthew Worsley
+# Copyright (C) 2003-2018, 2022 John Young, Matthew Worsley
 #
 # This file is part of mfit.
 #
@@ -23,13 +23,16 @@ Usage: fitgui &
 
 """
 
-
-import string, sys, os, tempfile, popen2, fcntl, time
+import sys
+import os
+import tempfile
+import time
+from subprocess import Popen, PIPE, STDOUT
 from tkinter import *
 from tkinter.scrolledtext import ScrolledText
 import tkinter.filedialog
 
-_revision = string.split("$Revision: 1.14 $")[1]
+_revision = "$Revision: 1.14 $".split()[1]
 
 
 class GUI:
@@ -46,14 +49,14 @@ class GUI:
 
     ChangeFileButton (Tkinter.Button) -- brings up data file dialog
     box (may wish to disable)
-    
+
     initialdir (string) -- initial directory for file dialog boxes
 
     preFitCallback -- function to call just before running clfit. If this
     returns false, clfit won't be run
 
     postFitCallback -- function to call after running clfit (if successful)
-    
+
     """
 
     def __init__(self, parent, dismissCommand=None):
@@ -114,7 +117,10 @@ class GUI:
         self.ChangeFileButton.pack(side=LEFT)
         calErrFrame = Frame(parent)
         calErrFrame.pack(side=TOP, fill=X, pady=4)
-        Label(calErrFrame, text='Calibration Error (extra frac. error in system vis.)').pack(side=LEFT, anchor=W)
+        Label(
+            calErrFrame,
+            text='Calibration Error (extra frac. error in system vis.)'
+        ).pack(side=LEFT, anchor=W)
         Entry(calErrFrame, textvariable=self.calErr, width=5).pack(
             side=LEFT, anchor=W, padx=4)
         wbFrame = Frame(parent)
@@ -131,7 +137,10 @@ class GUI:
               width=5).pack(side=LEFT, anchor=W, padx=4)
         targetFrame = Frame(parent)
         targetFrame.pack(side=TOP, fill=X, pady=4)
-        Label(targetFrame, text='TARGET_ID (blank to use 1st in OI_TARGET table):').pack(side=LEFT, anchor=W)
+        Label(
+            targetFrame,
+            text='TARGET_ID (blank to use 1st in OI_TARGET table):'
+        ).pack(side=LEFT, anchor=W)
         Entry(targetFrame, textvariable=self.target_id,
               width=5).pack(side=LEFT, anchor=W, padx=4)
         Label(parent, text='Model:').pack(side=TOP, anchor=W)
@@ -147,12 +156,12 @@ class GUI:
         for i in range(len(self.plots)):
             p = self.plots[i]
             Radiobutton(plotFrame, text=p, variable=self.selPlot,
-                        value=p).grid(row=(i+1)/ncol, column=(i+1)%ncol,
+                        value=p).grid(row=int((i+1) / ncol), column=(i+1) % ncol,
                                       sticky=W)
         Entry(plotFrame, textvariable=self.plotXIndex,
-              width=3).grid(row=len(self.plots)/ncol-1, column=ncol)
+              width=3).grid(row=int(len(self.plots)/ncol)-1, column=ncol)
         Entry(plotFrame, textvariable=self.plotYIndex,
-              width=3).grid(row=len(self.plots)/ncol, column=ncol)
+              width=3).grid(row=int(len(self.plots)/ncol), column=ncol)
         rangeFrame = Frame(midFrame1)
         rangeFrame.pack(side=LEFT)
         Label(rangeFrame, text='X From:').grid(row=0, column=0, sticky=E)
@@ -181,34 +190,37 @@ class GUI:
         midFrame3 = Frame(parent)
         midFrame3.pack(side=TOP, fill=X)
         Label(midFrame3, text='Results:').pack(side=LEFT, anchor=SW)
-        if dismissCommand is None: dismissCommand = parent.quit
+        if dismissCommand is None:
+            dismissCommand = parent.quit
         Button(midFrame3, text='Dismiss',
                command=dismissCommand).pack(side=RIGHT, padx=4, pady=4)
         Button(midFrame3, text='Clear results',
                command=self.ClearResults).pack(side=RIGHT, padx=4, pady=4)
         self.Results = ScrolledText(parent, height=31, width=90,
                                     font=('Courier', 10), state=DISABLED)
-        self.Results.tag_config('result', foreground='#1e90ff') # dodger blue
-        self.Results.tag_config('commentary', foreground='#ff8c00') # dark orange
-        self.Results.tag_config('error', foreground='#8b0000') # dark red
+        self.Results.tag_config('result', foreground='#1e90ff')  # dodger blue
+        self.Results.tag_config('commentary', foreground='#ff8c00')  # dark orange
+        self.Results.tag_config('error', foreground='#8b0000')  # dark red
         self.Results.pack(side=TOP, expand=1, fill=BOTH)
 
     def LoadModel(self):
         """Get filename and read model from file."""
-        fileName = tkinter.filedialog.askopenfilename(parent=self.parent,
+        fileName = tkinter.filedialog.askopenfilename(
+            parent=self.parent,
             initialdir=self.initialdir,
-            filetypes=[('mfit model files','*.model'),
-                       ('All files','*')])
-        if fileName != '': self.ReadModel(fileName)
+            filetypes=[('mfit model files', '*.model'),
+                       ('All files', '*')])
+        if fileName != '':
+            self.ReadModel(fileName)
 
     def ReadModel(self, fileName):
         """Read model from file."""
         try:
-            fil = file(fileName, 'r')
+            fil = open(fileName, 'r')
             text = fil.read()
             fil.close()
-        except IOError as xxx_todo_changeme:
-            (errNo, errStr) = xxx_todo_changeme.args
+        except IOError as e:
+            (errNo, errStr) = e.args
             self.ShowResult('Error reading %s: %s\n' % (fileName, errStr),
                             'error')
         else:
@@ -227,15 +239,17 @@ class GUI:
 
     def SaveModel(self):
         """Get filename and write model to file."""
-        fileName = tkinter.filedialog.asksaveasfilename(parent=self.parent,
+        fileName = tkinter.filedialog.asksaveasfilename(
+            parent=self.parent,
             initialdir=self.initialdir,
-            filetypes=[('mfit model files','*.model'),
-                       ('All files','*')])
-        if fileName != '': self.WriteModel(fileName)
+            filetypes=[('mfit model files', '*.model'),
+                       ('All files', '*')])
+        if fileName != '':
+            self.WriteModel(fileName)
 
     def WriteModel(self, fileName):
         """Write model text to file."""
-        fil = file(fileName, 'w')
+        fil = open(fileName, 'w')
         fil.write(self.ModelText.get(1.0, END))
         fil.close()
 
@@ -244,9 +258,12 @@ class GUI:
             parent=self.parent,
             initialdir=self.initialdir,
             title='Choose data file for fit',
-            filetypes=[('(OI-)FITS files','*fits'), ('COAST Mapping Data files', '*.mapdat'),
-                       ('wbCalib / nbCalib files','*calib'), ('All files','*')])
-        if newName != '': self.fileName.set(newName)
+            filetypes=[('(OI-)FITS files', '*fits'),
+                       ('COAST Mapping Data files', '*.mapdat'),
+                       ('wbCalib / nbCalib files', '*calib'),
+                       ('All files', '*')])
+        if newName != '':
+            self.fileName.set(newName)
 
     def ShowResult(self, text, tag):
         """Display text in 'Results'."""
@@ -260,18 +277,19 @@ class GUI:
         """Fit the current model."""
         # Execute pre-callback
         if callable(self.preFitCallback):
-            if not self.preFitCallback(): return
+            if not self.preFitCallback():
+                return
         # Write model text to tempfile
         self._tempName = tempfile.mktemp('.model')
         self.WriteModel(self._tempName)
         # Run clfit so we can grab its output
-        optText = ''
+        args = ["nice", self.exe, "--device", self.device]
         try:
             c = float(self.calErr.get())
         except ValueError:
             pass
         else:
-            optText += ' --calerr %.3f' % c
+            args += f"--calerr {c:.3f}".split()
         try:
             cwl = float(self.cwl.get())
             bw = float(self.bw.get())
@@ -279,18 +297,18 @@ class GUI:
             try:
                 wlmin = float(self.wlmin.get())
                 wlmax = float(self.wlmax.get())
-                optText += ' --waverange %.2f %.2f' % (wlmin, wlmax)
+                args += f"--waverange {wlmin:.2f} {wlmax:.2f}".split()
             except ValueError:
-                pass # don't specify waveband(s)
+                pass  # don't specify waveband(s)
         else:
-            optText += ' --waveband %.2f %.2f' % (cwl, bw)
+            args += f"--waveband {cwl:.2f} {bw:.2f}".split()
         try:
             target_id = int(self.target_id.get())
-            optText += ' --target_id %d' % target_id
+            args += f"--target_id {target_id}".split()
         except ValueError:
             pass
         p = self.selPlot.get()
-        if p != self.plots[0]: # not 'No plot'
+        if p != self.plots[0]:  # not 'No plot'
             if p == 'post' or p == 'mpost':
                 try:
                     index = int(self.plotXIndex.get())
@@ -310,46 +328,46 @@ class GUI:
                     ymax = float(self.plotYTo.get())
             except ValueError:
                 if p == 'post' or p == 'mpost':
-                    optText += ' --plot %s %d' % (p, index)
+                    args += f"--plot {p} {index}".split()
                 elif p == 'post2d' or p == 'mpost2d':
-                    optText += ' --plot %s %d %d' % (p, indx[0], indx[1])
+                    args += f"--plot {p} {indx[0]} {indx[1]}".split()
                 else:
-                    optText += ' --plot %s' % p
+                    args += f"--plot {p}".split()
             else:
                 if p == 'post' or p == 'mpost':
-                    optText += ' --zoomplot %s %d %.4f %.4f' % (p, index, xmin, xmax)
+                    args += f"--zoomplot {p} {index} {xmin} {xmax}".split()
                 elif p == 'post2d' or p == 'mpost2d':
-                    optText += ' --zoomplot %s %d %d %.4f %.4f  %.4f %.4f' % \
-                               (p, indx[0], indx[1], xmin, xmax, ymin, ymax)
+                    args += (f"--zoomplot {p} {indx[0]} {indx[1]} {xmin:.4f} {xmax:.4f}"
+                             f" {ymin:.4f} {ymax:.4f}".split())
                 else:
-                    optText += ' --zoomplot %s %.4f %.4f' % (p, xmin, xmax)
-        if self.nofit.get(): optText += ' --nofit'
+                    args += f"--zoomplot {p} {xmin:.4f} {xmax:.4f}".split()
+        if self.nofit.get():
+            args += ["--nofit"]
         if self.margErr.get():
-            optText += ' --margerr %s' % (self.margErrVar.get())
-        command = 'nice %s%s --device %s %s %s' % (
-            self.exe, optText, self.device, self.fileName.get(),
-            self._tempName)
-        self.ShowResult('Running %s:\n' % command, tag='commentary')
-        self._popen4 = popen2.Popen4(command, 10)
-        fd = self._popen4.fromchild.fileno() # stdout & stderr of child process
-        oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
-        fcntl.fcntl(fd, fcntl.F_SETFL, oldflags|os.O_NONBLOCK)
-        self.parent.tk.createfilehandler(fd, READABLE, self._HandleChildOutput)
+            args += f"--margerr {self.margErrVar.get()}".split()
+        args += [self.fileName.get(), self._tempName]
+        self.ShowResult('Running %s:\n' % " ".join(args), tag='commentary')
+
+        # https://gitpress.io/u/1282/tkinter-read-async-subprocess-output
+        self._proc = Popen(args, bufsize=10, stdout=PIPE, stderr=STDOUT,
+                           close_fds=True)
+        self.parent.createfilehandler(self._proc.stdout, READABLE,
+                                      self._HandleChildOutput)
 
     def _HandleChildOutput(self, fd, mask):
         """Handle output from child process."""
         self._ShowOutput()
-        status = self._popen4.poll()
+        status = self._proc.poll()
         if status != -1:
             # child process completed
-            time.sleep(0.5) # wait for last output
+            time.sleep(0.5)  # wait for last output
             self._ShowOutput()
             if os.WEXITSTATUS(status) != 0:
-                self.ShowResult('Subprocess exited with code %d\n' \
+                self.ShowResult('Subprocess exited with code %d\n'
                                 % os.WEXITSTATUS(status), 'error')
             else:
                 self.ShowResult('Subprocess exited normally\n', 'commentary')
-            self.parent.tk.deletefilehandler(fd)
+            self.parent.deletefilehandler(self._proc.stdout)
             os.remove(self._tempName)
             # Execute post-callback
             if callable(self.postFitCallback):
@@ -358,14 +376,14 @@ class GUI:
     def _ShowOutput(self):
         """Read child process output and pass to ShowResult()."""
         try:
-            result = self._popen4.fromchild.read()
-        except IOError as xxx_todo_changeme1:
-            (errNo, errMsg) = xxx_todo_changeme1.args
+            result = self._proc.stdout.read()
+        except IOError as e:
+            (errNo, errMsg) = e.args
             self.ShowResult('I/O Error %d: %s\n' % (errNo, errMsg),
                             'commentary')
         else:
             self.ShowResult(result, 'result')
-    
+
 
 def _main(altExe=None):
     """Main routine."""
@@ -376,7 +394,8 @@ def _main(altExe=None):
         main = GUI(root)
         main.fileName.set('test.oifits')
         main.ReadModel('test.model')
-        if altExe is not None: main.exe = altExe
+        if altExe is not None:
+            main.exe = altExe
         root.mainloop()
     else:
         # Too many arguments
@@ -384,9 +403,6 @@ def _main(altExe=None):
         print(__doc__)
         sys.exit(2)
 
+
 if __name__ == '__main__':
     _main()
- 
-# Local Variables:
-# mode: python
-# End:
