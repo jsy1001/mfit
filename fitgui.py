@@ -25,9 +25,9 @@ Usage: fitgui &
 
 
 import string, sys, os, tempfile, popen2, fcntl, time
-from Tkinter import *
-from ScrolledText import ScrolledText
-import tkFileDialog
+from tkinter import *
+from tkinter.scrolledtext import ScrolledText
+import tkinter.filedialog
 
 _revision = string.split("$Revision: 1.14 $")[1]
 
@@ -195,7 +195,7 @@ class GUI:
 
     def LoadModel(self):
         """Get filename and read model from file."""
-        fileName = tkFileDialog.askopenfilename(parent=self.parent,
+        fileName = tkinter.filedialog.askopenfilename(parent=self.parent,
             initialdir=self.initialdir,
             filetypes=[('mfit model files','*.model'),
                        ('All files','*')])
@@ -207,7 +207,8 @@ class GUI:
             fil = file(fileName, 'r')
             text = fil.read()
             fil.close()
-        except IOError, (errNo, errStr):
+        except IOError as xxx_todo_changeme:
+            (errNo, errStr) = xxx_todo_changeme.args
             self.ShowResult('Error reading %s: %s\n' % (fileName, errStr),
                             'error')
         else:
@@ -226,7 +227,7 @@ class GUI:
 
     def SaveModel(self):
         """Get filename and write model to file."""
-        fileName = tkFileDialog.asksaveasfilename(parent=self.parent,
+        fileName = tkinter.filedialog.asksaveasfilename(parent=self.parent,
             initialdir=self.initialdir,
             filetypes=[('mfit model files','*.model'),
                        ('All files','*')])
@@ -239,7 +240,7 @@ class GUI:
         fil.close()
 
     def _ChangeFileName(self):
-        newName = tkFileDialog.askopenfilename(
+        newName = tkinter.filedialog.askopenfilename(
             parent=self.parent,
             initialdir=self.initialdir,
             title='Choose data file for fit',
@@ -358,7 +359,8 @@ class GUI:
         """Read child process output and pass to ShowResult()."""
         try:
             result = self._popen4.fromchild.read()
-        except IOError, (errNo, errMsg):
+        except IOError as xxx_todo_changeme1:
+            (errNo, errMsg) = xxx_todo_changeme1.args
             self.ShowResult('I/O Error %d: %s\n' % (errNo, errMsg),
                             'commentary')
         else:
@@ -378,8 +380,8 @@ def _main(altExe=None):
         root.mainloop()
     else:
         # Too many arguments
-        print "%s %s\n" % (sys.argv[0], _revision)
-        print __doc__
+        print("%s %s\n" % (sys.argv[0], _revision))
+        print(__doc__)
         sys.exit(2)
 
 if __name__ == '__main__':
