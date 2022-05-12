@@ -1,15 +1,15 @@
 * Mfit release notes - package release 1.5.3
-			   
+
 ** Description
 
 Mfit is a tool for fitting simple parametrisations of the sky brightness distribution to optical (visible/IR) interferometry data.
 
 Features of mfit include:
 
-- Asymmetric, multi-component models 
+- Asymmetric, multi-component models
 - Four limb-darkening parametrizations (Taylor and Gauss-Hermite expansions, Hestroffer and square-root models), plus support for arbitrary limb-darkening profiles specified numerically (may be wavelength-dependent)
 - Support for wavelength-dependent models (specified model parameters can take different values for different wavebands)
-- Interactive, command-line, and GUI interfaces 
+- Interactive, command-line, and GUI interfaces
 - Plots of data and model
 - Optional marginalisation by numerical integration of the posterior probability (requires commercial NAG library)
 
@@ -34,9 +34,9 @@ If you have it, mfit can make use of the commercial Numerical Algorithms Group F
 
 If the NAG library is not available, the marginalisation-by-integration features of mfit (=--margerr=, =--plot mpost=, =--plot mpost2= in clfit) will not work.
 
-To build mfit, you will need scons - see http://www.scons.org - and a working installation of Python (1.5.2 or later).
+To build mfit, you will need scons - see http://www.scons.org - and a working installation of Python.
 
-To run the fitgui graphical interface, you will need a working installation of Python 2.2 or above and Tkinter (see http://www.python.org).
+To run the fitgui graphical interface, you will need a working installation of Python 3.7 or above and Tkinter (see http://www.python.org).
 
 
 ** Files
@@ -109,9 +109,12 @@ Please report successes or failures with other compilers/operating systems.
 
 ** Installing mfit
 
-Build the executables as described above.
+Build the executables as described above.  Install mfit by typing =sudo scons install= at the shell prompt.
 
-Edit the command following =#!= at the top of =fitgui= so that it starts the Python interpreter on your system. Put the =mfit= and =clfit= executables and the =fitgui= script somewhere in the PATH. Put =fitgui.py= somewhere in your python module search path (e.g. in one of the directories in $PYTHONPATH).
+Alternatively, follow these steps to install manually:
+- Edit the command following =#!= at the top of =fitgui= so that it starts the Python interpreter on your system.
+- Put the =mfit= and =clfit= executables and the =fitgui= script somewhere in the PATH.
+- Put =fitgui.py= somewhere in your python module search path (e.g. in one of the directories in $PYTHONPATH).
 
 
 ** Using mfit
