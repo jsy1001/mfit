@@ -71,15 +71,15 @@ class GUI:
         """
         # Initialise data attributes
         self.parent = parent
-        self.exe = 'clfit'
-        self.device = '/xserv'
+        self.exe = "clfit"
+        self.device = "/xserv"
         self.fileName = StringVar()
-        self.fileName.set('(unset)')
+        self.fileName.set("(unset)")
         self.initialdir = os.getcwd()
         self.preFitCallback = None
         self.postFitCallback = None
         self.calErr = StringVar()
-        self.calErr.set('0.0')
+        self.calErr.set("0.0")
         self.cwl = StringVar()
         self.bw = StringVar()
         self.wlmin = StringVar()
@@ -87,17 +87,33 @@ class GUI:
         self.target_id = StringVar()
         self.nofit = IntVar()
         self.nofit.set(0)
-        self.plots = ['No plot', 'uv', 'vis2', 't3amp', 't3phi',
-                      'vis2-wl', 't3amp-wl', 't3phi-wl',
-                      'vis2-mjd', 't3amp-mjd', 't3phi-mjd',
-                      'vis2-st', 't3amp-st', 't3phi-st', 'vis2-pa',
-                      'post', 'mpost', 'post2d', 'mpost2d']
+        self.plots = [
+            "No plot",
+            "uv",
+            "vis2",
+            "t3amp",
+            "t3phi",
+            "vis2-wl",
+            "t3amp-wl",
+            "t3phi-wl",
+            "vis2-mjd",
+            "t3amp-mjd",
+            "t3phi-mjd",
+            "vis2-st",
+            "t3amp-st",
+            "t3phi-st",
+            "vis2-pa",
+            "post",
+            "mpost",
+            "post2d",
+            "mpost2d",
+        ]
         self.selPlot = StringVar()
         self.selPlot.set(self.plots[1])
         self.plotXIndex = StringVar()
-        self.plotXIndex.set('1')
+        self.plotXIndex.set("1")
         self.plotYIndex = StringVar()
-        self.plotYIndex.set('2')
+        self.plotYIndex.set("2")
         self.plotXFrom = StringVar()
         self.plotXTo = StringVar()
         self.plotYFrom = StringVar()
@@ -105,102 +121,117 @@ class GUI:
         self.margErr = IntVar()
         self.margErr.set(0)
         self.margErrVar = StringVar()
-        self.margErrVar.set('1')
+        self.margErrVar.set("1")
 
         # Initialise GUI elements
         fileFrame = Frame(parent)
         fileFrame.pack(side=TOP)
-        Label(fileFrame, text='Data file:').pack(side=LEFT)
+        Label(fileFrame, text="Data file:").pack(side=LEFT)
         Label(fileFrame, textvariable=self.fileName).pack(side=LEFT)
-        self.ChangeFileButton = Button(fileFrame, text='Change',
-                                       command=self._ChangeFileName)
+        self.ChangeFileButton = Button(
+            fileFrame, text="Change", command=self._ChangeFileName
+        )
         self.ChangeFileButton.pack(side=LEFT)
         calErrFrame = Frame(parent)
         calErrFrame.pack(side=TOP, fill=X, pady=4)
         Label(
-            calErrFrame,
-            text='Calibration Error (extra frac. error in system vis.)'
+            calErrFrame, text="Calibration Error (extra frac. error in system vis.)"
         ).pack(side=LEFT, anchor=W)
         Entry(calErrFrame, textvariable=self.calErr, width=5).pack(
-            side=LEFT, anchor=W, padx=4)
+            side=LEFT, anchor=W, padx=4
+        )
         wbFrame = Frame(parent)
         wbFrame.pack(side=TOP, fill=X, pady=4)
-        Label(wbFrame, text='Waveband:').pack(side=LEFT, anchor=W)
-        Entry(wbFrame, textvariable=self.cwl, width=5).pack(side=LEFT,
-                                                            anchor=W, padx=4)
-        Entry(wbFrame, textvariable=self.bw, width=5).pack(side=LEFT,
-                                                           anchor=W, padx=4)
-        Label(wbFrame, text='or Wavelength range:').pack(side=LEFT, anchor=W)
-        Entry(wbFrame, textvariable=self.wlmin,
-              width=5).pack(side=LEFT, anchor=W, padx=4)
-        Entry(wbFrame, textvariable=self.wlmax,
-              width=5).pack(side=LEFT, anchor=W, padx=4)
+        Label(wbFrame, text="Waveband:").pack(side=LEFT, anchor=W)
+        Entry(wbFrame, textvariable=self.cwl, width=5).pack(side=LEFT, anchor=W, padx=4)
+        Entry(wbFrame, textvariable=self.bw, width=5).pack(side=LEFT, anchor=W, padx=4)
+        Label(wbFrame, text="or Wavelength range:").pack(side=LEFT, anchor=W)
+        Entry(wbFrame, textvariable=self.wlmin, width=5).pack(
+            side=LEFT, anchor=W, padx=4
+        )
+        Entry(wbFrame, textvariable=self.wlmax, width=5).pack(
+            side=LEFT, anchor=W, padx=4
+        )
         targetFrame = Frame(parent)
         targetFrame.pack(side=TOP, fill=X, pady=4)
         Label(
-            targetFrame,
-            text='TARGET_ID (blank to use 1st in OI_TARGET table):'
+            targetFrame, text="TARGET_ID (blank to use 1st in OI_TARGET table):"
         ).pack(side=LEFT, anchor=W)
-        Entry(targetFrame, textvariable=self.target_id,
-              width=5).pack(side=LEFT, anchor=W, padx=4)
-        Label(parent, text='Model:').pack(side=TOP, anchor=W)
-        self.ModelText = ScrolledText(parent, height=19, width=40,
-                                      font=('Helvetica', 10))
+        Entry(targetFrame, textvariable=self.target_id, width=5).pack(
+            side=LEFT, anchor=W, padx=4
+        )
+        Label(parent, text="Model:").pack(side=TOP, anchor=W)
+        self.ModelText = ScrolledText(
+            parent, height=19, width=40, font=("Helvetica", 10)
+        )
         self.ModelText.pack(side=TOP, expand=1, fill=BOTH)
         midFrame1 = Frame(parent)
         midFrame1.pack(side=TOP, fill=X, pady=4)
-        Label(midFrame1, text='Plot:').pack(side=LEFT, anchor=NW)
+        Label(midFrame1, text="Plot:").pack(side=LEFT, anchor=NW)
         plotFrame = Frame(midFrame1)
         plotFrame.pack(side=LEFT)
         ncol = 3
         for i in range(len(self.plots)):
             p = self.plots[i]
-            Radiobutton(plotFrame, text=p, variable=self.selPlot,
-                        value=p).grid(row=int((i+1) / ncol), column=(i+1) % ncol,
-                                      sticky=W)
-        Entry(plotFrame, textvariable=self.plotXIndex,
-              width=3).grid(row=int(len(self.plots)/ncol)-1, column=ncol)
-        Entry(plotFrame, textvariable=self.plotYIndex,
-              width=3).grid(row=int(len(self.plots)/ncol), column=ncol)
+            Radiobutton(plotFrame, text=p, variable=self.selPlot, value=p).grid(
+                row=int((i + 1) / ncol), column=(i + 1) % ncol, sticky=W
+            )
+        Entry(plotFrame, textvariable=self.plotXIndex, width=3).grid(
+            row=int(len(self.plots) / ncol) - 1, column=ncol
+        )
+        Entry(plotFrame, textvariable=self.plotYIndex, width=3).grid(
+            row=int(len(self.plots) / ncol), column=ncol
+        )
         rangeFrame = Frame(midFrame1)
         rangeFrame.pack(side=LEFT)
-        Label(rangeFrame, text='X From:').grid(row=0, column=0, sticky=E)
+        Label(rangeFrame, text="X From:").grid(row=0, column=0, sticky=E)
         Entry(rangeFrame, textvariable=self.plotXFrom, width=5).grid(row=0, column=1)
-        Label(rangeFrame, text='To:').grid(row=0, column=2)
+        Label(rangeFrame, text="To:").grid(row=0, column=2)
         Entry(rangeFrame, textvariable=self.plotXTo, width=5).grid(row=0, column=3)
-        Label(rangeFrame, text='Y From:').grid(row=1, column=0, sticky=E)
+        Label(rangeFrame, text="Y From:").grid(row=1, column=0, sticky=E)
         Entry(rangeFrame, textvariable=self.plotYFrom, width=5).grid(row=1, column=1)
-        Label(rangeFrame, text='To:').grid(row=1, column=2)
+        Label(rangeFrame, text="To:").grid(row=1, column=2)
         Entry(rangeFrame, textvariable=self.plotYTo, width=5).grid(row=1, column=3)
-        Label(rangeFrame, text='[Y for (m)post2d only]').grid(row=2, columnspan=4)
-        Button(midFrame1, text='Go', command=self.Go).pack(side=RIGHT,
-                                                           anchor=NE, padx=4)
-        Button(midFrame1, text='Save model',
-               command=self.SaveModel).pack(side=RIGHT, anchor=NE, padx=4)
-        Button(midFrame1, text='Load model',
-               command=self.LoadModel).pack(side=RIGHT, anchor=NE, padx=4)
+        Label(rangeFrame, text="[Y for (m)post2d only]").grid(row=2, columnspan=4)
+        Button(midFrame1, text="Go", command=self.Go).pack(
+            side=RIGHT, anchor=NE, padx=4
+        )
+        Button(midFrame1, text="Save model", command=self.SaveModel).pack(
+            side=RIGHT, anchor=NE, padx=4
+        )
+        Button(midFrame1, text="Load model", command=self.LoadModel).pack(
+            side=RIGHT, anchor=NE, padx=4
+        )
         midFrame2 = Frame(parent)
         midFrame2.pack(side=TOP, fill=X, pady=4)
-        Checkbutton(midFrame2, text="Don't fit (report goodness-of-fit only)",
-                    variable=self.nofit).pack(side=LEFT, anchor=W, padx=8)
-        Entry(midFrame2, textvariable=self.margErrVar,
-              width=5).pack(side=LEFT, anchor=W)
-        Checkbutton(midFrame2, text="Error bar by marginalising",
-                    variable=self.margErr).pack(side=LEFT, anchor=W)
+        Checkbutton(
+            midFrame2,
+            text="Don't fit (report goodness-of-fit only)",
+            variable=self.nofit,
+        ).pack(side=LEFT, anchor=W, padx=8)
+        Entry(midFrame2, textvariable=self.margErrVar, width=5).pack(
+            side=LEFT, anchor=W
+        )
+        Checkbutton(
+            midFrame2, text="Error bar by marginalising", variable=self.margErr
+        ).pack(side=LEFT, anchor=W)
         midFrame3 = Frame(parent)
         midFrame3.pack(side=TOP, fill=X)
-        Label(midFrame3, text='Results:').pack(side=LEFT, anchor=SW)
+        Label(midFrame3, text="Results:").pack(side=LEFT, anchor=SW)
         if dismissCommand is None:
             dismissCommand = parent.quit
-        Button(midFrame3, text='Dismiss',
-               command=dismissCommand).pack(side=RIGHT, padx=4, pady=4)
-        Button(midFrame3, text='Clear results',
-               command=self.ClearResults).pack(side=RIGHT, padx=4, pady=4)
-        self.Results = ScrolledText(parent, height=31, width=90,
-                                    font=('Courier', 10), state=DISABLED)
-        self.Results.tag_config('result', foreground='#1e90ff')  # dodger blue
-        self.Results.tag_config('commentary', foreground='#ff8c00')  # dark orange
-        self.Results.tag_config('error', foreground='#8b0000')  # dark red
+        Button(midFrame3, text="Dismiss", command=dismissCommand).pack(
+            side=RIGHT, padx=4, pady=4
+        )
+        Button(midFrame3, text="Clear results", command=self.ClearResults).pack(
+            side=RIGHT, padx=4, pady=4
+        )
+        self.Results = ScrolledText(
+            parent, height=31, width=90, font=("Courier", 10), state=DISABLED
+        )
+        self.Results.tag_config("result", foreground="#1e90ff")  # dodger blue
+        self.Results.tag_config("commentary", foreground="#ff8c00")  # dark orange
+        self.Results.tag_config("error", foreground="#8b0000")  # dark red
         self.Results.pack(side=TOP, expand=1, fill=BOTH)
 
     def LoadModel(self):
@@ -208,21 +239,20 @@ class GUI:
         fileName = tkinter.filedialog.askopenfilename(
             parent=self.parent,
             initialdir=self.initialdir,
-            filetypes=[('mfit model files', '*.model'),
-                       ('All files', '*')])
-        if fileName != '':
+            filetypes=[("mfit model files", "*.model"), ("All files", "*")],
+        )
+        if fileName != "":
             self.ReadModel(fileName)
 
     def ReadModel(self, fileName):
         """Read model from file."""
         try:
-            fil = open(fileName, 'r')
+            fil = open(fileName, "r")
             text = fil.read()
             fil.close()
         except IOError as e:
             (errNo, errStr) = e.args
-            self.ShowResult('Error reading %s: %s\n' % (fileName, errStr),
-                            'error')
+            self.ShowResult("Error reading %s: %s\n" % (fileName, errStr), "error")
         else:
             self.SetModel(text)
 
@@ -242,14 +272,14 @@ class GUI:
         fileName = tkinter.filedialog.asksaveasfilename(
             parent=self.parent,
             initialdir=self.initialdir,
-            filetypes=[('mfit model files', '*.model'),
-                       ('All files', '*')])
-        if fileName != '':
+            filetypes=[("mfit model files", "*.model"), ("All files", "*")],
+        )
+        if fileName != "":
             self.WriteModel(fileName)
 
     def WriteModel(self, fileName):
         """Write model text to file."""
-        fil = open(fileName, 'w')
+        fil = open(fileName, "w")
         fil.write(self.ModelText.get(1.0, END))
         fil.close()
 
@@ -257,12 +287,15 @@ class GUI:
         newName = tkinter.filedialog.askopenfilename(
             parent=self.parent,
             initialdir=self.initialdir,
-            title='Choose data file for fit',
-            filetypes=[('(OI-)FITS files', '*fits'),
-                       ('COAST Mapping Data files', '*.mapdat'),
-                       ('wbCalib / nbCalib files', '*calib'),
-                       ('All files', '*')])
-        if newName != '':
+            title="Choose data file for fit",
+            filetypes=[
+                ("(OI-)FITS files", "*fits"),
+                ("COAST Mapping Data files", "*.mapdat"),
+                ("wbCalib / nbCalib files", "*calib"),
+                ("All files", "*"),
+            ],
+        )
+        if newName != "":
             self.fileName.set(newName)
 
     def ShowResult(self, text, tag):
@@ -280,7 +313,7 @@ class GUI:
             if not self.preFitCallback():
                 return
         # Write model text to tempfile
-        self._tempName = tempfile.mktemp('.model')
+        self._tempName = tempfile.mktemp(".model")
         self.WriteModel(self._tempName)
         # Run clfit so we can grab its output
         args = ["nice", self.exe, "--device", self.device]
@@ -309,36 +342,37 @@ class GUI:
             pass
         p = self.selPlot.get()
         if p != self.plots[0]:  # not 'No plot'
-            if p == 'post' or p == 'mpost':
+            if p == "post" or p == "mpost":
                 try:
                     index = int(self.plotXIndex.get())
                 except ValueError:
                     index = 1
-            if p == 'post2d' or p == 'mpost2d':
+            if p == "post2d" or p == "mpost2d":
                 try:
-                    indx = (int(self.plotXIndex.get()),
-                            int(self.plotYIndex.get()))
+                    indx = (int(self.plotXIndex.get()), int(self.plotYIndex.get()))
                 except ValueError:
                     indx = (1, 2)
             try:
                 xmin = float(self.plotXFrom.get())
                 xmax = float(self.plotXTo.get())
-                if p[-2:] == '2d':
+                if p[-2:] == "2d":
                     ymin = float(self.plotYFrom.get())
                     ymax = float(self.plotYTo.get())
             except ValueError:
-                if p == 'post' or p == 'mpost':
+                if p == "post" or p == "mpost":
                     args += f"--plot {p} {index}".split()
-                elif p == 'post2d' or p == 'mpost2d':
+                elif p == "post2d" or p == "mpost2d":
                     args += f"--plot {p} {indx[0]} {indx[1]}".split()
                 else:
                     args += f"--plot {p}".split()
             else:
-                if p == 'post' or p == 'mpost':
+                if p == "post" or p == "mpost":
                     args += f"--zoomplot {p} {index} {xmin} {xmax}".split()
-                elif p == 'post2d' or p == 'mpost2d':
-                    args += (f"--zoomplot {p} {indx[0]} {indx[1]} {xmin:.4f} {xmax:.4f}"
-                             f" {ymin:.4f} {ymax:.4f}".split())
+                elif p == "post2d" or p == "mpost2d":
+                    args += (
+                        f"--zoomplot {p} {indx[0]} {indx[1]} {xmin:.4f} {xmax:.4f}"
+                        f" {ymin:.4f} {ymax:.4f}".split()
+                    )
                 else:
                     args += f"--zoomplot {p} {xmin:.4f} {xmax:.4f}".split()
         if self.nofit.get():
@@ -346,13 +380,13 @@ class GUI:
         if self.margErr.get():
             args += f"--margerr {self.margErrVar.get()}".split()
         args += [self.fileName.get(), self._tempName]
-        self.ShowResult('Running %s:\n' % " ".join(args), tag='commentary')
+        self.ShowResult("Running %s:\n" % " ".join(args), tag="commentary")
 
         # https://gitpress.io/u/1282/tkinter-read-async-subprocess-output
-        self._proc = Popen(args, bufsize=10, stdout=PIPE, stderr=STDOUT,
-                           close_fds=True)
-        self.parent.createfilehandler(self._proc.stdout, READABLE,
-                                      self._HandleChildOutput)
+        self._proc = Popen(args, bufsize=10, stdout=PIPE, stderr=STDOUT, close_fds=True)
+        self.parent.createfilehandler(
+            self._proc.stdout, READABLE, self._HandleChildOutput
+        )
 
     def _HandleChildOutput(self, fd, mask):
         """Handle output from child process."""
@@ -363,10 +397,11 @@ class GUI:
             time.sleep(0.5)  # wait for last output
             self._ShowOutput()
             if os.WEXITSTATUS(status) != 0:
-                self.ShowResult('Subprocess exited with code %d\n'
-                                % os.WEXITSTATUS(status), 'error')
+                self.ShowResult(
+                    "Subprocess exited with code %d\n" % os.WEXITSTATUS(status), "error"
+                )
             else:
-                self.ShowResult('Subprocess exited normally\n', 'commentary')
+                self.ShowResult("Subprocess exited normally\n", "commentary")
             self.parent.deletefilehandler(self._proc.stdout)
             os.remove(self._tempName)
             # Execute post-callback
@@ -379,10 +414,9 @@ class GUI:
             result = self._proc.stdout.read()
         except IOError as e:
             (errNo, errMsg) = e.args
-            self.ShowResult('I/O Error %d: %s\n' % (errNo, errMsg),
-                            'commentary')
+            self.ShowResult("I/O Error %d: %s\n" % (errNo, errMsg), "commentary")
         else:
-            self.ShowResult(result, 'result')
+            self.ShowResult(result, "result")
 
 
 def _main(altExe=None):
@@ -390,10 +424,10 @@ def _main(altExe=None):
     if len(sys.argv) == 1:
         # No command-line arguments - run graphical user interface
         root = Tk()
-        root.title('fitgui %s' % _revision)
+        root.title("fitgui %s" % _revision)
         main = GUI(root)
-        main.fileName.set('test.oifits')
-        main.ReadModel('test.model')
+        main.fileName.set("test.oifits")
+        main.ReadModel("test.model")
         if altExe is not None:
             main.exe = altExe
         root.mainloop()
@@ -404,5 +438,5 @@ def _main(altExe=None):
         sys.exit(2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     _main()
