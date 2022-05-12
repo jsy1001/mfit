@@ -152,7 +152,7 @@ contains
     character(len=*), intent(out) :: info !! Error message
     character(len=*), intent(in) :: file_name !! Filename to read
     !! Wavebands being used in data
-    double precision, intent(in), optional :: wavebands(:,:) 
+    double precision, intent(in), optional :: wavebands(:,:)
 
     !local variables
     logical eof
@@ -258,7 +258,7 @@ contains
           case ('hestroffer')
              read (11,*,err=95,end=95) keyw
              order = 1
-          case ('taylor','gauss-hermite') 
+          case ('taylor','gauss-hermite')
              read (11,*,err=95,end=95) keyw, order
           case ('two-layer')
              read (11,*,err=95,end=95) keyw
@@ -429,7 +429,7 @@ contains
           case ('hestroffer')
              read (11,*,err=95,end=95) keyw
              order = 1
-          case ('taylor','gauss-hermite') 
+          case ('taylor','gauss-hermite')
              read (11,*,err=95,end=95) keyw, order
           case ('two-layer')
              read (11,*,err=95,end=95) keyw
@@ -564,7 +564,7 @@ contains
           n = skip_lines(11, comment, eof)
           read (11,*,err=95,end=95) keyw, &
                model_prior(j, ipar:ipar+model_wldep(2)*(nwave-1))
-          if (keyw /= 'flux_prior') goto 96  
+          if (keyw /= 'flux_prior') goto 96
 
           !Read shape parameters a, phi, epsilon depending on
           !shape type. Also read priors
@@ -717,7 +717,7 @@ contains
        end if
     end do pass2
 
-12  continue 
+12  continue
     close (11)
 
     !is this a centrosymmetric model?
@@ -739,7 +739,7 @@ contains
     deallocate(wb) !free local storage
     return
 
-    !error trapping 
+    !error trapping
 91  info = 'cannot open file '//trim(file_name)
     return
 92  info = 'cannot read from file '//trim(file_name)
@@ -782,7 +782,7 @@ contains
     if (nvar == 0) model_valid = .false.
 
     !for single component model cannot vary r/theta (change in position
-    !only constant phase offset) or B (flux is normalised anyway) 
+    !only constant phase offset) or B (flux is normalised anyway)
     if (size(model_param,1) == 1) then
        do iwave = 1, nwave
           if (model_prior(1, 2+4*model_wldep(1)*(iwave-1)) /= 0D0) &
@@ -826,7 +826,7 @@ contains
     if (.not. model_valid) &
          info = 'illegal freedom(s) in model'
 
-    !if centrosymmetric model is forced then must have 
+    !if centrosymmetric model is forced then must have
     !eccentricity epsilon fixed to be unity and position radius fixed at zero
     if (force_symm .and. .not. symm_model) then
        model_valid = .false.
@@ -1032,9 +1032,9 @@ contains
     call free_clv()
 
   end subroutine free_model
-  
+
   !============================================================================
-  
+
   !! Read numerical CLV from file and calculate model visibilities
   subroutine read_clv(info, file_name, wavebands)
 
@@ -1159,7 +1159,7 @@ contains
 
     return
 
-    !error trapping 
+    !error trapping
 90  info = 'file contains no data'
     return
 91  info = 'cannot open file '//trim(file_name)
@@ -1168,7 +1168,7 @@ contains
   end subroutine read_clv
 
   !============================================================================
-  
+
   !! Calculate visibilities from numerical CLV
   subroutine calcvis_clv(model_diam)
 

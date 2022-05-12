@@ -24,10 +24,10 @@ module ReadMC
   public :: mc_count_lines, mc_count_vars, mc_get_params
 
 contains
-  
+
   !! Count number of lines in specified text file
   subroutine mc_count_lines(filename, mode, nline)
- 
+
     !! Pathname of text file
     character(len=*), intent(in) :: filename
     !! If positive, only count samples for this mode
@@ -56,10 +56,10 @@ contains
 2   close(iunit)
 
   end subroutine mc_count_lines
-  
+
   !! Get number of variables from number of columns in specified text file
   subroutine mc_count_vars(filename, nvar)
- 
+
     !! Pathname of text file
     character(len=*), intent(in) :: filename
     !! On exit, number of variables
@@ -145,7 +145,7 @@ contains
        else
           write(suffix, '(a, i1, a)') 'param_', ivar, '.dat'
        end if
-       call mc_marg_1d(trim(nest_root)//suffix, & 
+       call mc_marg_1d(trim(nest_root)//suffix, &
             nsamp, nvar, ivar, range, prob, loglike, var)
     end do
 
@@ -162,13 +162,13 @@ contains
           write(suffix, '(a, i1, a, i1, a)') &
                'param_', ivar2(1), '_', ivar2(2), '.dat'
        end if
-       call mc_marg_2d(trim(nest_root)//suffix, & 
+       call mc_marg_2d(trim(nest_root)//suffix, &
             nsamp, nvar, ivar2, range2, prob, loglike, var)
     end do
 
   end subroutine mc_get_params
 
-  
+
   !! Read [root].txt file written by MultiNest
   subroutine mc_read_txt(filename, nsamp, nvar, mode, prob, loglike, var)
 
@@ -289,4 +289,3 @@ contains
   end subroutine mc_marg_2d
 
 end module ReadMC
-  

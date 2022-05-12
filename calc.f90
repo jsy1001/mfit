@@ -49,7 +49,7 @@ do i=1, 1000
 
    print *,' '
    select case (choice)
-   
+
      case('a')
         print *,'bessel function: input order, real argument'
         read *,nu,x
@@ -57,7 +57,7 @@ do i=1, 1000
         print *,'result'
         print *,routput(1+floor(nu))
         if (allocated(routput)) deallocate(routput)
-        
+
      case('b')
         print *,'gamma function : input argument'
         read *,x
@@ -72,7 +72,7 @@ do i=1, 1000
         print *,'result'
         print *,routput(n)
         if (allocated(routput)) deallocate(routput)
-        
+
      case('d')
         print *,'atan2: input cmplx number re part, im part'
         read *,x,y
@@ -96,7 +96,7 @@ do i=1, 1000
         read *,x
         print *,'result'
         print *,bess1(x)
-        
+
      case('h')
         print *,'a mod b: input a, b'
         read *,x,y
@@ -136,7 +136,7 @@ do i=1, 1000
      case default
         print *,'ILLEGAL CHOICE'
         goto 1
-        
+
    end select
 
 end do

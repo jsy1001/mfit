@@ -22,7 +22,7 @@ program Main
   use ReadMC
 
   implicit none
-  
+
   !============================================================================
   !variables
   integer, parameter :: width = 78            !for spacer lines
@@ -88,7 +88,7 @@ program Main
   do i = 1, n
      write(*,62) i, sol(i), err(i)
   end do
-62 format(' (', i2, ') ', 1x, f13.6, 1x, f12.6) 
+62 format(' (', i2, ') ', 1x, f13.6, 1x, f12.6)
 
   !-------------------------------------------------------------------------
   !Deallocate storage

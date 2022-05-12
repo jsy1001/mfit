@@ -45,9 +45,9 @@ module Inout
   character(len=5), parameter :: release = '1.5.3' !! Package release number
 
 contains
-  
+
   !============================================================================
-  
+
   subroutine read_vis(info, file_name, source, max_lines, &
        vis_data, num_vis, waveband, calib_error)
 
@@ -121,7 +121,7 @@ contains
     close(11)
     return
 
-    !error trapping 
+    !error trapping
 91  info = 'cannot open file'
     return
 92  info = 'cannot read from file'
@@ -218,7 +218,7 @@ contains
 2   close(11)
     return
 
-    !error trapping 
+    !error trapping
 92  info = 'cannot read from file'
     close (11)
     return
@@ -374,7 +374,7 @@ contains
 
     return
 
-    !error trapping 
+    !error trapping
 92  info = 'cannot read from file'
     close (11)
     return
@@ -430,9 +430,9 @@ contains
     i2 = 0
     do i = 1, max_lines+1
        read (11, '(a)', err=92, end=1) line
-       if (line(:3) == 'vis') then 
+       if (line(:3) == 'vis') then
           i1 = i1 + 1
-       else if (line(:6) == 'triple') then 
+       else if (line(:6) == 'triple') then
           i2 = i2 + 1
        end if
     end do
@@ -550,7 +550,7 @@ contains
     do i = num, 2, -1
        do j = 1, i-1
           if (wavebands(j, 1) > wavebands(j+1, 1)) then
-             swap = wavebands(j, :) 
+             swap = wavebands(j, :)
              wavebands(j, :) = wavebands(j+1, :)
              wavebands(j+1, :) = swap
           end if
@@ -563,7 +563,7 @@ contains
 
     return
 
-    !error trapping 
+    !error trapping
 90  info = 'blank filename'
     goto 200
 91  info = 'cannot open file'
@@ -951,7 +951,7 @@ contains
     do i = num_wb, 2, -1
        do j = 1, i-1
           if (wavebands(j, 1) > wavebands(j+1, 1)) then
-             swap = wavebands(j, :) 
+             swap = wavebands(j, :)
              wavebands(j, :) = wavebands(j+1, :)
              wavebands(j+1, :) = swap
           end if
@@ -1221,11 +1221,3 @@ contains
   !============================================================================
 
 end module Inout
-
-
-
-
-
-
-
-

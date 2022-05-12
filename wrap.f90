@@ -22,7 +22,7 @@ module Wrap
   public
 
   type allparam
-   
+
      logical :: done_init = .false.
      double precision, pointer :: param(:,:)
      double precision, pointer :: svar(:)
@@ -153,7 +153,7 @@ contains
     !subroutine arguments
     type(allparam), intent(inout) :: this
     double precision, intent(in) :: var_scale(:)
-    
+
     if (.not. this%done_init) stop 'allparam instance not initialised'
     this%var_scale = var_scale
 
@@ -167,7 +167,7 @@ contains
     !subroutine arguments
     type(allparam), intent(inout) :: this
     double precision, intent(in) :: var_offset(:)
-    
+
     if (.not. this%done_init) stop 'allparam instance not initialised'
     this%var_offset = var_offset
 
@@ -181,7 +181,7 @@ contains
 
     !subroutine arguments
     type(allparam), intent(inout) :: this
-    
+
     if (.not. this%done_init) stop 'allparam instance not initialised'
     this%var_scale = 1D0
 
@@ -195,7 +195,7 @@ contains
 
     !subroutine arguments
     type(allparam), intent(inout) :: this
-    
+
     if (.not. this%done_init) stop 'allparam instance not initialised'
     this%var_offset = 0D0
 
@@ -251,7 +251,7 @@ contains
   !============================================================================
 
   !! Update all variable parameters from supplied (scaled) values
-  !!  
+  !!
   !! Doesn't check against limits
   !! Want to optimise this, as its needed for each posterior evaluation
   subroutine allparam_setvar(this, var)
@@ -303,7 +303,7 @@ contains
     deallocate(this%var_pos)
     deallocate(this%var_scale)
     deallocate(this%var_offset)
-    
+
   end subroutine allparam_free
 
   !============================================================================

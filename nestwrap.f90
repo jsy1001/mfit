@@ -34,7 +34,7 @@ module nestwrapper
   ! Parameters for Nested Sampler
 
   !whether to do multimodal sampling
-  logical nest_mmodal 
+  logical nest_mmodal
 
   !sample with constant efficiency
   logical nest_ceff
@@ -43,18 +43,18 @@ module nestwrapper
   !max no. of live points
   integer nest_nlive
   parameter(nest_nlive=500)
-       
+
   !tot no. of parameters, should be nvar in most cases but if you need to
   !store some additional parameters with the actual parameters then
   !you need to pass them through the likelihood routine
-  integer nest_nPar 
+  integer nest_nPar
 
   !seed for nested sampler, -ve means take it from sys clock
-  integer nest_rseed 
+  integer nest_rseed
   parameter(nest_rseed=-1)
 
   !evidence tolerance factor
-  real*8 nest_tol 
+  real*8 nest_tol
   parameter(nest_tol=0.5)
 
   !enlargement factor reduction parameter
@@ -74,7 +74,7 @@ module nestwrapper
   parameter(nest_Ztol=-1.d90)
 
   !max modes expected, for memory allocation
-  integer nest_maxModes 
+  integer nest_maxModes
   parameter(nest_maxModes=50)
 
   !no. of parameters to cluster (for mode detection)
@@ -83,14 +83,14 @@ module nestwrapper
   !whether to resume from a previous run
   logical nest_resume
   parameter(nest_resume=.false.)
-	
+
   integer nest_maxDim
   parameter(nest_maxDim=20)
   !parameters to wrap around (0 is F & non-zero T)
   integer nest_pWrap(nest_maxDim)
 
   !feedback on the sampling progress?
-  logical nest_fb 
+  logical nest_fb
   parameter(nest_fb=.true.)
 
 contains
@@ -150,7 +150,7 @@ contains
     real*8, intent(inout) :: Cube(nPar)
     real*8, intent(out) :: lnew
 
-    !call your loglike function here   
+    !call your loglike function here
     call allparam_setvar(nest_param, Cube(1:n_dim))
     Cube(1:n_dim) = nest_param%svar  !scaled (physical) parameters
     lnew = -likelihood(vis_data, triple_data, model_spec, nest_param%param)

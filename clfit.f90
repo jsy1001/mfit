@@ -26,10 +26,10 @@ program Main
   use PostPlot
 
   implicit none
-  
+
   !============================================================================
   !variables
-  
+
   !parameters
   !pi, deg/rad conversions all picked up from Maths module
   integer, parameter :: max_lines = 5000      !max. lines in data file
@@ -182,9 +182,9 @@ program Main
   !----------------------------------------------------------------------------
   !Read vis/triple data
   !
-  !End up with vis_data and triple_data arrays. 
+  !End up with vis_data and triple_data arrays.
   !
-  !vis_data holds the visibility data points of lambda, u, v, vis, vis_err, 
+  !vis_data holds the visibility data points of lambda, u, v, vis, vis_err,
   !where vis is the squared visibility amplitude and vis_err is its abs error
   !
   !triple_data holds the triple product data points of lambda, u1,v1,u2,v2,
@@ -195,7 +195,7 @@ program Main
   !
   !Negative or zero absolute errors are stored if the mapdat/vis file contains
   !negative or zero entries for its errors (defined differently). These points
-  !are retained in the file for potential plotting purposes but are completely 
+  !are retained in the file for potential plotting purposes but are completely
   !ignored in fitting (i.e. ignored in likelihood calculation and goodness of
   !fit calculations).
 
@@ -333,7 +333,7 @@ program Main
   print *, ' '
   print *, '    MJD   wave   band     baseline coords     sqrd      abs'
   print *, '        length  width         u         v      vis    error'
-  print *, '          (nm)   (nm)       (m)       (m)'  
+  print *, '          (nm)   (nm)       (m)       (m)'
   do i = 1, num_vis
      write(*,60) vis_data(i,7), vis_data(i,:6)
   end do
@@ -403,7 +403,7 @@ program Main
      call model_nvar(n)
      degfreedom = useful_vis + useful_amp + useful_cp - n
      print *, ' '
-     print *, '           chi squared =',real(chisqrd) 
+     print *, '           chi squared =',real(chisqrd)
      print *, '    degrees of freedom =',degfreedom
      if (degfreedom > 0) then
         normchisqrd = chisqrd/degfreedom
@@ -413,7 +413,7 @@ program Main
      top_title = trim(source)//' - initial model: '//trim(model_name)
 
      if (sel_plot == 'vis2' .and. useful_vis > 0) then
-        if (zoom) then 
+        if (zoom) then
            call plot_vis_bas(model_spec, model_param, mod_line, &
                 'Baseline /M\gl', 'Squared visibility', top_title, &
                 uxmin, uxmax)
@@ -426,7 +426,7 @@ program Main
         call parse_plot_arg(sel_plot, pl_vis, pl_amp, pl_cp, &
              xindex, xlabel, ylabel)
         if (pl_vis .and. useful_vis > 0) then
-           if (zoom) then 
+           if (zoom) then
               call plot_vis(xindex, model_spec, model_param, &
                    xlabel, ylabel, top_title, uxmin, uxmax)
            else
@@ -434,7 +434,7 @@ program Main
                    xlabel, ylabel, top_title)
            end if
         else if (pl_amp .and. useful_amp > 0) then
-           if (zoom) then 
+           if (zoom) then
               call plot_triple_amp(xindex, model_spec, model_param, &
                    xlabel, ylabel, top_title, uxmin, uxmax)
            else
@@ -442,7 +442,7 @@ program Main
                    xlabel, ylabel, top_title)
            end if
         else if (pl_cp .and. useful_cp > 0) then
-           if (zoom) then 
+           if (zoom) then
               call plot_triple_phase(xindex, model_spec, model_param, &
                    xlabel, ylabel, top_title, uxmin, uxmax)
            else
@@ -478,7 +478,7 @@ program Main
      !calculate initial goodness-of-fit
      call gof(model_spec, allpar%param, chisqrd)
      print *,' '
-     print *,'initial chi squared =',real(chisqrd) 
+     print *,'initial chi squared =',real(chisqrd)
 
      !minimise
      call minimiser(allpar, sol, chisqrd, nlposterior, fit_ok, info)
@@ -505,7 +505,7 @@ program Main
         print *, 'negative log posterior =',real(nlposterior)
         if (hes_valid) print *, 'negative log evidence  =',real(nlevidence)
         print *, ' '
-        print *, '           chi squared =',real(chisqrd) 
+        print *, '           chi squared =',real(chisqrd)
         print *, '    degrees of freedom =',degfreedom
         if (degfreedom > 0) then
            normchisqrd = chisqrd/degfreedom
@@ -519,7 +519,7 @@ program Main
         do i = 1, n
            write(*,62) i, var_desc(i), sol(i), err(i)
         end do
-62      format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6) 
+62      format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6)
 
         if (hes_valid) then
            ! Display alternative error bars for fitted parameters: estimates
@@ -532,7 +532,7 @@ program Main
            do i = 1, n
               write(*,63) i, var_desc(i), sol(i), sqrt(normchisqrd)*err(i)
            end do
-63         format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*') 
+63         format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*')
 
            print *, ' '
            print *, 'hessian matrix'
@@ -627,7 +627,7 @@ program Main
                 var_desc(indx(1)), var_desc(indx(2)), top_title, &
                 uxmin, uxmax, uymin, uymax)
         else if (sel_plot == 'vis2' .and. useful_vis > 0) then
-           if (zoom) then 
+           if (zoom) then
               call plot_vis_bas(model_spec, allpar%param, mod_line, &
                    'Baseline /M\gl', 'Squared visibility', top_title, &
                    uxmin, uxmax)
@@ -639,7 +639,7 @@ program Main
            call parse_plot_arg(sel_plot, pl_vis, pl_amp, pl_cp, &
                 xindex, xlabel, ylabel)
            if (pl_vis .and. useful_vis > 0) then
-              if (zoom) then 
+              if (zoom) then
                  call plot_vis(xindex, model_spec, allpar%param, &
                       xlabel, ylabel, top_title, uxmin, uxmax)
               else
@@ -647,7 +647,7 @@ program Main
                       xlabel, ylabel, top_title)
               end if
            else if (pl_amp .and. useful_amp > 0) then
-              if (zoom) then 
+              if (zoom) then
                  call plot_triple_amp(xindex, model_spec, allpar%param, &
                       xlabel, ylabel, top_title, uxmin, uxmax)
               else
@@ -655,7 +655,7 @@ program Main
                       xlabel, ylabel, top_title)
               end if
            else if (pl_cp .and. useful_cp > 0) then
-              if (zoom) then 
+              if (zoom) then
                  call plot_triple_phase(xindex, model_spec, allpar%param, &
                       xlabel, ylabel, top_title, uxmin, uxmax)
               else
@@ -680,7 +680,7 @@ program Main
            print '(1x, a, 49x, a)', 'num  parameter name', ' value'
            write(*,77) margerr_var, var_desc(margerr_var), sol(margerr_var), &
                 ' +', alt_err(1), ' -', alt_err(2)
-77         format(' (', i2, ') ', a55, 1x, f13.6, a, f12.6, a, f12.6) 
+77         format(' (', i2, ') ', a55, 1x, f13.6, a, f12.6, a, f12.6)
            deallocate(errguess)
         end if
      end if
@@ -790,7 +790,7 @@ contains
     if (plot_t3phi) ylabel = 'Closure phase /'//char(176)
 
   end subroutine parse_plot_arg
- 
+
 !==============================================================================
 
   subroutine filt_by_wb(data, wb, sig, new_dim1)
