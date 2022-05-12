@@ -28,9 +28,9 @@ import os
 import tempfile
 import time
 from subprocess import Popen, PIPE, STDOUT
-from tkinter import *
+import tkinter as tk
+import tkinter.filedialog as tk_filedialog
 from tkinter.scrolledtext import ScrolledText
-import tkinter.filedialog
 
 _revision = "$Revision: 1.14 $".split()[1]
 
@@ -44,10 +44,10 @@ class GUI:
 
     device (string) -- PGPLOT device, passed to clfit
 
-    fileName (Tkinter.StringVar) -- path to OI-FITS/Mapping Data file
+    fileName (tkinter.StringVar) -- path to OI-FITS/Mapping Data file
     (use set() & get() methods)
 
-    ChangeFileButton (Tkinter.Button) -- brings up data file dialog
+    ChangeFileButton (tkinter.Button) -- brings up data file dialog
     box (may wish to disable)
 
     initialdir (string) -- initial directory for file dialog boxes
@@ -73,19 +73,19 @@ class GUI:
         self.parent = parent
         self.exe = "clfit"
         self.device = "/xserv"
-        self.fileName = StringVar()
+        self.fileName = tk.StringVar()
         self.fileName.set("(unset)")
         self.initialdir = os.getcwd()
         self.preFitCallback = None
         self.postFitCallback = None
-        self.calErr = StringVar()
+        self.calErr = tk.StringVar()
         self.calErr.set("0.0")
-        self.cwl = StringVar()
-        self.bw = StringVar()
-        self.wlmin = StringVar()
-        self.wlmax = StringVar()
-        self.target_id = StringVar()
-        self.nofit = IntVar()
+        self.cwl = tk.StringVar()
+        self.bw = tk.StringVar()
+        self.wlmin = tk.StringVar()
+        self.wlmax = tk.StringVar()
+        self.target_id = tk.StringVar()
+        self.nofit = tk.IntVar()
         self.nofit.set(0)
         self.plots = [
             "No plot",
@@ -108,135 +108,139 @@ class GUI:
             "post2d",
             "mpost2d",
         ]
-        self.selPlot = StringVar()
+        self.selPlot = tk.StringVar()
         self.selPlot.set(self.plots[1])
-        self.plotXIndex = StringVar()
+        self.plotXIndex = tk.StringVar()
         self.plotXIndex.set("1")
-        self.plotYIndex = StringVar()
+        self.plotYIndex = tk.StringVar()
         self.plotYIndex.set("2")
-        self.plotXFrom = StringVar()
-        self.plotXTo = StringVar()
-        self.plotYFrom = StringVar()
-        self.plotYTo = StringVar()
-        self.margErr = IntVar()
+        self.plotXFrom = tk.StringVar()
+        self.plotXTo = tk.StringVar()
+        self.plotYFrom = tk.StringVar()
+        self.plotYTo = tk.StringVar()
+        self.margErr = tk.IntVar()
         self.margErr.set(0)
-        self.margErrVar = StringVar()
+        self.margErrVar = tk.StringVar()
         self.margErrVar.set("1")
 
         # Initialise GUI elements
-        fileFrame = Frame(parent)
-        fileFrame.pack(side=TOP)
-        Label(fileFrame, text="Data file:").pack(side=LEFT)
-        Label(fileFrame, textvariable=self.fileName).pack(side=LEFT)
-        self.ChangeFileButton = Button(
+        fileFrame = tk.Frame(parent)
+        fileFrame.pack(side=tk.TOP)
+        tk.Label(fileFrame, text="Data file:").pack(side=tk.LEFT)
+        tk.Label(fileFrame, textvariable=self.fileName).pack(side=tk.LEFT)
+        self.ChangeFileButton = tk.Button(
             fileFrame, text="Change", command=self._ChangeFileName
         )
-        self.ChangeFileButton.pack(side=LEFT)
-        calErrFrame = Frame(parent)
-        calErrFrame.pack(side=TOP, fill=X, pady=4)
-        Label(
+        self.ChangeFileButton.pack(side=tk.LEFT)
+        calErrFrame = tk.Frame(parent)
+        calErrFrame.pack(side=tk.TOP, fill=tk.X, pady=4)
+        tk.Label(
             calErrFrame, text="Calibration Error (extra frac. error in system vis.)"
-        ).pack(side=LEFT, anchor=W)
-        Entry(calErrFrame, textvariable=self.calErr, width=5).pack(
-            side=LEFT, anchor=W, padx=4
+        ).pack(side=tk.LEFT, anchor=tk.W)
+        tk.Entry(calErrFrame, textvariable=self.calErr, width=5).pack(
+            side=tk.LEFT, anchor=tk.W, padx=4
         )
-        wbFrame = Frame(parent)
-        wbFrame.pack(side=TOP, fill=X, pady=4)
-        Label(wbFrame, text="Waveband:").pack(side=LEFT, anchor=W)
-        Entry(wbFrame, textvariable=self.cwl, width=5).pack(side=LEFT, anchor=W, padx=4)
-        Entry(wbFrame, textvariable=self.bw, width=5).pack(side=LEFT, anchor=W, padx=4)
-        Label(wbFrame, text="or Wavelength range:").pack(side=LEFT, anchor=W)
-        Entry(wbFrame, textvariable=self.wlmin, width=5).pack(
-            side=LEFT, anchor=W, padx=4
+        wbFrame = tk.Frame(parent)
+        wbFrame.pack(side=tk.TOP, fill=tk.X, pady=4)
+        tk.Label(wbFrame, text="Waveband:").pack(side=tk.LEFT, anchor=tk.W)
+        tk.Entry(wbFrame, textvariable=self.cwl, width=5).pack(
+            side=tk.LEFT, anchor=tk.W, padx=4
         )
-        Entry(wbFrame, textvariable=self.wlmax, width=5).pack(
-            side=LEFT, anchor=W, padx=4
+        tk.Entry(wbFrame, textvariable=self.bw, width=5).pack(
+            side=tk.LEFT, anchor=tk.W, padx=4
         )
-        targetFrame = Frame(parent)
-        targetFrame.pack(side=TOP, fill=X, pady=4)
-        Label(
+        tk.Label(wbFrame, text="or Wavelength range:").pack(side=tk.LEFT, anchor=tk.W)
+        tk.Entry(wbFrame, textvariable=self.wlmin, width=5).pack(
+            side=tk.LEFT, anchor=tk.W, padx=4
+        )
+        tk.Entry(wbFrame, textvariable=self.wlmax, width=5).pack(
+            side=tk.LEFT, anchor=tk.W, padx=4
+        )
+        targetFrame = tk.Frame(parent)
+        targetFrame.pack(side=tk.TOP, fill=tk.X, pady=4)
+        tk.Label(
             targetFrame, text="TARGET_ID (blank to use 1st in OI_TARGET table):"
-        ).pack(side=LEFT, anchor=W)
-        Entry(targetFrame, textvariable=self.target_id, width=5).pack(
-            side=LEFT, anchor=W, padx=4
+        ).pack(side=tk.LEFT, anchor=tk.W)
+        tk.Entry(targetFrame, textvariable=self.target_id, width=5).pack(
+            side=tk.LEFT, anchor=tk.W, padx=4
         )
-        Label(parent, text="Model:").pack(side=TOP, anchor=W)
+        tk.Label(parent, text="Model:").pack(side=tk.TOP, anchor=tk.W)
         self.ModelText = ScrolledText(
             parent, height=19, width=40, font=("Helvetica", 10)
         )
-        self.ModelText.pack(side=TOP, expand=1, fill=BOTH)
-        midFrame1 = Frame(parent)
-        midFrame1.pack(side=TOP, fill=X, pady=4)
-        Label(midFrame1, text="Plot:").pack(side=LEFT, anchor=NW)
-        plotFrame = Frame(midFrame1)
-        plotFrame.pack(side=LEFT)
+        self.ModelText.pack(side=tk.TOP, expand=1, fill=tk.BOTH)
+        midFrame1 = tk.Frame(parent)
+        midFrame1.pack(side=tk.TOP, fill=tk.X, pady=4)
+        tk.Label(midFrame1, text="Plot:").pack(side=tk.LEFT, anchor=tk.NW)
+        plotFrame = tk.Frame(midFrame1)
+        plotFrame.pack(side=tk.LEFT)
         ncol = 3
         for i in range(len(self.plots)):
             p = self.plots[i]
-            Radiobutton(plotFrame, text=p, variable=self.selPlot, value=p).grid(
-                row=int((i + 1) / ncol), column=(i + 1) % ncol, sticky=W
+            tk.Radiobutton(plotFrame, text=p, variable=self.selPlot, value=p).grid(
+                row=int((i + 1) / ncol), column=(i + 1) % ncol, sticky=tk.W
             )
-        Entry(plotFrame, textvariable=self.plotXIndex, width=3).grid(
+        tk.Entry(plotFrame, textvariable=self.plotXIndex, width=3).grid(
             row=int(len(self.plots) / ncol) - 1, column=ncol
         )
-        Entry(plotFrame, textvariable=self.plotYIndex, width=3).grid(
+        tk.Entry(plotFrame, textvariable=self.plotYIndex, width=3).grid(
             row=int(len(self.plots) / ncol), column=ncol
         )
-        rangeFrame = Frame(midFrame1)
-        rangeFrame.pack(side=LEFT)
-        Label(rangeFrame, text="X From:").grid(row=0, column=0, sticky=E)
-        Entry(rangeFrame, textvariable=self.plotXFrom, width=5).grid(row=0, column=1)
-        Label(rangeFrame, text="To:").grid(row=0, column=2)
-        Entry(rangeFrame, textvariable=self.plotXTo, width=5).grid(row=0, column=3)
-        Label(rangeFrame, text="Y From:").grid(row=1, column=0, sticky=E)
-        Entry(rangeFrame, textvariable=self.plotYFrom, width=5).grid(row=1, column=1)
-        Label(rangeFrame, text="To:").grid(row=1, column=2)
-        Entry(rangeFrame, textvariable=self.plotYTo, width=5).grid(row=1, column=3)
-        Label(rangeFrame, text="[Y for (m)post2d only]").grid(row=2, columnspan=4)
-        Button(midFrame1, text="Go", command=self.Go).pack(
-            side=RIGHT, anchor=NE, padx=4
+        rangeFrame = tk.Frame(midFrame1)
+        rangeFrame.pack(side=tk.LEFT)
+        tk.Label(rangeFrame, text="X From:").grid(row=0, column=0, sticky=tk.E)
+        tk.Entry(rangeFrame, textvariable=self.plotXFrom, width=5).grid(row=0, column=1)
+        tk.Label(rangeFrame, text="To:").grid(row=0, column=2)
+        tk.Entry(rangeFrame, textvariable=self.plotXTo, width=5).grid(row=0, column=3)
+        tk.Label(rangeFrame, text="Y From:").grid(row=1, column=0, sticky=tk.E)
+        tk.Entry(rangeFrame, textvariable=self.plotYFrom, width=5).grid(row=1, column=1)
+        tk.Label(rangeFrame, text="To:").grid(row=1, column=2)
+        tk.Entry(rangeFrame, textvariable=self.plotYTo, width=5).grid(row=1, column=3)
+        tk.Label(rangeFrame, text="[Y for (m)post2d only]").grid(row=2, columnspan=4)
+        tk.Button(midFrame1, text="Go", command=self.Go).pack(
+            side=tk.RIGHT, anchor=tk.NE, padx=4
         )
-        Button(midFrame1, text="Save model", command=self.SaveModel).pack(
-            side=RIGHT, anchor=NE, padx=4
+        tk.Button(midFrame1, text="Save model", command=self.SaveModel).pack(
+            side=tk.RIGHT, anchor=tk.NE, padx=4
         )
-        Button(midFrame1, text="Load model", command=self.LoadModel).pack(
-            side=RIGHT, anchor=NE, padx=4
+        tk.Button(midFrame1, text="Load model", command=self.LoadModel).pack(
+            side=tk.RIGHT, anchor=tk.NE, padx=4
         )
-        midFrame2 = Frame(parent)
-        midFrame2.pack(side=TOP, fill=X, pady=4)
-        Checkbutton(
+        midFrame2 = tk.Frame(parent)
+        midFrame2.pack(side=tk.TOP, fill=tk.X, pady=4)
+        tk.Checkbutton(
             midFrame2,
             text="Don't fit (report goodness-of-fit only)",
             variable=self.nofit,
-        ).pack(side=LEFT, anchor=W, padx=8)
-        Entry(midFrame2, textvariable=self.margErrVar, width=5).pack(
-            side=LEFT, anchor=W
+        ).pack(side=tk.LEFT, anchor=tk.W, padx=8)
+        tk.Entry(midFrame2, textvariable=self.margErrVar, width=5).pack(
+            side=tk.LEFT, anchor=tk.W
         )
-        Checkbutton(
+        tk.Checkbutton(
             midFrame2, text="Error bar by marginalising", variable=self.margErr
-        ).pack(side=LEFT, anchor=W)
-        midFrame3 = Frame(parent)
-        midFrame3.pack(side=TOP, fill=X)
-        Label(midFrame3, text="Results:").pack(side=LEFT, anchor=SW)
+        ).pack(side=tk.LEFT, anchor=tk.W)
+        midFrame3 = tk.Frame(parent)
+        midFrame3.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(midFrame3, text="Results:").pack(side=tk.LEFT, anchor=tk.SW)
         if dismissCommand is None:
             dismissCommand = parent.quit
-        Button(midFrame3, text="Dismiss", command=dismissCommand).pack(
-            side=RIGHT, padx=4, pady=4
+        tk.Button(midFrame3, text="Dismiss", command=dismissCommand).pack(
+            side=tk.RIGHT, padx=4, pady=4
         )
-        Button(midFrame3, text="Clear results", command=self.ClearResults).pack(
-            side=RIGHT, padx=4, pady=4
+        tk.Button(midFrame3, text="Clear results", command=self.ClearResults).pack(
+            side=tk.RIGHT, padx=4, pady=4
         )
         self.Results = ScrolledText(
-            parent, height=31, width=90, font=("Courier", 10), state=DISABLED
+            parent, height=31, width=90, font=("Courier", 10), state=tk.DISABLED
         )
         self.Results.tag_config("result", foreground="#1e90ff")  # dodger blue
         self.Results.tag_config("commentary", foreground="#ff8c00")  # dark orange
         self.Results.tag_config("error", foreground="#8b0000")  # dark red
-        self.Results.pack(side=TOP, expand=1, fill=BOTH)
+        self.Results.pack(side=tk.TOP, expand=1, fill=tk.BOTH)
 
     def LoadModel(self):
         """Get filename and read model from file."""
-        fileName = tkinter.filedialog.askopenfilename(
+        fileName = tk_filedialog.askopenfilename(
             parent=self.parent,
             initialdir=self.initialdir,
             filetypes=[("mfit model files", "*.model"), ("All files", "*")],
@@ -258,18 +262,18 @@ class GUI:
 
     def SetModel(self, text):
         """Set model text."""
-        self.ModelText.delete(1.0, END)
-        self.ModelText.insert(END, text)
+        self.ModelText.delete(1.0, tk.END)
+        self.ModelText.insert(tk.END, text)
 
     def ClearResults(self):
         """Clear results window."""
-        self.Results.configure(state=NORMAL)
-        self.Results.delete(1.0, END)
-        self.Results.configure(state=DISABLED)
+        self.Results.configure(state=tk.NORMAL)
+        self.Results.delete(1.0, tk.END)
+        self.Results.configure(state=tk.DISABLED)
 
     def SaveModel(self):
         """Get filename and write model to file."""
-        fileName = tkinter.filedialog.asksaveasfilename(
+        fileName = tk_filedialog.asksaveasfilename(
             parent=self.parent,
             initialdir=self.initialdir,
             filetypes=[("mfit model files", "*.model"), ("All files", "*")],
@@ -280,11 +284,11 @@ class GUI:
     def WriteModel(self, fileName):
         """Write model text to file."""
         fil = open(fileName, "w")
-        fil.write(self.ModelText.get(1.0, END))
+        fil.write(self.ModelText.get(1.0, tk.END))
         fil.close()
 
     def _ChangeFileName(self):
-        newName = tkinter.filedialog.askopenfilename(
+        newName = tk.filedialog.askopenfilename(
             parent=self.parent,
             initialdir=self.initialdir,
             title="Choose data file for fit",
@@ -300,10 +304,10 @@ class GUI:
 
     def ShowResult(self, text, tag):
         """Display text in 'Results'."""
-        self.Results.configure(state=NORMAL)
-        self.Results.insert(END, text, tag)
-        self.Results.yview(END)
-        self.Results.configure(state=DISABLED)
+        self.Results.configure(state=tk.NORMAL)
+        self.Results.insert(tk.END, text, tag)
+        self.Results.yview(tk.END)
+        self.Results.configure(state=tk.DISABLED)
         self.parent.update_idletasks()
 
     def Go(self):
@@ -385,7 +389,7 @@ class GUI:
         # https://gitpress.io/u/1282/tkinter-read-async-subprocess-output
         self._proc = Popen(args, bufsize=10, stdout=PIPE, stderr=STDOUT, close_fds=True)
         self.parent.createfilehandler(
-            self._proc.stdout, READABLE, self._HandleChildOutput
+            self._proc.stdout, tk.READABLE, self._HandleChildOutput
         )
 
     def _HandleChildOutput(self, fd, mask):
@@ -423,7 +427,7 @@ def _main(altExe=None):
     """Main routine."""
     if len(sys.argv) == 1:
         # No command-line arguments - run graphical user interface
-        root = Tk()
+        root = tk.Tk()
         root.title("fitgui %s" % _revision)
         main = GUI(root)
         main.fileName.set("test.oifits")
