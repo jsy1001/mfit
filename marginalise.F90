@@ -1,4 +1,4 @@
-! Copyright (C) 2003-2018 John Young, Matthew Worsley
+! Copyright (C) 2003-2018, 2022 John Young, Matthew Worsley
 !
 ! This file is part of mfit.
 !
@@ -76,18 +76,19 @@ contains
     logical, intent(in) :: marg_var(:)
 
     !local variables
-    integer :: iv, iwave, idim, ndim, minpts, maxpts, lenwrk, leniwrk
-    integer :: ifail, alpha, indx1, indx2
-    double precision :: epsabs, epsrel, acc, abserr, finval, sol0, sig
-    double precision :: lhd, pri, delt, lbound, ubound, chisqrd, unmg_post
+    integer :: idim, ndim
+    integer :: indx1, indx2
+    double precision :: sol0, sig
+    double precision :: lhd, pri, lbound, ubound, chisqrd, unmg_post
     double precision, dimension(:), allocatable :: sol(:), alim(:), blim(:)
     double precision, dimension(:), allocatable :: wrk(:)
     integer, allocatable :: iwrk(:)
     type(allparam) :: fitpar
     logical :: fit_ok
 
-    integer :: num_points, i
-    double precision :: val
+#ifdef HAVE_NAG
+    integer :: iv, iwave, lenwrk, leniwrk, ifail, alpha, num_points, i
+    double precision :: epsabs, epsrel, acc, abserr, finval, delt, val
 
     interface
        subroutine D01FCF(ndim, alim, blim, minpts, maxpts, functn, epsrel, &
@@ -115,6 +116,7 @@ contains
          integer, intent(inout) :: ifail
        end subroutine D01AJF
     end interface
+#endif
 
     !evaluate unmarginalised -ln(postprob) (used for scaling)
     !at minimum found by varying to-marginalise parameters only
@@ -364,11 +366,14 @@ contains
     double precision x0, x1, sigma, rtb
     double precision dx, xmid, fmid
     double precision :: err_quad(2) !! Estimate of errors by quadratic interp.
-    integer nb, i, j, ifail
+    integer nb, i, j
     integer, parameter :: max_iter = 20
     real, parameter :: tol = 0.1
     integer, dimension(2), parameter :: sign = (/1, -1/)
     logical, parameter :: usenag = .true.
+
+#ifdef HAVE_NAG
+    integer ifail
 
     interface
        subroutine C05ADF(a, b, eps, eta, f, x, ifail)
@@ -378,6 +383,7 @@ contains
          integer, intent(inout) :: ifail
        end subroutine C05ADF
     end interface
+#endif
 
     !assign to module variables needed by ferr
     call allparam_copy(inpar, mgerr_par)

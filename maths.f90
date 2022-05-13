@@ -1,4 +1,4 @@
-! Copyright (C) 2003-2018 John Young, Matthew Worsley
+! Copyright (C) 2003-2018, 2022 John Young, Matthew Worsley
 !
 ! This file is part of mfit.
 !
@@ -227,7 +227,6 @@ contains
     !local variables
     integer :: ncalc
     double precision, dimension(2) :: output
-    integer :: ifail
 
     call RJBESL(x, 0D0, 2, output, ncalc)
     if (ncalc < 0) then
