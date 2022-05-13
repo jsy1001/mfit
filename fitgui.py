@@ -24,6 +24,7 @@ Usage: fitgui &
 """
 
 import sys
+import fcntl
 import os
 import tempfile
 import time
@@ -388,6 +389,8 @@ class GUI:
 
         # https://gitpress.io/u/1282/tkinter-read-async-subprocess-output
         self._proc = Popen(args, bufsize=10, stdout=PIPE, stderr=STDOUT, close_fds=True)
+        oldflags = fcntl.fcntl(self._proc.stdout, fcntl.F_GETFL)
+        fcntl.fcntl(self._proc.stdout, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
         self.parent.createfilehandler(
             self._proc.stdout, tk.READABLE, self._HandleChildOutput
         )
@@ -395,15 +398,13 @@ class GUI:
     def _HandleChildOutput(self, fd, mask):
         """Handle output from child process."""
         self._ShowOutput()
-        status = self._proc.poll()
-        if status != -1:
+        returncode = self._proc.poll()
+        if returncode is not None:
             # child process completed
             time.sleep(0.5)  # wait for last output
             self._ShowOutput()
-            if os.WEXITSTATUS(status) != 0:
-                self.ShowResult(
-                    "Subprocess exited with code %d\n" % os.WEXITSTATUS(status), "error"
-                )
+            if returncode != 0:
+                self.ShowResult(f"Subprocess exited with code {returncode}\n", "error")
             else:
                 self.ShowResult("Subprocess exited normally\n", "commentary")
             self.parent.deletefilehandler(self._proc.stdout)
