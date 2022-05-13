@@ -1,0 +1,5 @@
+[flake8]
+inherit = false
+# exclude = .git,.tox,.eggs
+max-line-length = 88
+extend-ignore = D400,E203

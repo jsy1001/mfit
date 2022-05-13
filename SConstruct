@@ -1,3 +1,6 @@
+from __future__ import print_function
+import site
+
 #### May need to edit this section ####
 
 # These may be overridden using "debug=" and "release=" command-line arguments
@@ -33,13 +36,13 @@ user_f95 = ARGUMENTS.get('f95', None)
 # Find fortran compiler and set command-line switches to use for it
 if user_f95 is not None:
     f95 = user_f95
-else:    
+else:
     f95 = env.Detect(f95List)
     if f95 is None:
-        print "No f90/f95 compiler found in %s" % env['ENV']['PATH']
+        print("No f90/f95 compiler found in %s" % env['ENV']['PATH'])
         Exit(1)
-print "Building on '%s' using %s" % (Platform(), f95)
-print "debug=%s  release=%s" % (debug, release)
+print("Building on '%s' using %s" % (Platform(), f95))
+print("debug=%s  release=%s" % (debug, release))
 env.Replace(FORTRAN=f95, LINK=f95)
 env.Replace(FORTRANFLAGS=[])
 env.Replace(LINKFLAGS=[])
@@ -47,17 +50,17 @@ if debug:
     # most compilers understand -g
     env.Append(FORTRANFLAGS=['-g'])
 if f95 == 'g95':
-    print "Configuring for G95"
+    print("Configuring for G95")
     env.Append(FORTRANFLAGS=['-fno-second-underscore'])
     f2kcli = 'f2kcli.f90'
 elif f95 == 'gfortran':
-    print "Configuring for gfortran"
+    print("Configuring for gfortran")
     env.Append(FORTRANFLAGS=['-Wall'])
     if release:
         env.Append(FORTRANFLAGS=['-O3'])
     f2kcli = 'f2kcli.f90'
 elif f95 == sun_f95:
-    print "Configuring for Sun WorkShop Fortran 95"
+    print("Configuring for Sun WorkShop Fortran 95")
     env.Append(FORTRANFLAGS=['-dalign'])
     if release:
         env.Append(FORTRANFLAGS=['-fast'])
@@ -68,7 +71,7 @@ elif f95 == sun_f95:
     env.Append(LIBS=['f77compat'])
     f2kcli = 'f2kcli.f90'
 elif f95 == nagw_f95:
-    print "Configuring for NAGWare Fortran 95"
+    print("Configuring for NAGWare Fortran 95")
     env.Append(FORTRANFLAGS=['-mismatch'])
     if release:
         env.Append(FORTRANFLAGS=['-O'])
@@ -93,7 +96,7 @@ elif f95 == nagw_f95:
         # Fortunately cc understands -R directly
         env.Append(LINKFLAGS=['-Wl,-R%s' % ':'.join(libPath)])
 else:
-    print "Configuring for generic Fortran 9x compiler"
+    print("Configuring for generic Fortran 9x compiler")
     f2kcli = 'f2kcli.f90'
 # Work around inconsistent behaviour between scons versions
 env.Replace(F90FLAGS=env['FORTRANFLAGS'])
@@ -123,7 +126,7 @@ if conf.CheckLib('nag'):
 else:
     nagLibs = []
 nestLibs = ['nest3', 'lapack']
-    
+
 env = conf.Finish()
 
 # Define targets and dependencies...
@@ -163,7 +166,7 @@ objects = {}
 for key in sources.keys():
     allobjs = env.Object(sources[key])
     # filter out mod files
-    objects[key] = filter(lambda o: str(o)[-4:] != '.mod', allobjs)
+    objects[key] = list(filter(lambda o: str(o)[-4:] != '.mod', allobjs))
 
 # ...executables
 for key in objects.keys():
@@ -174,9 +177,10 @@ for key in objects.keys():
 env.Alias('install', '/usr/local/bin')
 
 # ...install fitgui python code
+sitedir = site.getsitepackages()[0]  # e.g. /usr/local/lib/python3.8/dist-packages
 env.Install('/usr/local/bin', Split('fitgui fitgui_dev'))
-env.Install('/usr/local/lib/python2.7/site-packages', 'fitgui.py')
-env.Alias('install', '/usr/local/lib/python2.7/site-packages')
+env.Install(sitedir, 'fitgui.py')
+env.Alias('install', sitedir)
 
 # ...targets for distribution of mfit
 import glob

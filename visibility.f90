@@ -51,10 +51,10 @@ module Visibility
 contains
 
   !===========================================================================
-  
+
   !! Return complex visibility for multiple component model
   !!
-  !! Model component details are supplied in 
+  !! Model component details are supplied in
   !! the spec and param arrays. u, v must be supplied in metres, lambda in nm.
   !! mjd argument gives epoch of observation as Modified Julian Day.
   function cmplx_vis(spec, param, lambda, delta_lambda, u, v, mjd)
@@ -80,7 +80,7 @@ contains
     num_comps = size(spec,1)
 
     !trap zero baseline case
-    if ((u == 0D0) .and. (v == 0D0)) then 
+    if ((u == 0D0) .and. (v == 0D0)) then
        cmplx_vis = cmplx(1D0,0D0)
        B_total = 1D0
 
@@ -179,7 +179,7 @@ contains
                 select case (trim(spec(i,3)))
                 case ('uniform')
                    F = uniform(a, rho)
-		case ('thin-ring')
+                case ('thin-ring')
                    F = thin_ring(a, rho)
                 case ('taylor')
                    !alpha is array of taylor coeffs 0-20 (0th defined as -1)
@@ -415,12 +415,12 @@ contains
     !sigma over n
     x1 = 0
     x2 = 0
-    do n = 0, nmax  
+    do n = 0, nmax
 
        !sigma over t
        y1 = 0
        y2 = 0
-       do t = 0, n        
+       do t = 0, n
           z1 = dble((-1D0)**t)
           z2 = gamma(dble(t)+1D0)
           z3 = (2D0)**(3D0*dble(t))
@@ -459,7 +459,7 @@ contains
 
     !function variables
     integer :: i, steps
-    double precision :: step_size, cosine, r, sample, norm
+    double precision :: step_size, r, sample, norm
     double precision :: p1, p2
     steps = int (alpha (1))
 
@@ -548,9 +548,3 @@ contains
   !============================================================================
 
 end module Visibility
-
-
-
-
-
-

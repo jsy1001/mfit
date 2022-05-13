@@ -16,7 +16,7 @@
 ! along with this program.  If not, see http://www.gnu.org/licenses/ .
 
 module Postplot
-  
+
   use Plot
   use Bayes
   use Wrap
@@ -305,7 +305,7 @@ contains
     endif
     call pggray(post_points, num_points, num_points, &
          1, num_points, 1, num_points, fg, bg, tr)
-      
+
     write (51, *) (levs(i), i=1, size(levs,1))
     call pgsci(2)
     call pgcont(post_points, num_points, num_points, &

@@ -49,7 +49,7 @@ module Fit
 contains
 
   !============================================================================
-  
+
   !! (Re-)allocate workspace
   subroutine alloc_work(lwork_req)
 
@@ -65,7 +65,7 @@ contains
   end subroutine alloc_work
 
   !============================================================================
-  
+
   !! Run minimiser and calculate goodness-of-fit at stopping point
   subroutine minimiser(inpar, sol, chisqrd, nlposterior, success, info)
 
@@ -185,7 +185,7 @@ contains
   end subroutine minimiser
 
   !===========================================================================
-  
+
   !! Check for minimum, estimate parameter error bars at solution point
   !! Need to call minimiser() before invoking this routine
   subroutine err_est(n, sol, &
@@ -240,7 +240,7 @@ contains
     !hessian matrix Aij has components (d2/(dyi*dyj))P({y}) where yi and yj
     !are parameters i and j, P({y}) is the neg log posterior for model with
     !parameters {y} = y1, y2, ... yi, ... yj, ... yN
-    !estimate each element Aij via taylor 2nd order symmetric numeric 
+    !estimate each element Aij via taylor 2nd order symmetric numeric
     !differentiation method, for off-diagonals this is
     ![P(i+di,j+dj)+P(i-di,j-dj)-P(i+di,j-dj)-P(i-di,j+dj)]/[4di*dj],
     !for diagonals
@@ -282,13 +282,13 @@ contains
              call posterior(n, temp_x, P_u)
              !P(i+di,j-dj)
              temp_x(j) = x(j)-deltaj
-             call posterior(n, temp_x, P_i)   
+             call posterior(n, temp_x, P_i)
              !P(i-di,j-dj)
              temp_x(i) = x(i)-deltai
              call posterior(n, temp_x, P_l)
              !P(i-di,j+dj)
              temp_x(j) = x(j)+deltaj
-             call posterior(n, temp_x, P_j)  
+             call posterior(n, temp_x, P_j)
              !hessian by numeric method
              diff = P_u + P_l - P_i - P_j
              hes(i,j) = diff / ((4D0*deltai*deltaj)*(x_scale(i)*x_scale(j)))
@@ -339,7 +339,7 @@ contains
 
   end subroutine err_est
   !===========================================================================
-  
+
   !! Check for minimum
   !! Need to call minimiser() before invoking this routine
   function is_minimum(n, sol, var_minimised)
@@ -407,12 +407,12 @@ contains
     integer, intent(in) :: n !! Number of variable parameters
     double precision, intent(in) :: x(n) !! Values of variable params
     double precision, intent(out) :: funcval !! Value of function to minimise
-    
+
     !local variables
     double precision :: lhd, pri
-    
+
     !check for range violations in current position
-    !if position is out of range then return very large energy 
+    !if position is out of range then return very large energy
     if (.not. allparam_inlimit(fitpar, x)) then
        funcval = 1.0d10
        return
@@ -474,7 +474,7 @@ contains
 
   !! Deallocate module storage
   subroutine free_fit()
-    
+
     call allparam_free(fitpar)
     if (allocated(work)) deallocate(work)
 

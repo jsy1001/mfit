@@ -138,7 +138,7 @@ contains
        pri = prior(fitpar%var_pos, fitpar%param, model_param, model_prior)
        unmg_post = lhd + pri
     end if
-    
+
     !special case - no marginalisation to do
     if (ndim == 0) then
        marg_post = unmg_post
@@ -448,7 +448,7 @@ contains
 
     ferr = marg_post(info, mgerr_par, mgerr_marg_var) - mgerr_minpost - 0.5D0
     if (info /= '') print *, trim(info)
-    
+
   end function ferr
 
   !============================================================================

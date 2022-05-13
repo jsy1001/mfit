@@ -77,9 +77,9 @@ program Main
   !----------------------------------------------------------------------------
   !Read vis/triple data
   !
-  !End up with vis_data and triple_data arrays. 
+  !End up with vis_data and triple_data arrays.
   !
-  !vis_data holds the visibility data points of lambda, u, v, vis, vis_err, 
+  !vis_data holds the visibility data points of lambda, u, v, vis, vis_err,
   !where vis is the squared visibility amplitude and vis_err is its abs error
   !
   !triple_data holds the triple product data points of lambda, u1,v1,u2,v2,
@@ -90,7 +90,7 @@ program Main
   !
   !Negative or zero absolute errors are stored if the mapdat/vis file contains
   !negative or zero entries for its errors (defined differently). These points
-  !are retained in the file for potential plotting purposes but are completely 
+  !are retained in the file for potential plotting purposes but are completely
   !ignored in fitting (i.e. ignored in likelihood calculation and goodness of
   !fit calculations).
 
@@ -244,7 +244,7 @@ program Main
   print *, ' '
   print *, '    MJD   wave   band   baseline coords       sqrd      abs'
   print *, '        length  width         u         v      vis    error'
-  print *, '          (nm)   (nm)       (m)       (m)'  
+  print *, '          (nm)   (nm)       (m)       (m)'
   do i = 1, num_vis
      write(*,60) vis_data(i,7), vis_data(i,:6)
   end do
@@ -376,7 +376,7 @@ program Main
         print *, 'negative log posterior =',real(nlposterior)
         if (hes_valid) print *, 'negative log evidence  =',real(nlevidence)
         print *, ' '
-        print *, '           chi squared =',real(chisqrd) 
+        print *, '           chi squared =',real(chisqrd)
         print *, '    degrees of freedom =',degfreedom
         if (degfreedom > 0) then
            normchisqrd = chisqrd/degfreedom
@@ -390,7 +390,7 @@ program Main
         do i = 1, size(sol,1)
            write(*,62) i, var_desc(i), sol(i), err(i)
         end do
-62      format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6) 
+62      format(' (', i2, ') ', A55, 1x, f13.6, 1x, f12.6)
 
         if (hes_valid) then
            ! Display alternative error bars for fitted parameters
@@ -401,14 +401,14 @@ program Main
            do i = 1, size(sol,1)
               write(*,63) i, var_desc(i), sol(i), sqrt(normchisqrd)*err(i)
            end do
-63         format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*') 
-           
+63         format('  *(', i2, ') ', A55, 1x, f13.6, 1x, f12.6, '*')
+
            print *, ' '
            print *, 'hessian matrix'
            do i = 1, n
               write(*,64) hes(i,:)
            end do
-        
+
            print *, ' '
            print *, 'covariance matrix'
            do i = 1, n
@@ -444,7 +444,7 @@ program Main
                    uxmin, uxmax)
            end if
         end if
-        if (useful_amp > 0) then 
+        if (useful_amp > 0) then
            call plot_triple_amp(-1, model_spec, allpar%param, &
                 'Longest baseline /M\gl', 'Triple amplitude', top_title)
            print *, 'enter x-axis range for replot ([return] to skip)'

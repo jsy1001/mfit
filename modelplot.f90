@@ -83,7 +83,7 @@ program Modelplot
 
   !check for unsupported model features
   do cmp = 1, size(model_spec, 1)
-     
+
      do iwb = 1, nwave
         ipar = 7 + (4*model_wldep(1)+model_wldep(2))*(nwave-1) &
              + 3*model_wldep(3)*(iwb-1)
@@ -91,9 +91,9 @@ program Modelplot
         if (epsilon /= 1D0) &
              stop '*** elliptical model component not supported'
      end do
-     
+
      select case (trim(model_spec(cmp,3)))
-        
+
      case ('taylor')
      case ('square-root')
      case ('gauss-hermite')
@@ -183,7 +183,7 @@ program Modelplot
 
            !loop over model components
            do cmp = 1, size(model_spec, 1)
-           
+
               !get parameters for this cpt
               radius = model_param(cmp, 2+4*model_wldep(1)*(iwb-1))
               theta = deg2rad*model_param(cmp, 3+4*model_wldep(1)*(iwb-1))
@@ -201,7 +201,7 @@ program Modelplot
               disp = sqrt((x-xx)**2 + (y-yy)**2)
 
               select case (trim(model_spec(cmp,3)))
-                 
+
               case ('gaussian')
                  ! - Gaussian
                  peak = scale*flux*4*log(2.)/(pi*axis**2)
@@ -260,14 +260,14 @@ program Modelplot
         endif
         call pggray(plotxy, npts_max, npts_max, 1, npts, 1, npts, fg, bg, tr)
      end if
-      
+
      if (docont) then
         do i = 1, nlevs
            levs(i) = plevs(i)/100.*plotxyhigh
         end do
         call pgsci(2)
         call pgcont(plotxy, npts_max, npts_max, 1, npts, 1, &
-             npts, levs, nlevs, tr) 
+             npts, levs, nlevs, tr)
         call pgsci(1)
      endif
 
@@ -304,7 +304,7 @@ program Modelplot
   call pgend
 
 contains
-      
+
   function inten_hest(alpha, diam, r)
 
     !Return intensity for Hestroffer (1997) A&A 327, 199
@@ -316,7 +316,7 @@ contains
     real, intent(in) :: alpha, diam, r
     real mu
     real inten_hest
-      
+
     if (r > diam/2.0) then
        inten_hest = 0.0
        return

@@ -16,7 +16,7 @@
 ! along with this program.  If not, see http://www.gnu.org/licenses/ .
 
 module Maths
-  
+
   implicit none
 
   public
@@ -78,9 +78,9 @@ contains
     end if
 
   end subroutine bessel
-  
+
   !============================================================================
-  
+
   subroutine inv_mat(A)
 
     !inverts matrix A in situ
@@ -176,7 +176,7 @@ contains
        c = ((((2D0*dble(i))-1D0-x)*b)-((dble(i)-1D0)*a))/(dble(i))
        a = b
        b = c
-       output(i) = c   
+       output(i) = c
     end do
 
   end subroutine laguerre
@@ -223,7 +223,7 @@ contains
 
     !function arguments
     double precision :: bess1, x
-    
+
     !local variables
     integer :: ncalc
     double precision, dimension(2) :: output
@@ -267,7 +267,7 @@ contains
 
     !local variables
     integer :: i
-    
+
     !fatal errors
     if (x < 0) stop 'maths error: fact: x < 0'
     if (x > 170) stop 'maths error: fact: x > 170'
@@ -282,10 +282,10 @@ contains
   !============================================================================
 
   function gamma(x)
-    
+
     !function arguments
     double precision :: gamma, DGAMMA, x
-    
+
     gamma = DGAMMA(x)
 
   end function gamma
@@ -299,15 +299,15 @@ contains
     !function arguments
     double precision :: machine_max
 
-    !local variables 
+    !local variables
     double precision :: PDA_D1MACH
 
     machine_max = PDA_D1MACH(2)
 
   end function machine_max
-  
+
   !============================================================================
-  
+
   function machine_min()
 
     !returns the machine min number (smallest magnitude)
@@ -315,7 +315,7 @@ contains
     !function arguments
     double precision :: machine_min
 
-    !local variables 
+    !local variables
     double precision :: PDA_D1MACH
 
     machine_min = PDA_D1MACH(1)

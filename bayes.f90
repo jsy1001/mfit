@@ -37,7 +37,7 @@ module Bayes
   !! Data arrays
   double precision, allocatable :: vis_data(:,:), triple_data(:,:)
   integer :: num_vis, num_triple
-  
+
   !! Wavebands included in data (for wavelength-dependent models).
   !! Not used in this module, but should go with data
   double precision, allocatable :: sel_wavebands(:,:)
@@ -73,7 +73,7 @@ contains
 
     !sum over the visibility data points
     do i = 1, num_vis
-       
+
        !extract points
        lambda = vis_data(i,1)
        delta_lambda = vis_data(i,2)
@@ -84,11 +84,11 @@ contains
        mjd = vis_data(i,7)
 
        if (data_vis_err>0D0) then
-          
+
           !compute model-predicted visibility amplitude squared
           vis = cmplx_vis(model_spec, param, lambda, delta_lambda, u, v, mjd)
           model_vis = (modulus(vis)**2D0)
-      
+
           !compute contribution to likelihood
           likelihood = likelihood + &
                (((data_vis-model_vis)**2D0)/(2D0*(data_vis_err**2D0)))
@@ -159,14 +159,14 @@ contains
     double precision :: value, value0, err
 
     prior = 0D0
-    
+
     !loop over the variable parameters
     do i = 1, size(x_pos,1)
 
        value0 = model_param(x_pos(i,1),x_pos(i,2)) !parameter original value
        err = model_prior(x_pos(i,1),x_pos(i,2)) !parameter prior width
        value = param(x_pos(i,1),x_pos(i,2)) !parameter value as it is varied
-       
+
        !calculate normalised contribution to the prior
        prior = prior + (((value-value0)**2D0)/(2D0*(err**2D0))) + log(err*sqrt(2D0*pi))
 
@@ -205,7 +205,7 @@ contains
 
     !sum over the visibility data points
     do i = 1, num_vis
-       
+
        !extract points
        lambda = vis_data(i,1)
        delta_lambda = vis_data(i,2)
